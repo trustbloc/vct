@@ -1,0 +1,109 @@
+#
+# Copyright SecureKey Technologies Inc. All Rights Reserved.
+#
+# SPDX-License-Identifier: Apache-2.0
+#
+
+run:
+  concurrency: 4
+  deadline: 3m
+  issues-exit-code: 1
+  tests: true
+  build-tags: [""]
+
+output:
+  format: colored-line-number
+  print-issued-lines: true
+  print-linter-name: true
+
+linters-settings:
+  errcheck:
+    check-type-assertions: true
+    check-blank: true
+    ignore: fmt:.*,io/ioutil:^Read.*
+  govet:
+    check-shadowing: true
+  golint:
+    min-confidence: 0.6
+  gofmt:
+    simplify: true
+  goimports:
+    local-prefixes: github.com/trustbloc/vct
+  gocyclo:
+    min-complexity: 15
+  cyclop:
+    max-complexity: 15
+  maligned:
+    suggest-new: true
+  dupl:
+    threshold: 500
+  goconst:
+    min-len: 3
+    min-occurrences: 3
+  misspell:
+    # default locale is a neutral variety of English.
+    locale:
+    ignore-words: []
+  lll:
+    line-length: 120
+    tab-width: 1
+  unused:
+    check-exported: false
+  unparam:
+    check-exported: false
+  nakedret:
+    max-func-lines: 0
+  gocritic:
+    enabled-tags:
+      - diagnostic
+      - performance
+      - style
+      - opinionated
+    disabled-checks:
+      - unnamedResult
+      - whyNoLint # TODO enable.
+  funlen:
+    lines: 60
+    statements: 40
+  wsl:
+    strict-append: true
+    allow-assign-and-call: true
+    allow-multiline-assign: true
+    allow-case-traling-whitespace: true
+    allow-cuddle-declarations: false
+  godot:
+    check-all: false
+
+linters:
+  enable-all: true
+  disable:
+    - testpackage
+    - maligned
+    - prealloc
+    - stylecheck
+    - interfacer # linter is deprecated (repository has been archived)
+    - scopelint  # linter is deprecated (repository has been archived)
+    - goerr113
+    - paralleltest
+    - exhaustivestruct
+
+issues:
+  exclude-use-default: false
+  exclude-rules:
+    - path: _test\.go
+      linters:
+        - dupl
+        - funlen
+        - gomnd
+    - path: example_[^\/]*_test\.go
+      linters:
+        - dupl
+        - funlen
+        - gomnd
+        - goconst
+        - lll
+
+  exclude:
+    -  Line contains TODO/BUG/FIXME
+    # Allow package logger variables (for now)
+    - logger is a global variable
