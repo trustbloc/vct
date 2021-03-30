@@ -6,4 +6,5 @@
 
 build/
 .idea/
+pkg/internal/gomocks
 coverage.out
