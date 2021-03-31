@@ -54,7 +54,7 @@ jobs:
 
   publish:
     name: Publish image
-    if: github.event_name == 'push' && (github.repository == 'github.com/trustbloc/vct' && github.ref == 'refs/heads/main')
+    if: github.event_name == 'push' && (github.repository == 'trustbloc/vct' && github.ref == 'refs/heads/main')
     needs: [checks, unitTest]
     runs-on: ubuntu-18.04
     timeout-minutes: 10
