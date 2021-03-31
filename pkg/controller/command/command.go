@@ -136,7 +136,7 @@ func (c *Cmd) GetHandlers() []Handler {
 }
 
 // GetIssuers returns issuers.
-func (c *Cmd) GetIssuers(w io.Writer, r io.Reader) error {
+func (c *Cmd) GetIssuers(w io.Writer, _ io.Reader) error {
 	return json.NewEncoder(w).Encode(c.uniqueIssuers) // nolint: wrapcheck
 }
 
