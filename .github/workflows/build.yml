@@ -80,5 +80,5 @@ jobs:
           if [[ $TAG == $VERSION ]]; then
               TAG=v0.0.0
           fi
-          docker tag ghcr.io/trustbloc/vct:latest ghcr.io/trustbloc-cicd:snapshot-$TAG-$VERSION
-          docker push ghcr.io/trustbloc-cicd:snapshot-$TAG-$VERSION
+          docker tag ghcr.io/trustbloc/vct:latest ghcr.io/trustbloc-cicd/vct:snapshot-$TAG-$VERSION
+          docker push ghcr.io/trustbloc-cicd/vct:snapshot-$TAG-$VERSION
