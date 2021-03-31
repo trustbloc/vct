@@ -32,7 +32,7 @@ jobs:
       - name: Upload coverage to Codecov
         timeout-minutes: 10
         if: matrix.os == 'ubuntu-18.04' && github.repository == 'trustbloc/vct'
-        uses: codecov/codecov-action@v1.0.13
+        uses: codecov/codecov-action@v1.3.1
         with:
           file: ./coverage.out
 
@@ -51,3 +51,34 @@ jobs:
       - name: Run checks
         timeout-minutes: 10
         run: make checks
+
+  publish:
+    name: Publish image
+    if: github.event_name == 'push' && (github.repository == 'github.com/trustbloc/vct' && github.ref == 'refs/heads/main')
+    needs: [checks, unitTest]
+    runs-on: ubuntu-18.04
+    timeout-minutes: 10
+    steps:
+      - name: Setup Go 1.16
+        uses: actions/setup-go@v2
+        with:
+          go-version: 1.16
+        id: go
+
+      - uses: actions/checkout@v2
+
+      - name: Publish docker images
+        run: |
+          function logout {
+            docker logout ghcr.io
+          }
+          trap logout EXIT
+          echo ${{ secrets.CR_PAT }} | docker login ghcr.io --username ${{ secrets.CR_USER }} --password-stdin
+          make build-vct-docker
+          TAG=$(git describe --tags --always `git rev-list --tags --max-count=1`)
+          VERSION=$(git rev-parse --short=7 HEAD)
+          if [[ $TAG == $VERSION ]]; then
+              TAG=v0.0.0
+          fi
+          docker tag ghcr.io/trustbloc/vct:latest ghcr.io/trustbloc-cicd:snapshot-$TAG-$VERSION
+          docker push ghcr.io/trustbloc-cicd:snapshot-$TAG-$VERSION

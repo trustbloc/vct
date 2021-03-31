@@ -8,8 +8,14 @@ MOCK_VERSION 	?=v1.5.0
 PROJECT_ROOT 	=github.com/trustbloc/vct
 GOMOCKS			=pkg/internal/gomocks
 
+DOCKER_OUTPUT_NS 	?=ghcr.io
+VCT_IMAGE_NAME 		?=trustbloc/vct
+
+ALPINE_VER ?= 3.12
+GO_VER ?= 1.16
+
 .PHONY: all
-all: clean checks unit-test
+all: clean checks unit-test build-vct-docker
 
 .PHONY: checks
 checks: license lint
@@ -27,18 +33,28 @@ lint: mocks
 unit-test: mocks
 	@go test $(shell go list ./... | grep -v /gomocks/) -count=1 -race -coverprofile=coverage.out -covermode=atomic -timeout=10m
 
+.PHONY: build-vct
+build-vct:
+	@echo "Building verifiable credentials transparency (vct)"
+	@go build -o build/bin/vct cmd/vct/main.go
+
+.PHONY: build-vct-docker
+build-vct-docker:
+	@echo "Building verifiable credentials transparency (vct) docker image"
+	@docker build -f ./images/vct/Dockerfile --no-cache -t $(DOCKER_OUTPUT_NS)/$(VCT_IMAGE_NAME):latest \
+	--build-arg GO_VER=$(GO_VER) \
+	--build-arg ALPINE_VER=$(ALPINE_VER)  .
+
 .PHONY: clean
 clean: clean-mocks
 	@rm -rf ./build
 	@rm -rf coverage.out
 
-.PHONY: mockgen
-mockgen:
-	@GOBIN=$(GOBIN_PATH) go install github.com/golang/mock/mockgen@$(MOCK_VERSION)
-
 .PHONY: mocks
-mocks: mockgen clean-mocks
+mocks: clean-mocks
+	@GOBIN=$(GOBIN_PATH) go install github.com/golang/mock/mockgen@$(MOCK_VERSION)
 	$(call create_mock,pkg/controller/command,KeyManager;TrillianLogClient;Crypto)
+	$(call create_mock,pkg/controller/rest,Cmd)
 
 .PHONY: clean-mocks
 clean-mocks:
