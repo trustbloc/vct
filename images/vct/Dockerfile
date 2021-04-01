@@ -8,19 +8,12 @@ ARG GO_VER
 ARG ALPINE_VER
 ARG BUILDPLATFORM
 
-FROM --platform=${BUILDPLATFORM:-linux/amd64} golang:${GO_VER}-alpine${ALPINE_VER} as golang
-RUN apk add --no-cache \
-	gcc \
-	musl-dev \
-	git \
-	libtool \
-	bash \
-	make;
-ADD . $GOPATH/src/github.com/trustbloc/vct
-WORKDIR $GOPATH/src/github.com/trustbloc/vct
-ENV EXECUTABLES go git
+FROM --platform=${BUILDPLATFORM:-linux/amd64} golang:${GO_VER}-alpine${ALPINE_VER} as builder
 
-FROM golang as vct
+RUN apk update && apk add git && apk add ca-certificates
+RUN adduser -D -g '' appuser
+COPY . $GOPATH/src/github.com/trustbloc/vct/
+WORKDIR $GOPATH/src/github.com/trustbloc/vct/
 
 ARG TARGETOS
 ARG TARGETARCH
@@ -29,12 +22,13 @@ ARG TARGETARCH
 RUN echo ${TARGETOS}
 RUN echo ${TARGETARCH}
 
-RUN GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build -o build/bin/vct cmd/vct/main.go
+RUN CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build -o /usr/bin/vct cmd/vct/main.go
 
-ARG ALPINE_VER
+FROM scratch
 
-FROM alpine:${ALPINE_VER} as base
-LABEL org.opencontainers.image.source https://github.com/trustbloc/vct
-RUN apk add -U --no-cache ca-certificates
-COPY --from=vct /go/src/github.com/trustbloc/vct/build/bin/vct /usr/local/bin
-ENTRYPOINT ["vct"]
+COPY --from=builder /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/
+COPY --from=builder /etc/passwd /etc/passwd
+COPY --from=builder /usr/bin/vct /usr/bin/vct
+USER appuser
+
+ENTRYPOINT ["/usr/bin/vct"]
