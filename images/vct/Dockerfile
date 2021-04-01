@@ -18,10 +18,6 @@ WORKDIR $GOPATH/src/github.com/trustbloc/vct/
 ARG TARGETOS
 ARG TARGETARCH
 
-# TODO: remove it after we know for sure that args were provided
-RUN echo ${TARGETOS}
-RUN echo ${TARGETARCH}
-
 RUN CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build -o /usr/bin/vct cmd/vct/main.go
 
 FROM scratch
