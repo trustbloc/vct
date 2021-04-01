@@ -91,8 +91,8 @@ jobs:
           file: ./images/vct/Dockerfile
           platforms: linux/amd64,linux/arm/v7,linux/arm64
           build-args: |
-            ALPINE_VER ?= 3.12
-            GO_VER ?= 1.16
+            ALPINE_VER=3.12
+            GO_VER=1.16
           push: true
           tags: |
             ${{ env.IMAGE_PREFIX }}:${{ env.IMAGE_TAG }}
