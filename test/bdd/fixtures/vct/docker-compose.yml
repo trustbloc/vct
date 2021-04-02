@@ -1,0 +1,94 @@
+#
+# Copyright SecureKey Technologies Inc. All Rights Reserved.
+#
+# SPDX-License-Identifier: Apache-2.0
+#
+
+version: '2'
+
+services:
+
+  vct.mysql:
+    container_name: vct.mysql
+    image: mysql:latest
+    restart: always
+    cap_add:
+      - SYS_NICE
+    environment:
+      - MYSQL_ALLOW_EMPTY_PASSWORD=true
+    volumes:
+      - ./mysql-config:/docker-entrypoint-initdb.d
+    networks:
+      - witness_ledger_net
+    ports:
+      - 3306:3306
+
+  # Tags can be found here
+  # https://console.cloud.google.com/gcr/images/trillian-opensource-ci
+  vct.trillian.log.server:
+    container_name: vct.trillian.log.server
+    image: gcr.io/trillian-opensource-ci/log_server:latest 
+    restart: always
+    command:
+      - --mysql_uri=root@tcp(vct.mysql:3306)/test
+      - --rpc_endpoint=0.0.0.0:8090
+      - --alsologtostderr
+    depends_on:
+      - vct.mysql
+    networks:
+      - witness_ledger_net
+    ports:
+      - 8090:8090
+
+  # Tags can be found here
+  # https://console.cloud.google.com/gcr/images/trillian-opensource-ci
+  vct.trillian.log.signer:
+    container_name: vct.trillian.log.signer
+    image: gcr.io/trillian-opensource-ci/log_signer:latest
+    restart: always
+    command:
+      - --mysql_uri=root@tcp(vct.mysql:3306)/test
+      - --http_endpoint=0.0.0.0:8091
+      - --force_master=true
+      - --alsologtostderr
+    depends_on:
+      - vct.mysql
+    networks:
+      - witness_ledger_net
+    ports:
+      - 8091:8091
+
+  vct.kms:
+    container_name: vct.kms
+    image: ghcr.io/trustbloc-cicd/kms:0.1.7-snapshot-913aeec
+    environment:
+      - KMS_BASE_URL=http://vct.kms:7878
+      - KMS_HOST_URL=0.0.0.0:7878
+      - KMS_DATABASE_TYPE=mem
+      - KMS_PRIMARY_KEY_DATABASE_TYPE=mem
+      - KMS_LOCAL_KMS_DATABASE_TYPE=mem
+      - KMS_KEY_MANAGER_STORAGE_TYPE=mem
+      - KMS_LOG_LEVEL=debug
+    ports:
+      - 7878:7878
+    entrypoint: ""
+    command: /bin/sh -c "kms-rest start"
+    networks:
+      - witness_ledger_net
+
+  vct:
+    container_name: vct
+    image: ghcr.io/trustbloc/vct:latest
+    environment:
+      - VCT_API_HOST=0.0.0.0:56565
+      - VCT_LOG_ID=${VCT_LOG_ID}
+      - VCT_LOG_ENDPOINT=vct.trillian.log.server:8090
+    ports:
+      - 56565:56565
+    command: start
+    networks:
+      - witness_ledger_net
+
+networks:
+  witness_ledger_net:
+    driver: bridge
