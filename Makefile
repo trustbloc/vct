@@ -15,7 +15,7 @@ ALPINE_VER ?= 3.12
 GO_VER ?= 1.16
 
 .PHONY: all
-all: clean checks unit-test build-vct-docker
+all: clean checks unit-test bdd-test
 
 .PHONY: checks
 checks: license lint
@@ -31,7 +31,11 @@ lint: mocks
 
 .PHONY: unit-test
 unit-test: mocks
-	@go test $(shell go list ./... | grep -v /gomocks/) -count=1 -race -coverprofile=coverage.out -covermode=atomic -timeout=10m
+	@go test $(shell go list ./... | grep -v /gomocks/ | grep -v /test/bdd) -count=1 -race -coverprofile=coverage.out -covermode=atomic -timeout=10m
+
+.PHONY: bdd-test
+bdd-test: build-vct-docker
+	@go test github.com/trustbloc/vct/test/bdd -count=1 -v -cover . -p 1 -timeout=20m -race
 
 .PHONY: build-vct
 build-vct:
@@ -48,6 +52,7 @@ build-vct-docker:
 .PHONY: clean
 clean: clean-mocks
 	@rm -rf ./build
+	@rm -rf ./test/bdd/build
 	@rm -rf coverage.out
 
 .PHONY: mocks
