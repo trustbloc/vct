@@ -1070,6 +1070,14 @@ func TestCmd_AddVC(t *testing.T) {
 
 		require.NotEmpty(t, frs.Signature)
 		require.NotEmpty(t, hrs.Signature)
+
+		var sig *DigitallySigned
+		require.NoError(t, json.Unmarshal(hrs.Signature, &sig))
+
+		require.NotEmpty(t, sig.Signature)
+		require.NotEmpty(t, sig.Algorithm.Hash)
+		require.NotEmpty(t, sig.Algorithm.Type)
+		require.NotEmpty(t, sig.Algorithm.Signature)
 	})
 
 	t.Run("Copy vc failed", func(t *testing.T) {

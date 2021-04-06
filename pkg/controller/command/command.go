@@ -200,7 +200,7 @@ func (c *Cmd) AddVC(w io.Writer, r io.Reader) error { // nolint: funlen
 		return fmt.Errorf("sign V1 VCTS: %w", err)
 	}
 
-	signature, err := json.Marshal(sct.Signature)
+	signature, err := json.Marshal(sct)
 	if err != nil {
 		return fmt.Errorf("marshal DigitallySigned payload: %w", err)
 	}
