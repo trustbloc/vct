@@ -69,6 +69,7 @@ mocks: clean-mocks
 	@GOBIN=$(GOBIN_PATH) go install github.com/golang/mock/mockgen@$(MOCK_VERSION)
 	$(call create_mock,pkg/controller/command,KeyManager;TrillianLogClient;Crypto)
 	$(call create_mock,pkg/controller/rest,Cmd)
+	$(call create_mock,pkg/client/vct,HTTPClient)
 
 .PHONY: clean-mocks
 clean-mocks:

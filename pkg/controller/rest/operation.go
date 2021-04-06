@@ -225,14 +225,15 @@ func execute(exec command.Exec, rw http.ResponseWriter, req io.Reader) {
 	}
 }
 
-type errorResponse struct {
+// ErrorResponse represents REST error message.
+type ErrorResponse struct {
 	Message string `json:"message"`
 }
 
 func sendError(rw http.ResponseWriter, e error) {
 	rw.WriteHeader(errors.StatusCodeFromError(e))
 
-	if err := json.NewEncoder(rw).Encode(errorResponse{Message: e.Error()}); err != nil {
+	if err := json.NewEncoder(rw).Encode(ErrorResponse{Message: e.Error()}); err != nil {
 		logger.Errorf("send error response: %v", e)
 	}
 }
