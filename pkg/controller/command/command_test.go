@@ -6,6 +6,9 @@ SPDX-License-Identifier: Apache-2.0
 
 package command_test
 
+// nolint: lll
+//go:generate mockgen -destination gomocks_test.go -self_package mocks -package command_test . KeyManager,TrillianLogClient,Crypto
+
 import (
 	"bytes"
 	_ "embed"
@@ -29,7 +32,6 @@ import (
 
 	. "github.com/trustbloc/vct/pkg/controller/command"
 	"github.com/trustbloc/vct/pkg/controller/errors"
-	mocks "github.com/trustbloc/vct/pkg/internal/gomocks/controller/command"
 )
 
 // nolint: gochecknoglobals
@@ -53,7 +55,7 @@ func TestNew(t *testing.T) {
 		ctrl := gomock.NewController(t)
 		defer ctrl.Finish()
 
-		km := mocks.NewMockKeyManager(ctrl)
+		km := NewMockKeyManager(ctrl)
 		km.EXPECT().Get(kid).Return(nil, nil)
 		km.EXPECT().ExportPubKeyBytes(kid).Return([]byte(`public key`), nil)
 
@@ -75,7 +77,7 @@ func TestNew(t *testing.T) {
 		ctrl := gomock.NewController(t)
 		defer ctrl.Finish()
 
-		km := mocks.NewMockKeyManager(ctrl)
+		km := NewMockKeyManager(ctrl)
 		km.EXPECT().Get(kid).Return(nil, errors.New("no key"))
 
 		cmd, err := New(&Config{KMS: km, Key: Key{
@@ -90,7 +92,7 @@ func TestNew(t *testing.T) {
 		ctrl := gomock.NewController(t)
 		defer ctrl.Finish()
 
-		km := mocks.NewMockKeyManager(ctrl)
+		km := NewMockKeyManager(ctrl)
 		km.EXPECT().Get(kid).Return(nil, nil)
 		km.EXPECT().ExportPubKeyBytes(kid).Return(nil, errors.New("internal error"))
 
@@ -109,7 +111,7 @@ func TestCmd_GetIssuers(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	km := mocks.NewMockKeyManager(ctrl)
+	km := NewMockKeyManager(ctrl)
 	km.EXPECT().Get(kid).Return(nil, nil)
 	km.EXPECT().ExportPubKeyBytes(kid).Return([]byte(`public key`), nil)
 
@@ -143,11 +145,11 @@ func TestCmd_GetEntries(t *testing.T) {
 		ctrl := gomock.NewController(t)
 		defer ctrl.Finish()
 
-		km := mocks.NewMockKeyManager(ctrl)
+		km := NewMockKeyManager(ctrl)
 		km.EXPECT().Get(kid).Return(nil, nil)
 		km.EXPECT().ExportPubKeyBytes(kid).Return([]byte(`public key`), nil)
 
-		client := mocks.NewMockTrillianLogClient(ctrl)
+		client := NewMockTrillianLogClient(ctrl)
 		client.EXPECT().GetLeavesByRange(gomock.Any(), gomock.Any()).Return(
 			&trillian.GetLeavesByRangeResponse{
 				Leaves:        []*trillian.LogLeaf{{LeafValue: queuedLeafValue}},
@@ -186,7 +188,7 @@ func TestCmd_GetEntries(t *testing.T) {
 		ctrl := gomock.NewController(t)
 		defer ctrl.Finish()
 
-		km := mocks.NewMockKeyManager(ctrl)
+		km := NewMockKeyManager(ctrl)
 		km.EXPECT().Get(kid).Return(nil, nil)
 		km.EXPECT().ExportPubKeyBytes(kid).Return([]byte(`public key`), nil)
 
@@ -211,7 +213,7 @@ func TestCmd_GetEntries(t *testing.T) {
 		ctrl := gomock.NewController(t)
 		defer ctrl.Finish()
 
-		km := mocks.NewMockKeyManager(ctrl)
+		km := NewMockKeyManager(ctrl)
 		km.EXPECT().Get(kid).Return(nil, nil)
 		km.EXPECT().ExportPubKeyBytes(kid).Return([]byte(`public key`), nil)
 
@@ -240,11 +242,11 @@ func TestCmd_GetEntries(t *testing.T) {
 		ctrl := gomock.NewController(t)
 		defer ctrl.Finish()
 
-		km := mocks.NewMockKeyManager(ctrl)
+		km := NewMockKeyManager(ctrl)
 		km.EXPECT().Get(kid).Return(nil, nil)
 		km.EXPECT().ExportPubKeyBytes(kid).Return([]byte(`public key`), nil)
 
-		client := mocks.NewMockTrillianLogClient(ctrl)
+		client := NewMockTrillianLogClient(ctrl)
 		client.EXPECT().GetLeavesByRange(gomock.Any(), gomock.Any()).Return(nil, errors.New("error")).Times(2)
 
 		cmd, err := New(&Config{
@@ -269,11 +271,11 @@ func TestCmd_GetEntries(t *testing.T) {
 		ctrl := gomock.NewController(t)
 		defer ctrl.Finish()
 
-		km := mocks.NewMockKeyManager(ctrl)
+		km := NewMockKeyManager(ctrl)
 		km.EXPECT().Get(kid).Return(nil, nil)
 		km.EXPECT().ExportPubKeyBytes(kid).Return([]byte(`public key`), nil)
 
-		client := mocks.NewMockTrillianLogClient(ctrl)
+		client := NewMockTrillianLogClient(ctrl)
 		client.EXPECT().GetLeavesByRange(gomock.Any(), gomock.Any()).Return(
 			&trillian.GetLeavesByRangeResponse{
 				SignedLogRoot: &trillian.SignedLogRoot{LogRoot: []byte{0}},
@@ -302,11 +304,11 @@ func TestCmd_GetEntries(t *testing.T) {
 		ctrl := gomock.NewController(t)
 		defer ctrl.Finish()
 
-		km := mocks.NewMockKeyManager(ctrl)
+		km := NewMockKeyManager(ctrl)
 		km.EXPECT().Get(kid).Return(nil, nil)
 		km.EXPECT().ExportPubKeyBytes(kid).Return([]byte(`public key`), nil)
 
-		client := mocks.NewMockTrillianLogClient(ctrl)
+		client := NewMockTrillianLogClient(ctrl)
 		client.EXPECT().GetLeavesByRange(gomock.Any(), gomock.Any()).Return(
 			&trillian.GetLeavesByRangeResponse{
 				SignedLogRoot: &trillian.SignedLogRoot{
@@ -341,11 +343,11 @@ func TestCmd_GetEntries(t *testing.T) {
 		ctrl := gomock.NewController(t)
 		defer ctrl.Finish()
 
-		km := mocks.NewMockKeyManager(ctrl)
+		km := NewMockKeyManager(ctrl)
 		km.EXPECT().Get(kid).Return(nil, nil)
 		km.EXPECT().ExportPubKeyBytes(kid).Return([]byte(`public key`), nil)
 
-		client := mocks.NewMockTrillianLogClient(ctrl)
+		client := NewMockTrillianLogClient(ctrl)
 		client.EXPECT().GetLeavesByRange(gomock.Any(), gomock.Any()).Return(
 			&trillian.GetLeavesByRangeResponse{
 				Leaves:        []*trillian.LogLeaf{{LeafIndex: 10}},
@@ -383,11 +385,11 @@ func TestCmd_GetProofByHash(t *testing.T) {
 		ctrl := gomock.NewController(t)
 		defer ctrl.Finish()
 
-		km := mocks.NewMockKeyManager(ctrl)
+		km := NewMockKeyManager(ctrl)
 		km.EXPECT().Get(kid).Return(nil, nil)
 		km.EXPECT().ExportPubKeyBytes(kid).Return([]byte(`public key`), nil)
 
-		client := mocks.NewMockTrillianLogClient(ctrl)
+		client := NewMockTrillianLogClient(ctrl)
 		client.EXPECT().GetInclusionProofByHash(gomock.Any(), gomock.Any()).Return(
 			&trillian.GetInclusionProofByHashResponse{
 				Proof:         []*trillian.Proof{{Hashes: [][]byte{{0, 1, 2}}}},
@@ -427,7 +429,7 @@ func TestCmd_GetProofByHash(t *testing.T) {
 		ctrl := gomock.NewController(t)
 		defer ctrl.Finish()
 
-		km := mocks.NewMockKeyManager(ctrl)
+		km := NewMockKeyManager(ctrl)
 		km.EXPECT().Get(kid).Return(nil, nil)
 		km.EXPECT().ExportPubKeyBytes(kid).Return([]byte(`public key`), nil)
 
@@ -452,7 +454,7 @@ func TestCmd_GetProofByHash(t *testing.T) {
 		ctrl := gomock.NewController(t)
 		defer ctrl.Finish()
 
-		km := mocks.NewMockKeyManager(ctrl)
+		km := NewMockKeyManager(ctrl)
 		km.EXPECT().Get(kid).Return(nil, nil)
 		km.EXPECT().ExportPubKeyBytes(kid).Return([]byte(`public key`), nil)
 
@@ -481,11 +483,11 @@ func TestCmd_GetProofByHash(t *testing.T) {
 		ctrl := gomock.NewController(t)
 		defer ctrl.Finish()
 
-		km := mocks.NewMockKeyManager(ctrl)
+		km := NewMockKeyManager(ctrl)
 		km.EXPECT().Get(kid).Return(nil, nil)
 		km.EXPECT().ExportPubKeyBytes(kid).Return([]byte(`public key`), nil)
 
-		client := mocks.NewMockTrillianLogClient(ctrl)
+		client := NewMockTrillianLogClient(ctrl)
 		client.EXPECT().GetInclusionProofByHash(gomock.Any(), gomock.Any()).Return(
 			&trillian.GetInclusionProofByHashResponse{
 				Proof:         []*trillian.Proof{{Hashes: [][]byte{{0}}}},
@@ -527,11 +529,11 @@ func TestCmd_GetSTHConsistency(t *testing.T) {
 		ctrl := gomock.NewController(t)
 		defer ctrl.Finish()
 
-		km := mocks.NewMockKeyManager(ctrl)
+		km := NewMockKeyManager(ctrl)
 		km.EXPECT().Get(kid).Return(nil, nil)
 		km.EXPECT().ExportPubKeyBytes(kid).Return([]byte(`public key`), nil)
 
-		client := mocks.NewMockTrillianLogClient(ctrl)
+		client := NewMockTrillianLogClient(ctrl)
 		client.EXPECT().GetConsistencyProof(gomock.Any(), gomock.Any()).Return(
 			&trillian.GetConsistencyProofResponse{
 				Proof:         &trillian.Proof{Hashes: [][]byte{{0, 1, 2}}},
@@ -573,7 +575,7 @@ func TestCmd_GetSTHConsistency(t *testing.T) {
 		ctrl := gomock.NewController(t)
 		defer ctrl.Finish()
 
-		km := mocks.NewMockKeyManager(ctrl)
+		km := NewMockKeyManager(ctrl)
 		km.EXPECT().Get(kid).Return(nil, nil)
 		km.EXPECT().ExportPubKeyBytes(kid).Return([]byte(`public key`), nil)
 
@@ -610,7 +612,7 @@ func TestCmd_GetSTHConsistency(t *testing.T) {
 		ctrl := gomock.NewController(t)
 		defer ctrl.Finish()
 
-		km := mocks.NewMockKeyManager(ctrl)
+		km := NewMockKeyManager(ctrl)
 		km.EXPECT().Get(kid).Return(nil, nil)
 		km.EXPECT().ExportPubKeyBytes(kid).Return([]byte(`public key`), nil)
 
@@ -635,7 +637,7 @@ func TestCmd_GetSTHConsistency(t *testing.T) {
 		ctrl := gomock.NewController(t)
 		defer ctrl.Finish()
 
-		km := mocks.NewMockKeyManager(ctrl)
+		km := NewMockKeyManager(ctrl)
 		km.EXPECT().Get(kid).Return(nil, nil)
 		km.EXPECT().ExportPubKeyBytes(kid).Return([]byte(`public key`), nil)
 
@@ -664,11 +666,11 @@ func TestCmd_GetSTHConsistency(t *testing.T) {
 		ctrl := gomock.NewController(t)
 		defer ctrl.Finish()
 
-		km := mocks.NewMockKeyManager(ctrl)
+		km := NewMockKeyManager(ctrl)
 		km.EXPECT().Get(kid).Return(nil, nil)
 		km.EXPECT().ExportPubKeyBytes(kid).Return([]byte(`public key`), nil)
 
-		client := mocks.NewMockTrillianLogClient(ctrl)
+		client := NewMockTrillianLogClient(ctrl)
 		client.EXPECT().GetConsistencyProof(gomock.Any(), gomock.Any()).Return(
 			&trillian.GetConsistencyProofResponse{
 				Proof:         &trillian.Proof{Hashes: [][]byte{{0, 1, 2}}},
@@ -714,7 +716,7 @@ func TestCmd_GetSTH(t *testing.T) {
 		newKID, _, err := km.Create(keyType)
 		require.NoError(t, err)
 
-		client := mocks.NewMockTrillianLogClient(ctrl)
+		client := NewMockTrillianLogClient(ctrl)
 		client.EXPECT().GetLatestSignedLogRoot(gomock.Any(), gomock.Any()).Return(
 			&trillian.GetLatestSignedLogRootResponse{
 				SignedLogRoot: &trillian.SignedLogRoot{LogRoot: logRoot},
@@ -756,11 +758,11 @@ func TestCmd_GetSTH(t *testing.T) {
 		ctrl := gomock.NewController(t)
 		defer ctrl.Finish()
 
-		km := mocks.NewMockKeyManager(ctrl)
+		km := NewMockKeyManager(ctrl)
 		km.EXPECT().Get(kid).Return(nil, nil)
 		km.EXPECT().ExportPubKeyBytes(kid).Return([]byte(`public key`), nil)
 
-		client := mocks.NewMockTrillianLogClient(ctrl)
+		client := NewMockTrillianLogClient(ctrl)
 		client.EXPECT().GetLatestSignedLogRoot(
 			gomock.Any(), gomock.Any(),
 		).Return(nil, errors.New("error")).Times(2)
@@ -786,11 +788,11 @@ func TestCmd_GetSTH(t *testing.T) {
 		ctrl := gomock.NewController(t)
 		defer ctrl.Finish()
 
-		km := mocks.NewMockKeyManager(ctrl)
+		km := NewMockKeyManager(ctrl)
 		km.EXPECT().Get(kid).Return(nil, nil)
 		km.EXPECT().ExportPubKeyBytes(kid).Return([]byte(`public key`), nil)
 
-		client := mocks.NewMockTrillianLogClient(ctrl)
+		client := NewMockTrillianLogClient(ctrl)
 		client.EXPECT().GetLatestSignedLogRoot(
 			gomock.Any(), gomock.Any(),
 		).Return(nil, nil).Times(2)
@@ -816,11 +818,11 @@ func TestCmd_GetSTH(t *testing.T) {
 		ctrl := gomock.NewController(t)
 		defer ctrl.Finish()
 
-		km := mocks.NewMockKeyManager(ctrl)
+		km := NewMockKeyManager(ctrl)
 		km.EXPECT().Get(kid).Return(nil, nil)
 		km.EXPECT().ExportPubKeyBytes(kid).Return([]byte(`public key`), nil)
 
-		client := mocks.NewMockTrillianLogClient(ctrl)
+		client := NewMockTrillianLogClient(ctrl)
 		client.EXPECT().GetLatestSignedLogRoot(gomock.Any(), gomock.Any()).Return(
 			&trillian.GetLatestSignedLogRootResponse{
 				SignedLogRoot: &trillian.SignedLogRoot{LogRoot: []byte{0}},
@@ -848,14 +850,14 @@ func TestCmd_GetSTH(t *testing.T) {
 		ctrl := gomock.NewController(t)
 		defer ctrl.Finish()
 
-		km := mocks.NewMockKeyManager(ctrl)
+		km := NewMockKeyManager(ctrl)
 		km.EXPECT().Get(kid).Return(nil, nil)
 		km.EXPECT().ExportPubKeyBytes(kid).Return([]byte(`public key`), nil)
 
-		cr := mocks.NewMockCrypto(ctrl)
+		cr := NewMockCrypto(ctrl)
 		cr.EXPECT().Sign(gomock.Any(), gomock.Any()).Return([]byte{}, errors.New("error")).Times(2)
 
-		client := mocks.NewMockTrillianLogClient(ctrl)
+		client := NewMockTrillianLogClient(ctrl)
 		client.EXPECT().GetLatestSignedLogRoot(gomock.Any(), gomock.Any()).Return(
 			&trillian.GetLatestSignedLogRootResponse{
 				SignedLogRoot: &trillian.SignedLogRoot{LogRoot: logRoot},
@@ -895,7 +897,7 @@ func TestCmd_GetEntryAndProof(t *testing.T) {
 		newKID, _, err := km.Create(keyType)
 		require.NoError(t, err)
 
-		client := mocks.NewMockTrillianLogClient(ctrl)
+		client := NewMockTrillianLogClient(ctrl)
 		client.EXPECT().GetEntryAndProof(gomock.Any(), gomock.Any()).Return(
 			&trillian.GetEntryAndProofResponse{
 				Proof: &trillian.Proof{},
@@ -942,7 +944,7 @@ func TestCmd_GetEntryAndProof(t *testing.T) {
 		newKID, _, err := km.Create(keyType)
 		require.NoError(t, err)
 
-		client := mocks.NewMockTrillianLogClient(ctrl)
+		client := NewMockTrillianLogClient(ctrl)
 		client.EXPECT().GetEntryAndProof(gomock.Any(), gomock.Any()).Return(
 			&trillian.GetEntryAndProofResponse{
 				Proof: &trillian.Proof{},
@@ -984,7 +986,7 @@ func TestCmd_GetEntryAndProof(t *testing.T) {
 		newKID, _, err := km.Create(keyType)
 		require.NoError(t, err)
 
-		client := mocks.NewMockTrillianLogClient(ctrl)
+		client := NewMockTrillianLogClient(ctrl)
 		client.EXPECT().GetEntryAndProof(gomock.Any(), gomock.Any()).Return(
 			&trillian.GetEntryAndProofResponse{
 				SignedLogRoot: &trillian.SignedLogRoot{LogRoot: logRoot},
@@ -1030,7 +1032,7 @@ func TestCmd_AddVC(t *testing.T) {
 		newKID, _, err := km.Create(keyType)
 		require.NoError(t, err)
 
-		client := mocks.NewMockTrillianLogClient(ctrl)
+		client := NewMockTrillianLogClient(ctrl)
 		client.EXPECT().QueueLeaf(gomock.Any(), gomock.Any()).Return(
 			&trillian.QueueLeafResponse{
 				QueuedLeaf: &trillian.QueuedLogLeaf{
@@ -1084,7 +1086,7 @@ func TestCmd_AddVC(t *testing.T) {
 		ctrl := gomock.NewController(t)
 		defer ctrl.Finish()
 
-		km := mocks.NewMockKeyManager(ctrl)
+		km := NewMockKeyManager(ctrl)
 		km.EXPECT().Get(kid).Return(nil, nil)
 		km.EXPECT().ExportPubKeyBytes(kid).Return([]byte(`public key`), nil)
 
@@ -1108,7 +1110,7 @@ func TestCmd_AddVC(t *testing.T) {
 		ctrl := gomock.NewController(t)
 		defer ctrl.Finish()
 
-		km := mocks.NewMockKeyManager(ctrl)
+		km := NewMockKeyManager(ctrl)
 		km.EXPECT().Get(kid).Return(nil, nil)
 		km.EXPECT().ExportPubKeyBytes(kid).Return([]byte(`public key`), nil)
 
@@ -1132,7 +1134,7 @@ func TestCmd_AddVC(t *testing.T) {
 		ctrl := gomock.NewController(t)
 		defer ctrl.Finish()
 
-		km := mocks.NewMockKeyManager(ctrl)
+		km := NewMockKeyManager(ctrl)
 		km.EXPECT().Get(kid).Return(nil, nil)
 		km.EXPECT().ExportPubKeyBytes(kid).Return([]byte(`public key`), nil)
 
@@ -1158,11 +1160,11 @@ func TestCmd_AddVC(t *testing.T) {
 		ctrl := gomock.NewController(t)
 		defer ctrl.Finish()
 
-		km := mocks.NewMockKeyManager(ctrl)
+		km := NewMockKeyManager(ctrl)
 		km.EXPECT().Get(kid).Return(nil, nil)
 		km.EXPECT().ExportPubKeyBytes(kid).Return([]byte(`public key`), nil)
 
-		client := mocks.NewMockTrillianLogClient(ctrl)
+		client := NewMockTrillianLogClient(ctrl)
 		client.EXPECT().QueueLeaf(gomock.Any(), gomock.Any()).Return(nil, errors.New("error")).Times(2)
 
 		cmd, err := New(&Config{
@@ -1187,11 +1189,11 @@ func TestCmd_AddVC(t *testing.T) {
 		ctrl := gomock.NewController(t)
 		defer ctrl.Finish()
 
-		km := mocks.NewMockKeyManager(ctrl)
+		km := NewMockKeyManager(ctrl)
 		km.EXPECT().Get(kid).Return(nil, nil)
 		km.EXPECT().ExportPubKeyBytes(kid).Return([]byte(`public key`), nil)
 
-		client := mocks.NewMockTrillianLogClient(ctrl)
+		client := NewMockTrillianLogClient(ctrl)
 		client.EXPECT().QueueLeaf(gomock.Any(), gomock.Any()).Return(&trillian.QueueLeafResponse{}, nil).Times(2)
 
 		cmd, err := New(&Config{
@@ -1216,11 +1218,11 @@ func TestCmd_AddVC(t *testing.T) {
 		ctrl := gomock.NewController(t)
 		defer ctrl.Finish()
 
-		km := mocks.NewMockKeyManager(ctrl)
+		km := NewMockKeyManager(ctrl)
 		km.EXPECT().Get(kid).Return(nil, nil)
 		km.EXPECT().ExportPubKeyBytes(kid).Return([]byte(`public key`), nil)
 
-		client := mocks.NewMockTrillianLogClient(ctrl)
+		client := NewMockTrillianLogClient(ctrl)
 		client.EXPECT().QueueLeaf(gomock.Any(), gomock.Any()).Return(&trillian.QueueLeafResponse{
 			QueuedLeaf: &trillian.QueuedLogLeaf{
 				Leaf: &trillian.LogLeaf{
@@ -1251,14 +1253,14 @@ func TestCmd_AddVC(t *testing.T) {
 		ctrl := gomock.NewController(t)
 		defer ctrl.Finish()
 
-		km := mocks.NewMockKeyManager(ctrl)
+		km := NewMockKeyManager(ctrl)
 		km.EXPECT().Get(kid).Return(nil, nil)
 		km.EXPECT().ExportPubKeyBytes(kid).Return([]byte(`public key`), nil)
 
-		cr := mocks.NewMockCrypto(ctrl)
+		cr := NewMockCrypto(ctrl)
 		cr.EXPECT().Sign(gomock.Any(), gomock.Any()).Return([]byte{}, errors.New("error")).Times(2)
 
-		client := mocks.NewMockTrillianLogClient(ctrl)
+		client := NewMockTrillianLogClient(ctrl)
 		client.EXPECT().QueueLeaf(gomock.Any(), gomock.Any()).Return(&trillian.QueueLeafResponse{
 			QueuedLeaf: &trillian.QueuedLogLeaf{
 				Leaf: &trillian.LogLeaf{

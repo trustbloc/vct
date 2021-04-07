@@ -4,6 +4,8 @@ Copyright SecureKey Technologies Inc. All Rights Reserved.
 SPDX-License-Identifier: Apache-2.0
 */
 
+//go:generate mockgen -destination gomocks_test.go -self_package mocks -package rest_test . Cmd
+
 package rest_test
 
 import (
@@ -23,7 +25,6 @@ import (
 	"github.com/trustbloc/vct/pkg/controller/command"
 	"github.com/trustbloc/vct/pkg/controller/errors"
 	. "github.com/trustbloc/vct/pkg/controller/rest"
-	mocks "github.com/trustbloc/vct/pkg/internal/gomocks/controller/rest"
 )
 
 func TestOperation_AddVC(t *testing.T) {
@@ -33,7 +34,7 @@ func TestOperation_AddVC(t *testing.T) {
 
 		const dummyVC = `{credentials}`
 
-		cmd := mocks.NewMockCmd(ctrl)
+		cmd := NewMockCmd(ctrl)
 		cmd.EXPECT().AddVC(gomock.Any(), gomock.Any()).Do(func(_ io.Writer, r io.Reader) {
 			payload, err := io.ReadAll(r)
 			require.NoError(t, err)
@@ -57,7 +58,7 @@ func TestOperation_AddVC(t *testing.T) {
 
 		const dummyVC = `{credentials}`
 
-		cmd := mocks.NewMockCmd(ctrl)
+		cmd := NewMockCmd(ctrl)
 		cmd.EXPECT().AddVC(gomock.Any(), gomock.Any()).Return(errors.ErrBadRequest)
 
 		operation := New(cmd)
@@ -76,7 +77,7 @@ func TestOperation_GetSTH(t *testing.T) {
 		ctrl := gomock.NewController(t)
 		defer ctrl.Finish()
 
-		cmd := mocks.NewMockCmd(ctrl)
+		cmd := NewMockCmd(ctrl)
 		cmd.EXPECT().GetSTH(gomock.Any(), gomock.Any()).Do(func(_ io.Writer, r io.Reader) {
 			require.Nil(t, r)
 		}).Return(nil)
@@ -94,7 +95,7 @@ func TestOperation_GetIssuers(t *testing.T) {
 		ctrl := gomock.NewController(t)
 		defer ctrl.Finish()
 
-		cmd := mocks.NewMockCmd(ctrl)
+		cmd := NewMockCmd(ctrl)
 		cmd.EXPECT().GetIssuers(gomock.Any(), gomock.Any()).Do(func(_ io.Writer, r io.Reader) {
 			require.Nil(t, r)
 		}).Return(nil)
@@ -112,7 +113,7 @@ func TestOperation_GetSTHConsistency(t *testing.T) {
 		ctrl := gomock.NewController(t)
 		defer ctrl.Finish()
 
-		cmd := mocks.NewMockCmd(ctrl)
+		cmd := NewMockCmd(ctrl)
 		cmd.EXPECT().GetSTHConsistency(gomock.Any(), gomock.Any()).Do(func(_ io.Writer, r io.Reader) {
 			var req *command.GetSTHConsistencyRequest
 			require.NoError(t, json.NewDecoder(r).Decode(&req))
@@ -166,7 +167,7 @@ func TestOperation_GetEntries(t *testing.T) {
 		ctrl := gomock.NewController(t)
 		defer ctrl.Finish()
 
-		cmd := mocks.NewMockCmd(ctrl)
+		cmd := NewMockCmd(ctrl)
 		cmd.EXPECT().GetEntries(gomock.Any(), gomock.Any()).Do(func(_ io.Writer, r io.Reader) {
 			var req *command.GetEntriesRequest
 			require.NoError(t, json.NewDecoder(r).Decode(&req))
@@ -220,7 +221,7 @@ func TestOperation_GetProofByHash(t *testing.T) {
 		ctrl := gomock.NewController(t)
 		defer ctrl.Finish()
 
-		cmd := mocks.NewMockCmd(ctrl)
+		cmd := NewMockCmd(ctrl)
 		cmd.EXPECT().GetProofByHash(gomock.Any(), gomock.Any()).Do(func(_ io.Writer, r io.Reader) {
 			var req *command.GetProofByHashRequest
 			require.NoError(t, json.NewDecoder(r).Decode(&req))
@@ -259,7 +260,7 @@ func TestOperation_GetEntryAndProof(t *testing.T) {
 		ctrl := gomock.NewController(t)
 		defer ctrl.Finish()
 
-		cmd := mocks.NewMockCmd(ctrl)
+		cmd := NewMockCmd(ctrl)
 		cmd.EXPECT().GetEntryAndProof(gomock.Any(), gomock.Any()).Do(func(_ io.Writer, r io.Reader) {
 			var req *command.GetEntryAndProofRequest
 			require.NoError(t, json.NewDecoder(r).Decode(&req))

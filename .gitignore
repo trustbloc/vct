@@ -6,5 +6,5 @@
 
 build/
 .idea/
-pkg/internal/gomocks
+gomocks_test.go
 coverage.out
