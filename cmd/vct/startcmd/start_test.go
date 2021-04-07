@@ -4,13 +4,27 @@ Copyright SecureKey Technologies Inc. All Rights Reserved.
 SPDX-License-Identifier: Apache-2.0
 */
 
-package startcmd
+package startcmd_test
 
 import (
 	"net/http"
 	"testing"
 
 	"github.com/stretchr/testify/require"
+
+	. "github.com/trustbloc/vct/cmd/vct/startcmd"
+)
+
+const (
+	agentHostFlagName         = "api-host"
+	logIDFlagName             = "log-id"
+	logEndpointFlagName       = "log-endpoint"
+	kmsStoreEndpointFlagName  = "kms-store-endpoint"
+	keyTypeFlagName           = "key-type"
+	tlsSystemCertPoolFlagName = "tls-systemcertpool"
+	datasourceNameFlagName    = "dsn"
+	datasourceTimeoutFlagName = "dsn-timeout"
+	tlsCACertsFlagName        = "tls-cacerts"
 )
 
 type mockServer struct{}
