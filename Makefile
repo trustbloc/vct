@@ -6,13 +6,19 @@ GOBIN_PATH 		=$(abspath .)/build/bin
 LINT_VERSION 	?=v1.39.0
 MOCK_VERSION 	?=v1.5.0
 PROJECT_ROOT 	=github.com/trustbloc/vct
-GOMOCKS			=pkg/internal/gomocks
 
 DOCKER_OUTPUT_NS 	?=ghcr.io
 VCT_IMAGE_NAME 		?=trustbloc/vct
 
 ALPINE_VER ?= 3.12
 GO_VER ?= 1.16
+
+OS := $(shell uname)
+ifeq  ($(OS),$(filter $(OS),Darwin Linux))
+	PATH:=$(PATH):$(GOBIN_PATH)
+else
+	PATH:=$(PATH);$(subst /,\\,$(GOBIN_PATH))
+endif
 
 .PHONY: all
 all: clean checks unit-test bdd-test
@@ -31,7 +37,7 @@ lint: mocks
 
 .PHONY: unit-test
 unit-test: mocks
-	@go test $(shell go list ./... | grep -v /gomocks/ | grep -v /test/bdd) -count=1 -race -coverprofile=coverage.out -covermode=atomic -timeout=10m
+	@go test $(shell go list ./... | grep -v /test/bdd) -count=1 -race -coverprofile=coverage.out -covermode=atomic -timeout=10m
 
 .PHONY: bdd-test
 bdd-test: build-vct-docker
@@ -59,29 +65,13 @@ build-vct-docker:
 	--build-arg ALPINE_VER=$(ALPINE_VER)  .
 
 .PHONY: clean
-clean: clean-mocks
+clean:
 	@rm -rf ./build
 	@rm -rf ./test/bdd/build
 	@rm -rf coverage.out
+	@find . -name "gomocks_test.go" -delete
 
 .PHONY: mocks
-mocks: clean-mocks
+mocks:
 	@GOBIN=$(GOBIN_PATH) go install github.com/golang/mock/mockgen@$(MOCK_VERSION)
-	$(call create_mock,pkg/controller/command,KeyManager;TrillianLogClient;Crypto)
-	$(call create_mock,pkg/controller/rest,Cmd)
-	$(call create_mock,pkg/client/vct,HTTPClient)
-
-.PHONY: clean-mocks
-clean-mocks:
-	@if [ -d $(GOMOCKS) ]; then rm -r $(GOMOCKS); echo "Folder $(GOMOCKS) was removed!"; fi
-
-comma:= ,
-semicolon:= ;
-mocks_dir =
-
-define create_mock
-  $(eval mocks_dir := $(subst pkg,$(GOMOCKS),$(1)))
-  @echo Creating $(mocks_dir)
-  @mkdir -p $(mocks_dir) && rm -rf $(mocks_dir)/*
-  @$(GOBIN_PATH)/mockgen -destination $(mocks_dir)/mocks.go -self_package mocks -package mocks $(PROJECT_ROOT)/$(1) $(subst $(semicolon),$(comma),$(2))
-endef
+	@go generate ./...

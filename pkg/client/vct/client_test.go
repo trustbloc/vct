@@ -4,6 +4,8 @@ Copyright SecureKey Technologies Inc. All Rights Reserved.
 SPDX-License-Identifier: Apache-2.0
 */
 
+//go:generate mockgen -destination gomocks_test.go -self_package mocks -package vct_test . HTTPClient
+
 package vct_test
 
 import (
@@ -20,7 +22,6 @@ import (
 	"github.com/trustbloc/vct/pkg/client/vct"
 	"github.com/trustbloc/vct/pkg/controller/command"
 	"github.com/trustbloc/vct/pkg/controller/rest"
-	mocks "github.com/trustbloc/vct/pkg/internal/gomocks/client/vct"
 )
 
 const endpoint = "http://example.com"
@@ -43,7 +44,7 @@ func TestClient_AddVC(t *testing.T) {
 		fakeResp, err := json.Marshal(expected)
 		require.NoError(t, err)
 
-		httpClient := mocks.NewMockHTTPClient(ctrl)
+		httpClient := NewMockHTTPClient(ctrl)
 		httpClient.EXPECT().Do(gomock.Any()).Do(func(req *http.Request) {
 			var credential []byte
 
@@ -74,7 +75,7 @@ func TestClient_AddVC(t *testing.T) {
 		fakeResp, err := json.Marshal(expected)
 		require.NoError(t, err)
 
-		httpClient := mocks.NewMockHTTPClient(ctrl)
+		httpClient := NewMockHTTPClient(ctrl)
 		httpClient.EXPECT().Do(gomock.Any()).Return(&http.Response{
 			Body:       ioutil.NopCloser(bytes.NewBuffer(fakeResp)),
 			StatusCode: http.StatusInternalServerError,
@@ -96,7 +97,7 @@ func TestClient_GetIssuers(t *testing.T) {
 		fakeResp, err := json.Marshal(expected)
 		require.NoError(t, err)
 
-		httpClient := mocks.NewMockHTTPClient(ctrl)
+		httpClient := NewMockHTTPClient(ctrl)
 		httpClient.EXPECT().Do(gomock.Any()).Return(&http.Response{
 			Body:       ioutil.NopCloser(bytes.NewBuffer(fakeResp)),
 			StatusCode: http.StatusOK,
@@ -121,7 +122,7 @@ func TestClient_GetIssuers(t *testing.T) {
 		fakeResp, err := json.Marshal(expected)
 		require.NoError(t, err)
 
-		httpClient := mocks.NewMockHTTPClient(ctrl)
+		httpClient := NewMockHTTPClient(ctrl)
 		httpClient.EXPECT().Do(gomock.Any()).Return(&http.Response{
 			Body:       ioutil.NopCloser(bytes.NewBuffer(fakeResp)),
 			StatusCode: http.StatusInternalServerError,
@@ -148,7 +149,7 @@ func TestClient_GetSTH(t *testing.T) {
 		fakeResp, err := json.Marshal(expected)
 		require.NoError(t, err)
 
-		httpClient := mocks.NewMockHTTPClient(ctrl)
+		httpClient := NewMockHTTPClient(ctrl)
 		httpClient.EXPECT().Do(gomock.Any()).Return(&http.Response{
 			Body:       ioutil.NopCloser(bytes.NewBuffer(fakeResp)),
 			StatusCode: http.StatusOK,
@@ -173,7 +174,7 @@ func TestClient_GetSTH(t *testing.T) {
 		fakeResp, err := json.Marshal(expected)
 		require.NoError(t, err)
 
-		httpClient := mocks.NewMockHTTPClient(ctrl)
+		httpClient := NewMockHTTPClient(ctrl)
 		httpClient.EXPECT().Do(gomock.Any()).Return(&http.Response{
 			Body:       ioutil.NopCloser(bytes.NewBuffer(fakeResp)),
 			StatusCode: http.StatusInternalServerError,
@@ -197,7 +198,7 @@ func TestClient_GetSTHConsistency(t *testing.T) {
 		fakeResp, err := json.Marshal(expected)
 		require.NoError(t, err)
 
-		httpClient := mocks.NewMockHTTPClient(ctrl)
+		httpClient := NewMockHTTPClient(ctrl)
 		httpClient.EXPECT().Do(gomock.Any()).Do(func(req *http.Request) {
 			require.Equal(t, "1", req.URL.Query().Get("first"))
 			require.Equal(t, "2", req.URL.Query().Get("second"))
@@ -225,7 +226,7 @@ func TestClient_GetSTHConsistency(t *testing.T) {
 		fakeResp, err := json.Marshal(expected)
 		require.NoError(t, err)
 
-		httpClient := mocks.NewMockHTTPClient(ctrl)
+		httpClient := NewMockHTTPClient(ctrl)
 		httpClient.EXPECT().Do(gomock.Any()).Return(&http.Response{
 			Body:       ioutil.NopCloser(bytes.NewBuffer(fakeResp)),
 			StatusCode: http.StatusInternalServerError,
@@ -250,7 +251,7 @@ func TestClient_GetProofByHash(t *testing.T) {
 		fakeResp, err := json.Marshal(expected)
 		require.NoError(t, err)
 
-		httpClient := mocks.NewMockHTTPClient(ctrl)
+		httpClient := NewMockHTTPClient(ctrl)
 		httpClient.EXPECT().Do(gomock.Any()).Do(func(req *http.Request) {
 			require.Equal(t, "hash", req.URL.Query().Get("hash"))
 			require.Equal(t, "2", req.URL.Query().Get("tree_size"))
@@ -278,7 +279,7 @@ func TestClient_GetProofByHash(t *testing.T) {
 		fakeResp, err := json.Marshal(expected)
 		require.NoError(t, err)
 
-		httpClient := mocks.NewMockHTTPClient(ctrl)
+		httpClient := NewMockHTTPClient(ctrl)
 		httpClient.EXPECT().Do(gomock.Any()).Return(&http.Response{
 			Body:       ioutil.NopCloser(bytes.NewBuffer(fakeResp)),
 			StatusCode: http.StatusInternalServerError,
@@ -302,7 +303,7 @@ func TestClient_GetEntries(t *testing.T) {
 		fakeResp, err := json.Marshal(expected)
 		require.NoError(t, err)
 
-		httpClient := mocks.NewMockHTTPClient(ctrl)
+		httpClient := NewMockHTTPClient(ctrl)
 		httpClient.EXPECT().Do(gomock.Any()).Do(func(req *http.Request) {
 			require.Equal(t, "1", req.URL.Query().Get("start"))
 			require.Equal(t, "2", req.URL.Query().Get("end"))
@@ -330,7 +331,7 @@ func TestClient_GetEntries(t *testing.T) {
 		fakeResp, err := json.Marshal(expected)
 		require.NoError(t, err)
 
-		httpClient := mocks.NewMockHTTPClient(ctrl)
+		httpClient := NewMockHTTPClient(ctrl)
 		httpClient.EXPECT().Do(gomock.Any()).Return(&http.Response{
 			Body:       ioutil.NopCloser(bytes.NewBuffer(fakeResp)),
 			StatusCode: http.StatusInternalServerError,
@@ -356,7 +357,7 @@ func TestClient_GetEntryAndProof(t *testing.T) {
 		fakeResp, err := json.Marshal(expected)
 		require.NoError(t, err)
 
-		httpClient := mocks.NewMockHTTPClient(ctrl)
+		httpClient := NewMockHTTPClient(ctrl)
 		httpClient.EXPECT().Do(gomock.Any()).Do(func(req *http.Request) {
 			require.Equal(t, "1", req.URL.Query().Get("leaf_index"))
 			require.Equal(t, "2", req.URL.Query().Get("tree_size"))
@@ -384,7 +385,7 @@ func TestClient_GetEntryAndProof(t *testing.T) {
 		fakeResp, err := json.Marshal(expected)
 		require.NoError(t, err)
 
-		httpClient := mocks.NewMockHTTPClient(ctrl)
+		httpClient := NewMockHTTPClient(ctrl)
 		httpClient.EXPECT().Do(gomock.Any()).Return(&http.Response{
 			Body:       ioutil.NopCloser(bytes.NewBuffer(fakeResp)),
 			StatusCode: http.StatusInternalServerError,
