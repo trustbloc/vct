@@ -396,3 +396,30 @@ func TestClient_GetEntryAndProof(t *testing.T) {
 		require.EqualError(t, err, "get entry and proof: error")
 	})
 }
+
+const simpleVC = `{
+   "@context":[
+      "https://www.w3.org/2018/credentials/v1"
+   ],
+   "credentialSubject":{
+      "id":"did:key:123"
+   },
+   "issuer":"did:key:123",
+   "issuanceDate":"2020-03-10T04:24:12.164Z",
+   "type":[
+      "VerifiableCredential"
+   ]
+}`
+
+func TestCalculateLeafHashFromBytes(t *testing.T) {
+	t.Run("Success", func(t *testing.T) {
+		hash, err := vct.CalculateLeafHashFromBytes(12345, []byte(simpleVC))
+		require.NoError(t, err)
+		require.Equal(t, "DLVCaNAUB6n/THIR6vmWqoJ6JGbeFG+IpJdeDOATbNg=", hash)
+	})
+	t.Run("Success", func(t *testing.T) {
+		_, err := vct.CalculateLeafHashFromBytes(12345, []byte(`{}`))
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "parse credential")
+	})
+}

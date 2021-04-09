@@ -9,7 +9,6 @@ package rest
 import (
 	"context"
 	"embed"
-	"encoding/base64"
 	"fmt"
 	"net/http"
 	"path/filepath"
@@ -19,7 +18,6 @@ import (
 
 	"github.com/cenkalti/backoff/v4"
 	"github.com/cucumber/godog"
-	"github.com/google/trillian/merkle/rfc6962/hasher"
 
 	"github.com/trustbloc/vct/pkg/client/vct"
 	"github.com/trustbloc/vct/pkg/controller/command"
@@ -32,15 +30,21 @@ var fs embed.FS // nolint: gochecknoglobals
 type Steps struct {
 	client *http.Client
 	vct    *vct.Client
-	state  struct {
-		GetSTHResponse *command.GetSTHResponse
-		LastEntries    []command.LeafEntry
-	}
+	state  state
+}
+
+type state struct {
+	GetSTHResponse   *command.GetSTHResponse
+	LastEntries      []command.LeafEntry
+	AddedCredentials map[string]*command.AddVCResponse
 }
 
 // New creates BDD test steps instance.
 func New() *Steps {
-	return &Steps{client: &http.Client{Timeout: time.Minute}}
+	return &Steps{
+		client: &http.Client{Timeout: time.Minute},
+		state:  state{AddedCredentials: map[string]*command.AddVCResponse{}},
+	}
 }
 
 // RegisterSteps registers the BDD steps on the suite.
@@ -50,7 +54,7 @@ func (s *Steps) RegisterSteps(suite *godog.Suite) {
 	suite.Step(`Retrieve latest signed tree head and check that tree_size is "([^"]*)"$`, s.getSTH)
 	suite.Step(`Retrieve merkle consistency proof between signed tree heads$`, s.getSTHConsistency)
 	suite.Step(`Retrieve entries from log and check that len is "([^"]*)"$`, s.getEntries)
-	suite.Step(`Retrieve merkle audit proof from log by leaf hash for entry "([^"]*)"$`, s.getProofByHash)
+	suite.Step(`Retrieve merkle audit proof from log by leaf hash for "([^"]*)"$`, s.getProofByHash)
 }
 
 func (s *Steps) setVCTClient(endpoint string) error {
@@ -66,18 +70,28 @@ func (s *Steps) setVCTClient(endpoint string) error {
 func (s *Steps) addVC(file string) error {
 	src, err := readFile(file)
 	if err != nil {
+		return fmt.Errorf("read file: %w", err)
+	}
+
+	resp, err := s.vct.AddVC(context.Background(), src)
+	if err != nil {
+		return fmt.Errorf("add vc: %w", err)
+	}
+
+	s.state.AddedCredentials[file] = resp
+
+	return nil
+}
+
+func (s *Steps) getProofByHash(file string) error {
+	src, err := readFile(file)
+	if err != nil {
 		return err
 	}
 
-	_, err = s.vct.AddVC(context.Background(), src)
-
-	return err // nolint: wrapcheck
-}
-
-func (s *Steps) getProofByHash(idx string) error {
-	id, err := strconv.Atoi(idx)
+	hash, err := vct.CalculateLeafHashFromBytes(s.state.AddedCredentials[file].Timestamp, src)
 	if err != nil {
-		return fmt.Errorf("parse index: %w", err)
+		return fmt.Errorf("calculate leaf hash from bytes: %w", err)
 	}
 
 	return backoff.Retry(func() error { // nolint: wrapcheck
@@ -86,11 +100,7 @@ func (s *Steps) getProofByHash(idx string) error {
 			return fmt.Errorf("get STH: %w", err)
 		}
 
-		entries, err := s.vct.GetProofByHash(
-			context.Background(),
-			base64.StdEncoding.EncodeToString(hasher.DefaultHasher.HashLeaf(s.state.LastEntries[id-1].LeafInput)),
-			resp.TreeSize,
-		)
+		entries, err := s.vct.GetProofByHash(context.Background(), hash, resp.TreeSize)
 		if err != nil {
 			return fmt.Errorf("get proof by hash: %w", err)
 		}

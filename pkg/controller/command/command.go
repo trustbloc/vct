@@ -140,6 +140,19 @@ func (c *Cmd) GetIssuers(w io.Writer, _ io.Reader) error {
 	return json.NewEncoder(w).Encode(c.uniqueIssuers) // nolint: wrapcheck
 }
 
+// CreateLeaf creates MerkleTreeLeaf.
+func CreateLeaf(timestamp uint64, credential *verifiable.Credential) *MerkleTreeLeaf {
+	return &MerkleTreeLeaf{
+		Version:  V1,
+		LeafType: TimestampedEntryLeafType,
+		TimestampedEntry: &TimestampedEntry{
+			EntryType: VCLogEntryType,
+			Timestamp: timestamp,
+			VCEntry:   credential,
+		},
+	}
+}
+
 // AddVC adds verifiable credential to log.
 func (c *Cmd) AddVC(w io.Writer, r io.Reader) error { // nolint: funlen
 	var dest bytes.Buffer
@@ -160,15 +173,7 @@ func (c *Cmd) AddVC(w io.Writer, r io.Reader) error { // nolint: funlen
 		return fmt.Errorf("%w: issuer %s is not in a list", errors.ErrBadRequest, vc.Issuer.ID)
 	}
 
-	leafData, err := json.Marshal(MerkleTreeLeaf{
-		Version:  V1,
-		LeafType: TimestampedEntryLeafType,
-		TimestampedEntry: &TimestampedEntry{
-			EntryType: VCLogEntryType,
-			Timestamp: uint64(time.Now().UnixNano() / int64(time.Millisecond)),
-			VCEntry:   vc,
-		},
-	})
+	leafData, err := json.Marshal(CreateLeaf(uint64(time.Now().UnixNano()/int64(time.Millisecond)), vc))
 	if err != nil {
 		return errors.NewStatusInternalServerError(fmt.Errorf("marshal MerkleTreeLeaf: %w", err))
 	}

@@ -32,5 +32,5 @@ Feature: Verifiable credentials transparency API.
     Then  Add verifiable credential "bachelor_degree_of_finance_no_proof.json" to Log
     And   Add verifiable credential "bachelor_degree_of_law_no_proof.json" to Log
     And   Retrieve entries from log and check that len is "2"
-    And   Retrieve merkle audit proof from log by leaf hash for entry "1"
-    And   Retrieve merkle audit proof from log by leaf hash for entry "2"
+    And   Retrieve merkle audit proof from log by leaf hash for "bachelor_degree_of_finance_no_proof.json"
+    And   Retrieve merkle audit proof from log by leaf hash for "bachelor_degree_of_law_no_proof.json"
