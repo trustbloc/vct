@@ -78,6 +78,16 @@ func (s *Steps) addVC(file string) error {
 		return fmt.Errorf("add vc: %w", err)
 	}
 
+	pubKey, err := s.vct.GetPublicKey(context.Background())
+	if err != nil {
+		return fmt.Errorf("get public key: %w", err)
+	}
+
+	err = vct.VerifyVCTimestampSignatureFromBytes(resp.Signature, pubKey, resp.Timestamp, src)
+	if err != nil {
+		return fmt.Errorf("verify VC Timestamp signature: %w", err)
+	}
+
 	s.state.AddedCredentials[file] = resp
 
 	return nil

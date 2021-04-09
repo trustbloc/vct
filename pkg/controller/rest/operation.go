@@ -32,6 +32,7 @@ const (
 	GetEntriesPath        = basePath + "/get-entries"
 	GetIssuersPath        = basePath + "/get-issuers"
 	GetEntryAndProofPath  = basePath + "/get-entry-and-proof"
+	GetPublicKeyPath      = basePath + "/get-public-key"
 )
 
 const (
@@ -48,6 +49,7 @@ type Cmd interface {
 	GetProofByHash(io.Writer, io.Reader) error
 	GetEntries(io.Writer, io.Reader) error
 	GetEntryAndProof(io.Writer, io.Reader) error
+	GetPublicKey(io.Writer, io.Reader) error
 }
 
 // Operation represents REST API controller.
@@ -69,6 +71,7 @@ func (c *Operation) GetRESTHandlers() []Handler {
 		NewHTTPHandler(GetProofByHashPath, http.MethodGet, c.GetProofByHash),
 		NewHTTPHandler(GetEntriesPath, http.MethodGet, c.GetEntries),
 		NewHTTPHandler(GetIssuersPath, http.MethodGet, c.GetIssuers),
+		NewHTTPHandler(GetPublicKeyPath, http.MethodGet, c.GetPublicKey),
 		NewHTTPHandler(GetEntryAndProofPath, http.MethodGet, c.GetEntryAndProof),
 	}
 }
@@ -86,6 +89,11 @@ func (c *Operation) GetSTH(w http.ResponseWriter, _ *http.Request) {
 // GetIssuers returns issuers.
 func (c *Operation) GetIssuers(w http.ResponseWriter, _ *http.Request) {
 	execute(c.cmd.GetIssuers, w, nil)
+}
+
+// GetPublicKey returns public key.
+func (c *Operation) GetPublicKey(w http.ResponseWriter, _ *http.Request) {
+	execute(c.cmd.GetPublicKey, w, nil)
 }
 
 // GetSTHConsistency retrieves merkle consistency proofs between signed tree heads.

@@ -9,7 +9,6 @@ package command
 import (
 	"fmt"
 
-	"github.com/hyperledger/aries-framework-go/pkg/doc/verifiable"
 	"github.com/hyperledger/aries-framework-go/pkg/kms"
 
 	"github.com/trustbloc/vct/pkg/controller/errors"
@@ -229,20 +228,20 @@ type MerkleTreeLeaf struct {
 
 // TimestampedEntry is part of the MerkleTreeLeaf structure.
 type TimestampedEntry struct {
-	Timestamp  uint64                 `json:"timestamp"`
-	EntryType  LogEntryType           `json:"entry_type"`
-	VCEntry    *verifiable.Credential `json:"vc_entry"`
-	Extensions []byte                 `json:"extensions"`
+	Timestamp  uint64       `json:"timestamp"`
+	EntryType  LogEntryType `json:"entry_type"`
+	VCEntry    []byte       `json:"vc_entry"`
+	Extensions []byte       `json:"extensions"`
 }
 
 // VCTimestampSignature keeps the data over which the signature is created.
 type VCTimestampSignature struct {
-	SVCTVersion   Version                `json:"svct_version"`
-	SignatureType SignatureType          `json:"signature_type"`
-	Timestamp     uint64                 `json:"timestamp"`
-	EntryType     LogEntryType           `json:"entry_type"`
-	VCEntry       *verifiable.Credential `json:"vc_entry"`
-	Extensions    []byte                 `json:"extensions"`
+	SVCTVersion   Version       `json:"svct_version"`
+	SignatureType SignatureType `json:"signature_type"`
+	Timestamp     uint64        `json:"timestamp"`
+	EntryType     LogEntryType  `json:"entry_type"`
+	VCEntry       []byte        `json:"vc_entry"`
+	Extensions    []byte        `json:"extensions"`
 }
 
 // AddVCResponse represents the response to add-vc.
