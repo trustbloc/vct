@@ -9,6 +9,7 @@ package vct
 import (
 	"bytes"
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -17,6 +18,9 @@ import (
 	"net/url"
 	"strconv"
 	"time"
+
+	"github.com/google/trillian/merkle/rfc6962/hasher"
+	"github.com/hyperledger/aries-framework-go/pkg/doc/verifiable"
 
 	"github.com/trustbloc/vct/pkg/controller/command"
 	"github.com/trustbloc/vct/pkg/controller/rest"
@@ -171,6 +175,29 @@ func (c *Client) GetEntryAndProof(ctx context.Context, leafIndex, treeSize uint6
 	}
 
 	return result, nil
+}
+
+// CalculateLeafHash calculates hash for given credentials.
+func CalculateLeafHash(timestamp uint64, credential *verifiable.Credential) (string, error) {
+	leaf, err := json.Marshal(command.CreateLeaf(timestamp, credential))
+	if err != nil {
+		return "", fmt.Errorf("marshal credential: %w", err)
+	}
+
+	return base64.StdEncoding.EncodeToString(hasher.DefaultHasher.HashLeaf(leaf)), nil
+}
+
+// CalculateLeafHashFromBytes calculates hash for given credentials.
+func CalculateLeafHashFromBytes(timestamp uint64, credential []byte) (string, error) {
+	vc, err := verifiable.ParseCredential(credential,
+		verifiable.WithDisabledProofCheck(),
+		verifiable.WithNoCustomSchemaCheck(),
+	)
+	if err != nil {
+		return "", fmt.Errorf("parse credential: %w", err)
+	}
+
+	return CalculateLeafHash(timestamp, vc)
 }
 
 type options struct {
