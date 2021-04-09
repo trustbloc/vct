@@ -108,6 +108,24 @@ func TestOperation_GetIssuers(t *testing.T) {
 	})
 }
 
+func TestOperation_GetPublicKey(t *testing.T) {
+	t.Run("Success", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		defer ctrl.Finish()
+
+		cmd := NewMockCmd(ctrl)
+		cmd.EXPECT().GetPublicKey(gomock.Any(), gomock.Any()).Do(func(_ io.Writer, r io.Reader) {
+			require.Nil(t, r)
+		}).Return(nil)
+
+		operation := New(cmd)
+
+		_, code := sendRequestToHandler(t, handlerLookup(t, operation, GetPublicKeyPath), nil, GetPublicKeyPath)
+
+		require.Equal(t, http.StatusOK, code)
+	})
+}
+
 func TestOperation_GetSTHConsistency(t *testing.T) {
 	t.Run("Success", func(t *testing.T) {
 		ctrl := gomock.NewController(t)

@@ -20,7 +20,9 @@ import (
 	"time"
 
 	"github.com/google/trillian/merkle/rfc6962/hasher"
+	"github.com/hyperledger/aries-framework-go/pkg/crypto/tinkcrypto"
 	"github.com/hyperledger/aries-framework-go/pkg/doc/verifiable"
+	"github.com/hyperledger/aries-framework-go/pkg/kms/localkms"
 
 	"github.com/trustbloc/vct/pkg/controller/command"
 	"github.com/trustbloc/vct/pkg/controller/rest"
@@ -72,6 +74,16 @@ func (c *Client) AddVC(ctx context.Context, credential []byte) (*command.AddVCRe
 	var result *command.AddVCResponse
 	if err := c.do(ctx, rest.AddVCPath, &result, withMethod(http.MethodPost), withBody(credential)); err != nil {
 		return nil, fmt.Errorf("add VC: %w", err)
+	}
+
+	return result, nil
+}
+
+// GetPublicKey returns public key.
+func (c *Client) GetPublicKey(ctx context.Context) ([]byte, error) {
+	var result []byte
+	if err := c.do(ctx, rest.GetPublicKeyPath, &result); err != nil {
+		return nil, fmt.Errorf("get public key: %w", err)
 	}
 
 	return result, nil
@@ -177,16 +189,6 @@ func (c *Client) GetEntryAndProof(ctx context.Context, leafIndex, treeSize uint6
 	return result, nil
 }
 
-// CalculateLeafHash calculates hash for given credentials.
-func CalculateLeafHash(timestamp uint64, credential *verifiable.Credential) (string, error) {
-	leaf, err := json.Marshal(command.CreateLeaf(timestamp, credential))
-	if err != nil {
-		return "", fmt.Errorf("marshal credential: %w", err)
-	}
-
-	return base64.StdEncoding.EncodeToString(hasher.DefaultHasher.HashLeaf(leaf)), nil
-}
-
 // CalculateLeafHashFromBytes calculates hash for given credentials.
 func CalculateLeafHashFromBytes(timestamp uint64, credential []byte) (string, error) {
 	vc, err := verifiable.ParseCredential(credential,
@@ -198,6 +200,60 @@ func CalculateLeafHashFromBytes(timestamp uint64, credential []byte) (string, er
 	}
 
 	return CalculateLeafHash(timestamp, vc)
+}
+
+// CalculateLeafHash calculates hash for given credentials.
+func CalculateLeafHash(timestamp uint64, credential *verifiable.Credential) (string, error) {
+	vc, err := json.Marshal(credential)
+	if err != nil {
+		return "", fmt.Errorf("marshal credential: %w", err)
+	}
+
+	leaf, err := json.Marshal(command.CreateLeaf(timestamp, vc))
+	if err != nil {
+		return "", fmt.Errorf("marshal leaf: %w", err)
+	}
+
+	return base64.StdEncoding.EncodeToString(hasher.DefaultHasher.HashLeaf(leaf)), nil
+}
+
+// VerifyVCTimestampSignature verifies VC timestamp signature.
+func VerifyVCTimestampSignature(signature, pubKey []byte, timestamp uint64, credential *verifiable.Credential) error {
+	var sig *command.DigitallySigned
+
+	if err := json.Unmarshal(signature, &sig); err != nil {
+		return fmt.Errorf("unmarshal signature: %w", err)
+	}
+
+	vc, err := json.Marshal(credential)
+	if err != nil {
+		return fmt.Errorf("marshal credential: %w", err)
+	}
+
+	data, err := json.Marshal(command.CreateVCTimestampSignature(command.CreateLeaf(timestamp, vc)))
+	if err != nil {
+		return fmt.Errorf("marshal VC timestamp signature: %w", err)
+	}
+
+	kh, err := (&localkms.LocalKMS{}).PubKeyBytesToHandle(pubKey, sig.Algorithm.Type)
+	if err != nil {
+		return fmt.Errorf("pub key to handle: %w", err)
+	}
+
+	return (&tinkcrypto.Crypto{}).Verify(sig.Signature, data, kh) // nolint: wrapcheck
+}
+
+// VerifyVCTimestampSignatureFromBytes verifies VC timestamp signature.
+func VerifyVCTimestampSignatureFromBytes(signature, pubKey []byte, timestamp uint64, credential []byte) error {
+	vc, err := verifiable.ParseCredential(credential,
+		verifiable.WithDisabledProofCheck(),
+		verifiable.WithNoCustomSchemaCheck(),
+	)
+	if err != nil {
+		return fmt.Errorf("parse credential: %w", err)
+	}
+
+	return VerifyVCTimestampSignature(signature, pubKey, timestamp, vc)
 }
 
 type options struct {

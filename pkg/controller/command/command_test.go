@@ -134,6 +134,35 @@ func TestCmd_GetIssuers(t *testing.T) {
 	require.Equal(t, `["issuer_a","issuer_b"]`+"\n", fr.String())
 }
 
+func TestCmd_GetPublicKey(t *testing.T) {
+	const kid = "kid"
+
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	km := NewMockKeyManager(ctrl)
+	km.EXPECT().Get(kid).Return(nil, nil)
+	km.EXPECT().ExportPubKeyBytes(kid).Return([]byte(`public key`), nil)
+
+	cmd, err := New(&Config{KMS: km, Key: Key{
+		ID:   kid,
+		Type: kms.ECDSAP256TypeIEEEP1363,
+	}})
+	require.NoError(t, err)
+	require.NotNil(t, cmd)
+
+	var fr bytes.Buffer
+
+	require.NoError(t, cmd.GetPublicKey(&fr, nil))
+
+	var hr bytes.Buffer
+
+	require.NoError(t, lookupHandler(t, cmd, GetPublicKey)(&hr, nil))
+
+	require.Equal(t, fr.String(), hr.String())
+	require.Equal(t, "\"cHVibGljIGtleQ==\"\n", fr.String())
+}
+
 func TestCmd_GetEntries(t *testing.T) {
 	const (
 		kid           = "kid"

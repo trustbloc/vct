@@ -34,6 +34,7 @@ const (
 	GetProofByHash    = "getProofByHash"
 	GetEntryAndProof  = "getEntryAndProof"
 	GetIssuers        = "getIssuers"
+	GetPublicKey      = "getPublicKey"
 	AddVC             = "addVC"
 )
 
@@ -63,6 +64,7 @@ type Cmd struct {
 	crypto        crypto.Crypto
 	issuers       map[string]struct{}
 	uniqueIssuers []string
+	PubKey        []byte
 	alg           *SignatureAndHashAlgorithm
 }
 
@@ -111,6 +113,7 @@ func New(cfg *Config) (*Cmd, error) {
 	return &Cmd{
 		client:        cfg.Trillian,
 		vdr:           cfg.VDR,
+		PubKey:        pubBytes,
 		VCLogID:       sha256.Sum256(pubBytes),
 		logID:         cfg.LogID,
 		kms:           cfg.KMS,
@@ -131,6 +134,7 @@ func (c *Cmd) GetHandlers() []Handler {
 		NewCmdHandler(GetProofByHash, c.GetProofByHash),
 		NewCmdHandler(GetEntryAndProof, c.GetEntryAndProof),
 		NewCmdHandler(GetIssuers, c.GetIssuers),
+		NewCmdHandler(GetPublicKey, c.GetPublicKey),
 		NewCmdHandler(AddVC, c.AddVC),
 	}
 }
@@ -140,8 +144,13 @@ func (c *Cmd) GetIssuers(w io.Writer, _ io.Reader) error {
 	return json.NewEncoder(w).Encode(c.uniqueIssuers) // nolint: wrapcheck
 }
 
+// GetPublicKey returns public key.
+func (c *Cmd) GetPublicKey(w io.Writer, _ io.Reader) error {
+	return json.NewEncoder(w).Encode(c.PubKey) // nolint: wrapcheck
+}
+
 // CreateLeaf creates MerkleTreeLeaf.
-func CreateLeaf(timestamp uint64, credential *verifiable.Credential) *MerkleTreeLeaf {
+func CreateLeaf(timestamp uint64, credential []byte) *MerkleTreeLeaf {
 	return &MerkleTreeLeaf{
 		Version:  V1,
 		LeafType: TimestampedEntryLeafType,
@@ -173,7 +182,12 @@ func (c *Cmd) AddVC(w io.Writer, r io.Reader) error { // nolint: funlen
 		return fmt.Errorf("%w: issuer %s is not in a list", errors.ErrBadRequest, vc.Issuer.ID)
 	}
 
-	leafData, err := json.Marshal(CreateLeaf(uint64(time.Now().UnixNano()/int64(time.Millisecond)), vc))
+	vcSrc, err := json.Marshal(vc)
+	if err != nil {
+		return errors.NewStatusInternalServerError(fmt.Errorf("marshal credential: %w", err))
+	}
+
+	leafData, err := json.Marshal(CreateLeaf(uint64(time.Now().UnixNano()/int64(time.Millisecond)), vcSrc))
 	if err != nil {
 		return errors.NewStatusInternalServerError(fmt.Errorf("marshal MerkleTreeLeaf: %w", err))
 	}
@@ -466,15 +480,20 @@ func (c *Cmd) GetSTHConsistency(w io.Writer, r io.Reader) error {
 	})
 }
 
-func (c *Cmd) signV1VCTS(leaf *MerkleTreeLeaf) (DigitallySigned, error) {
-	data, err := json.Marshal(VCTimestampSignature{
+// CreateVCTimestampSignature creates VCTimestampSignature structure.
+func CreateVCTimestampSignature(leaf *MerkleTreeLeaf) *VCTimestampSignature {
+	return &VCTimestampSignature{
 		SVCTVersion:   V1,
 		SignatureType: VCTimestampSignatureType,
 		Timestamp:     leaf.TimestampedEntry.Timestamp,
 		EntryType:     leaf.TimestampedEntry.EntryType,
 		VCEntry:       leaf.TimestampedEntry.VCEntry,
 		Extensions:    leaf.TimestampedEntry.Extensions,
-	})
+	}
+}
+
+func (c *Cmd) signV1VCTS(leaf *MerkleTreeLeaf) (DigitallySigned, error) {
+	data, err := json.Marshal(CreateVCTimestampSignature(leaf))
 	if err != nil {
 		return DigitallySigned{}, fmt.Errorf("marshal VCTimestampSignature: %w", err)
 	}
