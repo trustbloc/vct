@@ -363,6 +363,8 @@ func startAgent(parameters *agentParameters) error { // nolint: funlen
 		}
 	}()
 
+	logClient := trillian.NewTrillianLogClient(conn)
+
 	if parameters.testTree {
 		var tree *trillian.Tree
 
@@ -371,11 +373,16 @@ func startAgent(parameters *agentParameters) error { // nolint: funlen
 			return fmt.Errorf("create tree: %w", err)
 		}
 
+		_, err = logClient.InitLog(context.Background(), &trillian.InitLogRequest{LogId: tree.TreeId})
+		if err != nil {
+			return fmt.Errorf("init log: %w", err)
+		}
+
 		parameters.logID = tree.TreeId
 	}
 
 	cmd, err := command.New(&command.Config{
-		Trillian: trillian.NewTrillianLogClient(conn),
+		Trillian: logClient,
 		KMS:      km,
 		Crypto:   cr,
 		VDR:      vdr.New(&kmsCtx{KeyManager: km}, vdr.WithVDR(vdrkey.New())),
