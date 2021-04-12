@@ -25,6 +25,7 @@ const (
 	datasourceNameFlagName    = "dsn"
 	datasourceTimeoutFlagName = "dsn-timeout"
 	tlsCACertsFlagName        = "tls-cacerts"
+	testTreeFlagName          = "test-tree"
 )
 
 type mockServer struct{}
@@ -66,6 +67,38 @@ func TestCmd(t *testing.T) {
 		err = startCmd.Execute()
 
 		require.Contains(t, err.Error(), "log-id (command line flag) nor VCT_LOG_ID (environment variable) have been set")
+	})
+
+	t.Run("Parse test tree", func(t *testing.T) {
+		startCmd, err := Cmd(&mockServer{})
+		require.NoError(t, err)
+
+		args := []string{
+			"--" + agentHostFlagName, "",
+			"--" + testTreeFlagName, "t r u e",
+			"--" + logEndpointFlagName, "https://vct.example.com",
+		}
+		startCmd.SetArgs(args)
+
+		err = startCmd.Execute()
+
+		require.Contains(t, err.Error(), "parse test tree: strconv.ParseBool")
+	})
+
+	t.Run("Create tree (unavailable)", func(t *testing.T) {
+		startCmd, err := Cmd(&mockServer{})
+		require.NoError(t, err)
+
+		args := []string{
+			"--" + agentHostFlagName, "",
+			"--" + testTreeFlagName, "true",
+			"--" + logEndpointFlagName, "https://vct.example.com",
+		}
+		startCmd.SetArgs(args)
+
+		err = startCmd.Execute()
+
+		require.Contains(t, err.Error(), "create tree: rpc error: code = Unavailable")
 	})
 
 	t.Run("No log-id is not valid", func(t *testing.T) {

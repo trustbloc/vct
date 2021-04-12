@@ -7,6 +7,7 @@ SPDX-License-Identifier: Apache-2.0
 package startcmd
 
 import (
+	"context"
 	"crypto/tls"
 	"fmt"
 	"net/http"
@@ -17,6 +18,8 @@ import (
 
 	"github.com/cenkalti/backoff/v4"
 	"github.com/google/trillian"
+	"github.com/google/trillian/crypto/keyspb"
+	"github.com/google/trillian/crypto/sigpb"
 	"github.com/gorilla/mux"
 	"github.com/hyperledger/aries-framework-go-ext/component/storage/couchdb"
 	"github.com/hyperledger/aries-framework-go-ext/component/storage/mysql"
@@ -36,6 +39,7 @@ import (
 	"github.com/spf13/cobra"
 	tlsutils "github.com/trustbloc/edge-core/pkg/utils/tls"
 	"google.golang.org/grpc"
+	"google.golang.org/protobuf/types/known/durationpb"
 
 	"github.com/trustbloc/vct/pkg/controller/command"
 	"github.com/trustbloc/vct/pkg/controller/rest"
@@ -101,6 +105,12 @@ const (
 		" Alternatively, this can be set with the following environment variable: " + tlsSystemCertPoolEnvKey
 	tlsSystemCertPoolEnvKey = envPrefix + "TLS_SYSTEMCERTPOOL"
 
+	testTreeFlagName  = "test-tree"
+	testTreeFlagUsage = "Creates test tree." +
+		" Possible values [true] [false]. Defaults to false if not set." +
+		" Alternatively, this can be set with the following environment variable: " + testTreeEnvKey
+	testTreeEnvKey = envPrefix + "TEST_TREE"
+
 	tlsCACertsFlagName  = "tls-cacerts"
 	tlsCACertsFlagUsage = "Comma-Separated list of ca certs path." +
 		" Alternatively, this can be set with the following environment variable: " + tlsCACertsEnvKey
@@ -165,6 +175,7 @@ func Cmd(server server) (*cobra.Command, error) {
 
 type agentParameters struct {
 	logID             int64
+	testTree          bool
 	host              string
 	logEndpoint       string
 	keyID             string
@@ -184,7 +195,7 @@ type tlsParameters struct {
 	serveKeyPath   string
 }
 
-func createStartCMD(server server) *cobra.Command {
+func createStartCMD(server server) *cobra.Command { // nolint: funlen
 	return &cobra.Command{
 		Use:   "start",
 		Short: "Starts vct service",
@@ -195,13 +206,23 @@ func createStartCMD(server server) *cobra.Command {
 				return fmt.Errorf("get variable (%s or %s): %w", agentHostFlagName, agentHostEnvKey, err)
 			}
 
-			logIDVal, err := getUserSetVar(cmd, logIDFlagName, logIDEnvKey, false)
+			testTreeStr := getUserSetVarOptional(cmd, testTreeFlagName, testTreeEnvKey)
+			testTree, err := strconv.ParseBool(testTreeStr)
+			if err != nil {
+				return fmt.Errorf("parse test tree: %w", err)
+			}
+
+			if testTree {
+				logger.Warnf("VCT is running in test mode. Do not use %q option for production!", testTreeFlagName)
+			}
+
+			logIDVal, err := getUserSetVar(cmd, logIDFlagName, logIDEnvKey, testTree)
 			if err != nil {
 				return fmt.Errorf("get variable (%s or %s): %w", logIDFlagName, logIDEnvKey, err)
 			}
 
 			logID, err := strconv.ParseInt(logIDVal, 10, 64)
-			if err != nil {
+			if !testTree && err != nil {
 				return fmt.Errorf("log ID is not a number: %w", err)
 			}
 
@@ -228,6 +249,7 @@ func createStartCMD(server server) *cobra.Command {
 
 			parameters := &agentParameters{
 				server:            server,
+				testTree:          testTree,
 				host:              host,
 				logID:             logID,
 				logEndpoint:       logEndpoint,
@@ -341,6 +363,17 @@ func startAgent(parameters *agentParameters) error { // nolint: funlen
 		}
 	}()
 
+	if parameters.testTree {
+		var tree *trillian.Tree
+
+		tree, err = createTree(conn)
+		if err != nil {
+			return fmt.Errorf("create tree: %w", err)
+		}
+
+		parameters.logID = tree.TreeId
+	}
+
 	cmd, err := command.New(&command.Config{
 		Trillian: trillian.NewTrillianLogClient(conn),
 		KMS:      km,
@@ -373,6 +406,25 @@ func startAgent(parameters *agentParameters) error { // nolint: funlen
 	)
 }
 
+func createTree(conn *grpc.ClientConn) (*trillian.Tree, error) {
+	// nolint: wrapcheck
+	return trillian.NewTrillianAdminClient(conn).CreateTree(context.Background(), &trillian.CreateTreeRequest{
+		Tree: &trillian.Tree{
+			TreeState:          trillian.TreeState_ACTIVE,
+			TreeType:           trillian.TreeType_LOG,
+			HashStrategy:       trillian.HashStrategy_RFC6962_SHA256,
+			HashAlgorithm:      sigpb.DigitallySigned_SHA256,
+			SignatureAlgorithm: sigpb.DigitallySigned_ECDSA,
+			MaxRootDuration:    durationpb.New(time.Hour),
+		},
+		KeySpec: &keyspb.Specification{
+			Params: &keyspb.Specification_EcdsaParams{
+				EcdsaParams: &keyspb.Specification_ECDSA{},
+			},
+		},
+	})
+}
+
 func getUserSetVar(cmd *cobra.Command, flagName, envKey string, isOptional bool) (string, error) {
 	defaultOrFlagVal, err := cmd.Flags().GetString(flagName)
 	if cmd.Flags().Changed(flagName) {
@@ -401,10 +453,11 @@ func createFlags(startCmd *cobra.Command) {
 	startCmd.Flags().StringP(keyTypeFlagName, keyTypeFlagShorthand, string(kms.ECDSAP256TypeIEEEP1363), keyTypeFlagUsage)
 	startCmd.Flags().StringP(datasourceNameFlagName, datasourceNameFlagShorthand, "mem://test", datasourceNameFlagUsage)
 	startCmd.Flags().String(datasourceTimeoutFlagName, "30", datasourceTimeoutFlagUsage)
-	startCmd.Flags().StringP(tlsSystemCertPoolFlagName, "", "false", tlsSystemCertPoolFlagUsage)
-	startCmd.Flags().StringP(tlsCACertsFlagName, "", "", tlsCACertsFlagUsage)
-	startCmd.Flags().StringP(tlsServeCertPathFlagName, "", "", tlsServeCertPathFlagUsage)
-	startCmd.Flags().StringP(tlsServeKeyPathFlagName, "", "", tlsServeKeyPathFlagUsage)
+	startCmd.Flags().String(tlsSystemCertPoolFlagName, "false", tlsSystemCertPoolFlagUsage)
+	startCmd.Flags().String(tlsCACertsFlagName, "", tlsCACertsFlagUsage)
+	startCmd.Flags().String(tlsServeCertPathFlagName, "", tlsServeCertPathFlagUsage)
+	startCmd.Flags().String(tlsServeKeyPathFlagName, "", tlsServeKeyPathFlagUsage)
+	startCmd.Flags().String(testTreeFlagName, "false", testTreeFlagUsage)
 }
 
 func getTLS(cmd *cobra.Command) (*tlsParameters, error) {

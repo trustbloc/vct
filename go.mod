@@ -21,4 +21,5 @@ require (
 	github.com/stretchr/testify v1.7.0
 	github.com/trustbloc/edge-core v0.1.7-0.20210310142750-7eb11997c4a9
 	google.golang.org/grpc v1.36.1
+	google.golang.org/protobuf v1.25.0
 )
