@@ -1,0 +1,24 @@
+{
+  "@context":"https://w3id.org/did/v1",
+  "id":"did:web:web.vct.local",
+  "verificationMethod":[
+    {
+      "id":"did:web:web.vct.local#z6Mkh3Z2dZRcNJG7w8eyVU2usfRZcdrqesPMtiNJjhEvmnRK",
+      "controller":"did:web:web.vct.local",
+      "type":"Ed25519VerificationKey2018",
+      "publicKeyBase58":"3bHz3KBB2kmepdpGou552ZsZo4azEz91ChTNuRGurZdw"
+    }
+  ],
+  "authentication":[
+    "did:web:web.vct.local#z6Mkh3Z2dZRcNJG7w8eyVU2usfRZcdrqesPMtiNJjhEvmnRK"
+  ],
+  "assertionMethod":[
+    "did:web:web.vct.local#z6Mkh3Z2dZRcNJG7w8eyVU2usfRZcdrqesPMtiNJjhEvmnRK"
+  ],
+  "capabilityDelegation":[
+    "did:web:web.vct.local#z6Mkh3Z2dZRcNJG7w8eyVU2usfRZcdrqesPMtiNJjhEvmnRK"
+  ],
+  "capabilityInvocation":[
+    "did:web:web.vct.local#z6Mkh3Z2dZRcNJG7w8eyVU2usfRZcdrqesPMtiNJjhEvmnRK"
+  ]
+}
