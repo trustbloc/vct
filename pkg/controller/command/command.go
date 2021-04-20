@@ -172,7 +172,7 @@ func (c *Cmd) AddVC(w io.Writer, r io.Reader) error { // nolint: funlen
 	}
 
 	vc, err := verifiable.ParseCredential(dest.Bytes(), verifiable.WithPublicKeyFetcher(
-		verifiable.NewDIDKeyResolver(c.vdr).PublicKeyFetcher(),
+		verifiable.NewVDRKeyResolver(c.vdr).PublicKeyFetcher(),
 	))
 	if err != nil {
 		return errors.NewBadRequestError(fmt.Errorf("parse credential: %w", err))

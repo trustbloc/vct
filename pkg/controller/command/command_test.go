@@ -1075,7 +1075,7 @@ func TestCmd_AddVC(t *testing.T) {
 			Crypto:   cr,
 			LogID:    logID,
 			Trillian: client,
-			VDR:      vdr.New(&kmsCtx{KeyManager: km}, vdr.WithVDR(key.New())),
+			VDR:      vdr.New(vdr.WithVDR(key.New())),
 			Key: Key{
 				ID:   newKID,
 				Type: keyType,
@@ -1170,7 +1170,7 @@ func TestCmd_AddVC(t *testing.T) {
 		cmd, err := New(&Config{
 			KMS:     km,
 			LogID:   logID,
-			VDR:     vdr.New(&kmsCtx{KeyManager: km}, vdr.WithVDR(key.New())),
+			VDR:     vdr.New(vdr.WithVDR(key.New())),
 			Issuers: []string{"issuer_a"},
 			Key: Key{
 				ID:   kid,
@@ -1200,7 +1200,7 @@ func TestCmd_AddVC(t *testing.T) {
 			KMS:      km,
 			LogID:    logID,
 			Trillian: client,
-			VDR:      vdr.New(&kmsCtx{KeyManager: km}, vdr.WithVDR(key.New())),
+			VDR:      vdr.New(vdr.WithVDR(key.New())),
 			Key: Key{
 				ID:   kid,
 				Type: keyType,
@@ -1229,7 +1229,7 @@ func TestCmd_AddVC(t *testing.T) {
 			KMS:      km,
 			LogID:    logID,
 			Trillian: client,
-			VDR:      vdr.New(&kmsCtx{KeyManager: km}, vdr.WithVDR(key.New())),
+			VDR:      vdr.New(vdr.WithVDR(key.New())),
 			Key: Key{
 				ID:   kid,
 				Type: keyType,
@@ -1264,7 +1264,7 @@ func TestCmd_AddVC(t *testing.T) {
 			KMS:      km,
 			LogID:    logID,
 			Trillian: client,
-			VDR:      vdr.New(&kmsCtx{KeyManager: km}, vdr.WithVDR(key.New())),
+			VDR:      vdr.New(vdr.WithVDR(key.New())),
 			Key: Key{
 				ID:   kid,
 				Type: keyType,
@@ -1303,7 +1303,7 @@ func TestCmd_AddVC(t *testing.T) {
 			LogID:    logID,
 			Trillian: client,
 			Crypto:   cr,
-			VDR:      vdr.New(&kmsCtx{KeyManager: km}, vdr.WithVDR(key.New())),
+			VDR:      vdr.New(vdr.WithVDR(key.New())),
 			Key: Key{
 				ID:   kid,
 				Type: keyType,
@@ -1349,12 +1349,6 @@ func createKMSAndCrypto(t *testing.T) (kms.KeyManager, crypto.Crypto) {
 	require.NoError(t, err)
 
 	return local, cr
-}
-
-type kmsCtx struct{ kms.KeyManager }
-
-func (c *kmsCtx) KMS() kms.KeyManager {
-	return c.KeyManager
 }
 
 type kmsProvider struct {

@@ -40,7 +40,7 @@ unit-test: mocks
 	@go test $(shell go list ./... | grep -v /test/bdd) -count=1 -race -coverprofile=coverage.out -covermode=atomic -timeout=10m
 
 .PHONY: bdd-test
-bdd-test: build-vct-docker
+bdd-test: generate-test-keys build-vct-docker
 	@go test github.com/trustbloc/vct/test/bdd -count=1 -v -cover . -p 1 -timeout=20m -race
 
 .PHONY: build-vct
@@ -64,9 +64,18 @@ build-vct-docker:
 	--build-arg GO_VER=$(GO_VER) \
 	--build-arg ALPINE_VER=$(ALPINE_VER)  .
 
+.PHONY: generate-test-keys
+generate-test-keys:
+	@mkdir -p test/bdd/fixtures/vct/keys/tls
+	@docker run -i --rm \
+		-v $(abspath .):/opt/workspace/vct \
+		--entrypoint "/opt/workspace/vct/scripts/generate_test_keys.sh" \
+		frapsoft/openssl
+
 .PHONY: clean
 clean:
 	@rm -rf ./build
+	@rm -rf test/bdd/fixtures/vct/keys
 	@rm -rf ./test/bdd/build
 	@rm -rf coverage.out
 	@find . -name "gomocks_test.go" -delete

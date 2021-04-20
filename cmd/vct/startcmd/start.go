@@ -28,6 +28,8 @@ import (
 	"github.com/hyperledger/aries-framework-go/pkg/crypto"
 	"github.com/hyperledger/aries-framework-go/pkg/crypto/tinkcrypto"
 	webcrypto "github.com/hyperledger/aries-framework-go/pkg/crypto/webkms"
+	"github.com/hyperledger/aries-framework-go/pkg/doc/did"
+	vdrapi "github.com/hyperledger/aries-framework-go/pkg/framework/aries/api/vdr"
 	"github.com/hyperledger/aries-framework-go/pkg/kms"
 	"github.com/hyperledger/aries-framework-go/pkg/kms/localkms"
 	"github.com/hyperledger/aries-framework-go/pkg/kms/webkms"
@@ -35,6 +37,7 @@ import (
 	"github.com/hyperledger/aries-framework-go/pkg/secretlock/noop"
 	"github.com/hyperledger/aries-framework-go/pkg/vdr"
 	vdrkey "github.com/hyperledger/aries-framework-go/pkg/vdr/key"
+	vdrweb "github.com/hyperledger/aries-framework-go/pkg/vdr/web"
 	"github.com/hyperledger/aries-framework-go/spi/storage"
 	"github.com/spf13/cobra"
 	tlsutils "github.com/trustbloc/edge-core/pkg/utils/tls"
@@ -333,7 +336,7 @@ func startAgent(parameters *agentParameters) error { // nolint: funlen
 		return fmt.Errorf("get cert pool: %w", err)
 	}
 
-	km, cr, err := createKMSAndCrypto(parameters, &http.Client{
+	httpClient := &http.Client{
 		Timeout: time.Minute,
 		Transport: &http.Transport{
 			TLSClientConfig: &tls.Config{
@@ -341,7 +344,9 @@ func startAgent(parameters *agentParameters) error { // nolint: funlen
 				MinVersion: tls.VersionTLS12,
 			},
 		},
-	}, store)
+	}
+
+	km, cr, err := createKMSAndCrypto(parameters, httpClient, store)
 	if err != nil {
 		return fmt.Errorf("create kms and crypto: %w", err)
 	}
@@ -385,8 +390,11 @@ func startAgent(parameters *agentParameters) error { // nolint: funlen
 		Trillian: logClient,
 		KMS:      km,
 		Crypto:   cr,
-		VDR:      vdr.New(&kmsCtx{KeyManager: km}, vdr.WithVDR(vdrkey.New())),
-		LogID:    parameters.logID,
+		VDR: vdr.New(
+			vdr.WithVDR(vdrkey.New()),
+			vdr.WithVDR(&webVDR{http: httpClient, VDR: vdrweb.New()}),
+		),
+		LogID: parameters.logID,
 		Key: command.Key{
 			ID:   parameters.keyID,
 			Type: parameters.keyType,
@@ -411,6 +419,15 @@ func startAgent(parameters *agentParameters) error { // nolint: funlen
 		parameters.tlsParams.serveCertPath,
 		parameters.tlsParams.serveKeyPath,
 	)
+}
+
+type webVDR struct {
+	http *http.Client
+	*vdrweb.VDR
+}
+
+func (w *webVDR) Read(didID string, opts ...vdrapi.DIDMethodOption) (*did.DocResolution, error) {
+	return w.VDR.Read(didID, append(opts, vdrapi.WithOption(vdrweb.HTTPClientOpt, w.http))...) // nolint: wrapcheck
 }
 
 func createTree(conn *grpc.ClientConn) (*trillian.Tree, error) {
@@ -526,12 +543,6 @@ func getDBParams(dbURL string) (driver, dsn string, err error) {
 	}
 
 	return parsed[0], strings.TrimPrefix(parsed[1], "//"), nil
-}
-
-type kmsCtx struct{ kms.KeyManager }
-
-func (c *kmsCtx) KMS() kms.KeyManager {
-	return c.KeyManager
 }
 
 type kmsProvider struct {

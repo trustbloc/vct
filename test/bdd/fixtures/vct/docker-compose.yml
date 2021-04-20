@@ -83,9 +83,29 @@ services:
       - VCT_API_HOST=0.0.0.0:56565
       - VCT_LOG_ID=${VCT_LOG_ID}
       - VCT_LOG_ENDPOINT=vct.trillian.log.server:8090
+      - VCT_TLS_CACERTS=/etc/tls/vct.local.crt
+    volumes:
+      - ./keys/tls:/etc/tls
     ports:
       - 56565:56565
     command: start
+    networks:
+      - witness_ledger_net
+
+  web.vct.local:
+    container_name: web.vct.local
+    image: halverneus/static-file-server:latest
+    environment:
+      - PORT=443
+      - FOLDER=/web
+      - CORS=true
+      - TLS_CERT=/etc/tls/vct.local.crt
+      - TLS_KEY=/etc/tls/vct.local.key
+    ports:
+      - 443:443
+    volumes:
+      - ./wellknown/did.json:/web/.well-known/did.json
+      - ./keys/tls:/etc/tls
     networks:
       - witness_ledger_net
 
