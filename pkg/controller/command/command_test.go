@@ -1046,6 +1046,13 @@ func TestCmd_GetEntryAndProof(t *testing.T) {
 	})
 }
 
+func TestCreateLeaf(t *testing.T) {
+	leaf, err := CreateLeaf(1, []byte(`[]`))
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "parse credential: unmarshal new credential")
+	require.Nil(t, leaf)
+}
+
 func TestCmd_AddVC(t *testing.T) {
 	const (
 		kid           = "kid"

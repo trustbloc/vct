@@ -475,6 +475,12 @@ func TestCalculateLeafHashFromBytes(t *testing.T) {
 		require.Contains(t, err.Error(), "parse credential")
 	})
 
+	t.Run("Create leaf", func(t *testing.T) {
+		_, err := vct.CalculateLeafHash(12345, &verifiable.Credential{})
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "create leaf: parse credential: build new credential")
+	})
+
 	t.Run("Marshal credential", func(t *testing.T) {
 		_, err := vct.CalculateLeafHash(12345, &verifiable.Credential{
 			Subject: make(chan int),
@@ -492,17 +498,17 @@ func TestVerifyVCTimestampSignature(t *testing.T) {
 			  "signature":"ECDSA",
 			  "type":"ECDSAP256IEEEP1363"
 		   },
-		   "signature":"s0jmWzf+uC5/Q5Nr6WbXxCoqltMMKgIyEwkNFXL2wive/Sm/79LQvnt6WkNvauSQX+U2W5sI+/J2JV8XXs9f2Q=="
+		   "signature":"l8NfxVChPH7fG4cId6iNIbgpbRzxov+rwozdL4r5lRNXGiOTy7iAn2+Zg84VwkJoeJWvLGyO2a3WZnQKtNu/Lg=="
 		}`
 
 		pubKey := []byte{
-			4, 200, 161, 44, 217, 50, 82, 169, 162, 245, 83, 163, 217, 60, 176, 74, 194, 240, 185, 100, 77, 72,
-			109, 194, 64, 216, 251, 122, 84, 82, 186, 116, 101, 121, 43, 24, 79, 80, 80, 86, 66, 141, 243, 216,
-			86, 229, 171, 141, 21, 159, 111, 211, 61, 12, 108, 119, 114, 181, 105, 7, 1, 16, 103, 207, 138,
+			4, 185, 70, 232, 62, 166, 17, 233, 172, 19, 143, 227, 170, 181, 184, 202, 177, 242, 247, 199, 73, 209,
+			108, 207, 87, 26, 199, 162, 21, 140, 117, 0, 143, 48, 20, 118, 255, 221, 200, 185, 227, 42, 213, 124,
+			156, 109, 160, 211, 29, 245, 44, 128, 46, 88, 117, 88, 240, 223, 241, 24, 209, 87, 214, 115, 101,
 		}
 
 		require.NoError(t, vct.VerifyVCTimestampSignatureFromBytes(
-			[]byte(signature), pubKey, 1617977793917, vcBachelorDegree,
+			[]byte(signature), pubKey, 1619006293939, vcBachelorDegree,
 		))
 	})
 
@@ -522,6 +528,12 @@ func TestVerifyVCTimestampSignature(t *testing.T) {
 		require.Contains(t, vct.VerifyVCTimestampSignatureFromBytes(
 			[]byte(`{}`), []byte(`[]`), 1617977793917, []byte(`[]`),
 		).Error(), "parse credential: unmarshal new credential")
+	})
+
+	t.Run("Create leaf", func(t *testing.T) {
+		require.Contains(t, vct.VerifyVCTimestampSignature(
+			[]byte(`{}`), []byte(`[]`), 1617977793917, &verifiable.Credential{},
+		).Error(), "create leaf: parse credential: build new credential")
 	})
 
 	t.Run("Marshal credential", func(t *testing.T) {

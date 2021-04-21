@@ -54,6 +54,7 @@ func (s *Steps) RegisterSteps(suite *godog.Suite) {
 	suite.Step(`Retrieve latest signed tree head and check that tree_size is "([^"]*)"$`, s.getSTH)
 	suite.Step(`Retrieve merkle consistency proof between signed tree heads$`, s.getSTHConsistency)
 	suite.Step(`Retrieve entries from log and check that len is "([^"]*)"$`, s.getEntries)
+	suite.Step(`Use timestamp from "([^"]*)" for "([^"]*)"$`, s.setTimestamp)
 	suite.Step(`Retrieve merkle audit proof from log by leaf hash for "([^"]*)"$`, s.getProofByHash)
 }
 
@@ -93,6 +94,12 @@ func (s *Steps) addVC(file string) error {
 	return nil
 }
 
+func (s *Steps) setTimestamp(from, to string) error {
+	s.state.AddedCredentials[to] = s.state.AddedCredentials[from]
+
+	return nil
+}
+
 func (s *Steps) getProofByHash(file string) error {
 	src, err := readFile(file)
 	if err != nil {
@@ -115,7 +122,7 @@ func (s *Steps) getProofByHash(file string) error {
 			return fmt.Errorf("get proof by hash: %w", err)
 		}
 
-		if len(entries.AuditPath) < 1 {
+		if resp.TreeSize > 1 && len(entries.AuditPath) < 1 {
 			return fmt.Errorf("no audit, expected greater than zero, got %d", len(entries.AuditPath))
 		}
 
