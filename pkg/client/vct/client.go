@@ -209,12 +209,17 @@ func CalculateLeafHash(timestamp uint64, credential *verifiable.Credential) (str
 		return "", fmt.Errorf("marshal credential: %w", err)
 	}
 
-	leaf, err := json.Marshal(command.CreateLeaf(timestamp, vc))
+	leaf, err := command.CreateLeaf(timestamp, vc)
+	if err != nil {
+		return "", fmt.Errorf("create leaf: %w", err)
+	}
+
+	leafData, err := json.Marshal(leaf)
 	if err != nil {
 		return "", fmt.Errorf("marshal leaf: %w", err)
 	}
 
-	return base64.StdEncoding.EncodeToString(hasher.DefaultHasher.HashLeaf(leaf)), nil
+	return base64.StdEncoding.EncodeToString(hasher.DefaultHasher.HashLeaf(leafData)), nil
 }
 
 // VerifyVCTimestampSignature verifies VC timestamp signature.
@@ -230,7 +235,12 @@ func VerifyVCTimestampSignature(signature, pubKey []byte, timestamp uint64, cred
 		return fmt.Errorf("marshal credential: %w", err)
 	}
 
-	data, err := json.Marshal(command.CreateVCTimestampSignature(command.CreateLeaf(timestamp, vc)))
+	leaf, err := command.CreateLeaf(timestamp, vc)
+	if err != nil {
+		return fmt.Errorf("create leaf: %w", err)
+	}
+
+	data, err := json.Marshal(command.CreateVCTimestampSignature(leaf))
 	if err != nil {
 		return fmt.Errorf("marshal VC timestamp signature: %w", err)
 	}

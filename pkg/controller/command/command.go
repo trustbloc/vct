@@ -150,16 +150,31 @@ func (c *Cmd) GetPublicKey(w io.Writer, _ io.Reader) error {
 }
 
 // CreateLeaf creates MerkleTreeLeaf.
-func CreateLeaf(timestamp uint64, credential []byte) *MerkleTreeLeaf {
+func CreateLeaf(timestamp uint64, credential []byte) (*MerkleTreeLeaf, error) {
+	vc, err := verifiable.ParseCredential(credential,
+		verifiable.WithDisabledProofCheck(),
+		verifiable.WithNoCustomSchemaCheck(),
+	)
+	if err != nil {
+		return nil, fmt.Errorf("parse credential: %w", err)
+	}
+
+	vc.Proofs = nil
+
+	credentialWithoutProofs, err := json.Marshal(vc)
+	if err != nil {
+		return nil, fmt.Errorf("marshal credential: %w", err)
+	}
+
 	return &MerkleTreeLeaf{
 		Version:  V1,
 		LeafType: TimestampedEntryLeafType,
 		TimestampedEntry: &TimestampedEntry{
 			EntryType: VCLogEntryType,
 			Timestamp: timestamp,
-			VCEntry:   credential,
+			VCEntry:   credentialWithoutProofs,
 		},
-	}
+	}, nil
 }
 
 // AddVC adds verifiable credential to log.
@@ -182,22 +197,28 @@ func (c *Cmd) AddVC(w io.Writer, r io.Reader) error { // nolint: funlen
 		return fmt.Errorf("%w: issuer %s is not in a list", errors.ErrBadRequest, vc.Issuer.ID)
 	}
 
-	vcSrc, err := json.Marshal(vc)
+	leaf, err := CreateLeaf(uint64(time.Now().UnixNano()/int64(time.Millisecond)), dest.Bytes())
 	if err != nil {
-		return errors.NewStatusInternalServerError(fmt.Errorf("marshal credential: %w", err))
+		return fmt.Errorf("create leaf: %w", err)
 	}
 
-	leafData, err := json.Marshal(CreateLeaf(uint64(time.Now().UnixNano()/int64(time.Millisecond)), vcSrc))
+	leafData, err := json.Marshal(leaf)
 	if err != nil {
 		return errors.NewStatusInternalServerError(fmt.Errorf("marshal MerkleTreeLeaf: %w", err))
 	}
 
-	leafIDHash := sha256.Sum256(dest.Bytes())
+	extraData, err := json.Marshal(vc.Proofs)
+	if err != nil {
+		return errors.NewStatusInternalServerError(fmt.Errorf("marshal credential proofs: %w", err))
+	}
+
+	leafIDHash := sha256.Sum256(leaf.TimestampedEntry.VCEntry)
 
 	resp, err := c.client.QueueLeaf(context.Background(), &trillian.QueueLeafRequest{
 		LogId: c.logID,
 		Leaf: &trillian.LogLeaf{
 			LeafValue:        leafData,
+			ExtraData:        extraData,
 			LeafIdentityHash: leafIDHash[:],
 		},
 	})

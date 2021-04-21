@@ -8,7 +8,7 @@
 Feature: Verifiable credentials transparency API.
   Scenario: Adds verifiable credentials to Log
     Given VCT agent is running on "http://localhost:56565"
-    Then  Add verifiable credential "bachelor_degree.json" to Log
+    Then  Add verifiable credential "bachelor_degree_no_proof.json" to Log
     When  Retrieve latest signed tree head and check that tree_size is "1"
     And   Retrieve entries from log and check that len is "1"
 
@@ -18,6 +18,8 @@ Feature: Verifiable credentials transparency API.
     And   Add verifiable credential "verifiable_credentials_bbs+.json" to Log
     When  Retrieve latest signed tree head and check that tree_size is "1"
     And   Retrieve entries from log and check that len is "1"
+    Then  Use timestamp from "verifiable_credentials_bbs+.json" for "verifiable_credentials_bbs+_no_proof.json"
+    And   Retrieve merkle audit proof from log by leaf hash for "verifiable_credentials_bbs+_no_proof.json"
 
   Scenario: Retrieve merkle consistency proof between signed tree heads
     Given VCT agent is running on "http://localhost:56565"
