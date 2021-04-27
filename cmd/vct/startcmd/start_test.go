@@ -20,12 +20,13 @@ const (
 	logIDFlagName             = "log-id"
 	logEndpointFlagName       = "log-endpoint"
 	kmsStoreEndpointFlagName  = "kms-store-endpoint"
+	kmsEndpointFlagName       = "kms-endpoint"
 	keyTypeFlagName           = "key-type"
 	tlsSystemCertPoolFlagName = "tls-systemcertpool"
 	datasourceNameFlagName    = "dsn"
 	datasourceTimeoutFlagName = "dsn-timeout"
 	tlsCACertsFlagName        = "tls-cacerts"
-	testTreeFlagName          = "test-tree"
+	autoInitTreeFlagName      = "auto-init-tree"
 )
 
 type mockServer struct{}
@@ -41,6 +42,11 @@ func TestStartCmdContents(t *testing.T) {
 	require.Equal(t, "start", startCmd.Use)
 	require.Equal(t, "Starts vct service", startCmd.Short)
 	require.Equal(t, "Starts verifiable credentials transparency service", startCmd.Long)
+}
+
+func TestBuildKMSURL(t *testing.T) {
+	require.Equal(t, BuildKMSURL("https://kms.com", "/keys"), "https://kms.com/keys")
+	require.Equal(t, BuildKMSURL("oops", "https://kms.com/keys"), "https://kms.com/keys")
 }
 
 func TestCmd(t *testing.T) {
@@ -75,7 +81,7 @@ func TestCmd(t *testing.T) {
 
 		args := []string{
 			"--" + agentHostFlagName, "",
-			"--" + testTreeFlagName, "t r u e",
+			"--" + autoInitTreeFlagName, "t r u e",
 			"--" + logEndpointFlagName, "https://vct.example.com",
 		}
 		startCmd.SetArgs(args)
@@ -91,14 +97,14 @@ func TestCmd(t *testing.T) {
 
 		args := []string{
 			"--" + agentHostFlagName, "",
-			"--" + testTreeFlagName, "true",
+			"--" + autoInitTreeFlagName, "true",
 			"--" + logEndpointFlagName, "https://vct.example.com",
 		}
 		startCmd.SetArgs(args)
 
 		err = startCmd.Execute()
 
-		require.Contains(t, err.Error(), "create tree: rpc error: code = Unavailable")
+		require.Contains(t, err.Error(), "create and init tree: init config value for \"tree-log\"")
 	})
 
 	t.Run("No log-id is not valid", func(t *testing.T) {
@@ -145,7 +151,24 @@ func TestCmd(t *testing.T) {
 		require.Nil(t, startCmd.Execute())
 	})
 
-	t.Run("KMS fails", func(t *testing.T) {
+	t.Run("KMS fails (web-key-store)", func(t *testing.T) {
+		startCmd, err := Cmd(&mockServer{})
+		require.NoError(t, err)
+
+		args := []string{
+			"--" + agentHostFlagName, ":98989",
+			"--" + logIDFlagName, "11111",
+			"--" + logEndpointFlagName, "http://vct.example.com",
+			"--" + kmsEndpointFlagName, "http://vct.example.com",
+		}
+		startCmd.SetArgs(args)
+
+		err = startCmd.Execute()
+
+		require.Contains(t, err.Error(), "get or init: init config value for \"web-key-store\"")
+	})
+
+	t.Run("KMS fails (create kid)", func(t *testing.T) {
 		startCmd, err := Cmd(&mockServer{})
 		require.NoError(t, err)
 
@@ -159,7 +182,7 @@ func TestCmd(t *testing.T) {
 
 		err = startCmd.Execute()
 
-		require.Contains(t, err.Error(), "create kid: create: posting Create key failed")
+		require.Contains(t, err.Error(), "create kid: init config value for \"kid\"")
 	})
 
 	t.Run("Create command (supported key)", func(t *testing.T) {
