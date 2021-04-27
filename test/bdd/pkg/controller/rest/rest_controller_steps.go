@@ -61,11 +61,13 @@ func (s *Steps) RegisterSteps(suite *godog.Suite) {
 func (s *Steps) setVCTClient(endpoint string) error {
 	s.vct = vct.New(endpoint, vct.WithHTTPClient(s.client))
 
-	resp, err := s.vct.GetSTH(context.Background())
+	return backoff.Retry(func() error { // nolint: wrapcheck
+		resp, err := s.vct.GetSTH(context.Background())
 
-	s.state.GetSTHResponse = resp
+		s.state.GetSTHResponse = resp
 
-	return err // nolint: wrapcheck
+		return err // nolint: wrapcheck
+	}, backoff.WithMaxRetries(backoff.NewConstantBackOff(time.Second), 60))
 }
 
 func (s *Steps) addVC(file string) error {

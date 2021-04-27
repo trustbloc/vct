@@ -8,19 +8,15 @@ package bdd_test
 
 import (
 	"flag"
-	"fmt"
 	"os"
 	"os/exec"
-	"strconv"
 	"strings"
 	"testing"
 	"time"
 
-	"github.com/cenkalti/backoff/v4"
 	"github.com/cucumber/godog"
 	"github.com/hyperledger/aries-framework-go/pkg/common/log"
 
-	"github.com/trustbloc/vct/pkg/controller/errors"
 	"github.com/trustbloc/vct/test/bdd/pkg/controller/rest"
 )
 
@@ -63,44 +59,10 @@ func getCmdArg(argName string) string {
 var (
 	dockerComposeUp   = []string{"docker-compose", "-f", "./fixtures/vct/docker-compose.yml", "up", "-d"}
 	dockerComposeDown = []string{"docker-compose", "-f", "./fixtures/vct/docker-compose.yml", "down"}
-	createTree        = []string{"make", "--no-print-directory", "createtree"}
 )
 
 func runBddTests(tags, format string) int {
 	return godog.RunWithOptions("godogs", func(s *godog.Suite) {
-		s.BeforeSuite(func() {
-			logger.Infof("Running %s", strings.Join(dockerComposeUp, " "))
-			if err := exec.Command(dockerComposeUp[0], dockerComposeUp[1:]...).Run(); err != nil { //nolint: gosec
-				logger.Errorf("command %q failed: %w", strings.Join(dockerComposeUp, " "), err)
-			}
-		})
-		s.BeforeSuite(func() {
-			logger.Infof("Running %s", strings.Join(createTree, " "))
-			err := backoff.Retry(func() error {
-				resp, err := exec.Command(createTree[0], createTree[1:]...).CombinedOutput() //nolint: gosec
-				if err != nil {
-					return fmt.Errorf("command %q failed: %w", strings.Join(createTree, " "), err)
-				}
-
-				logID := strings.TrimSpace(string(resp))
-
-				_, err = strconv.ParseInt(logID, 10, 64)
-				if err != nil {
-					return errors.New(string(resp)) // nolint: wrapcheck
-				}
-
-				logger.Infof("LogID was created %s", logID)
-
-				if err = os.Setenv("VCT_LOG_ID", logID); err != nil {
-					return fmt.Errorf("set env: %w", err)
-				}
-
-				return nil
-			}, backoff.WithMaxRetries(backoff.NewConstantBackOff(time.Second), 60))
-			if err != nil {
-				logger.Errorf("create tree failed: %w", err)
-			}
-		})
 		s.BeforeSuite(func() {
 			logger.Infof("Running %s", strings.Join(dockerComposeUp, " "))
 			if err := exec.Command(dockerComposeUp[0], dockerComposeUp[1:]...).Run(); err != nil { //nolint: gosec

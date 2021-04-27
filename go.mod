@@ -11,6 +11,7 @@ require (
 	github.com/cucumber/godog v0.9.0
 	github.com/golang/mock v1.4.4
 	github.com/google/trillian v1.3.13
+	github.com/google/uuid v1.2.0 // indirect
 	github.com/gorilla/mux v1.8.0
 	github.com/hyperledger/aries-framework-go v0.1.7-0.20210416102014-f347f45b984f
 	github.com/hyperledger/aries-framework-go-ext/component/storage/couchdb v0.0.0-20210326155331-14f4ca7d75cb
