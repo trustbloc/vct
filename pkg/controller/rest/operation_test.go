@@ -108,6 +108,16 @@ func TestOperation_GetIssuers(t *testing.T) {
 	})
 }
 
+func TestOperation_HealthCheck(t *testing.T) {
+	t.Run("Success", func(t *testing.T) {
+		operation := New(nil)
+
+		_, code := sendRequestToHandler(t, handlerLookup(t, operation, HealthCheckPath), nil, HealthCheckPath)
+
+		require.Equal(t, http.StatusOK, code)
+	})
+}
+
 func TestOperation_GetPublicKey(t *testing.T) {
 	t.Run("Success", func(t *testing.T) {
 		ctrl := gomock.NewController(t)

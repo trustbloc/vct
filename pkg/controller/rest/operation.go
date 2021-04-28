@@ -13,6 +13,7 @@ import (
 	"io"
 	"net/http"
 	"strconv"
+	"time"
 
 	"github.com/hyperledger/aries-framework-go/pkg/common/log"
 
@@ -33,6 +34,7 @@ const (
 	GetIssuersPath        = basePath + "/get-issuers"
 	GetEntryAndProofPath  = basePath + "/get-entry-and-proof"
 	GetPublicKeyPath      = basePath + "/get-public-key"
+	HealthCheckPath       = "/healthcheck"
 )
 
 const (
@@ -73,6 +75,7 @@ func (c *Operation) GetRESTHandlers() []Handler {
 		NewHTTPHandler(GetIssuersPath, http.MethodGet, c.GetIssuers),
 		NewHTTPHandler(GetPublicKeyPath, http.MethodGet, c.GetPublicKey),
 		NewHTTPHandler(GetEntryAndProofPath, http.MethodGet, c.GetEntryAndProof),
+		NewHTTPHandler(HealthCheckPath, http.MethodGet, c.HealthCheck),
 	}
 }
 
@@ -89,6 +92,16 @@ func (c *Operation) GetSTH(w http.ResponseWriter, _ *http.Request) {
 // GetIssuers returns issuers.
 func (c *Operation) GetIssuers(w http.ResponseWriter, _ *http.Request) {
 	execute(c.cmd.GetIssuers, w, nil)
+}
+
+// HealthCheck returns status.
+func (c *Operation) HealthCheck(w http.ResponseWriter, _ *http.Request) {
+	execute(func(rw io.Writer, req io.Reader) error {
+		return json.NewEncoder(rw).Encode(map[string]interface{}{ // nolint: wrapcheck
+			"status":       "success",
+			"current_time": time.Now(),
+		})
+	}, w, nil)
 }
 
 // GetPublicKey returns public key.
