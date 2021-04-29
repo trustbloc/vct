@@ -32,6 +32,7 @@ import (
 	"github.com/hyperledger/aries-framework-go/pkg/crypto/tinkcrypto"
 	webcrypto "github.com/hyperledger/aries-framework-go/pkg/crypto/webkms"
 	"github.com/hyperledger/aries-framework-go/pkg/doc/did"
+	"github.com/hyperledger/aries-framework-go/pkg/doc/jsonld"
 	vdrapi "github.com/hyperledger/aries-framework-go/pkg/framework/aries/api/vdr"
 	"github.com/hyperledger/aries-framework-go/pkg/kms"
 	"github.com/hyperledger/aries-framework-go/pkg/kms/localkms"
@@ -42,6 +43,7 @@ import (
 	vdrkey "github.com/hyperledger/aries-framework-go/pkg/vdr/key"
 	vdrweb "github.com/hyperledger/aries-framework-go/pkg/vdr/web"
 	"github.com/hyperledger/aries-framework-go/spi/storage"
+	"github.com/piprate/json-gold/ld"
 	"github.com/spf13/cobra"
 	tlsutils "github.com/trustbloc/edge-core/pkg/utils/tls"
 	"google.golang.org/grpc"
@@ -111,6 +113,11 @@ const (
 		" Alternatively, this can be set with the following environment variable: " + datasourceTimeoutEnvKey
 	datasourceTimeoutEnvKey = envPrefix + "DSN_TIMEOUT"
 
+	trillianTimeoutFlagName  = "trillian-timeout"
+	trillianTimeoutFlagUsage = "Total time in seconds to wait until the trillian is available before giving up." +
+		" Alternatively, this can be set with the following environment variable: " + trillianTimeoutEnvKey
+	trillianTimeoutEnvKey = envPrefix + "TRILLIAN_TIMEOUT"
+
 	databasePrefixFlagName  = "database-prefix"
 	databasePrefixFlagUsage = "An optional prefix to be used when creating and retrieving underlying databases. " +
 		" Alternatively, this can be set with the following environment variable: " + databasePrefixEnvKey
@@ -132,6 +139,11 @@ const (
 	tlsCACertsFlagUsage = "Comma-Separated list of ca certs path." +
 		" Alternatively, this can be set with the following environment variable: " + tlsCACertsEnvKey
 	tlsCACertsEnvKey = envPrefix + "TLS_CACERTS"
+
+	issuersFlagName  = "issuers"
+	issuersFlagUsage = "Comma-Separated list of supported issuers." +
+		" Alternatively, this can be set with the following environment variable: " + issuersEnvKey
+	issuersEnvKey = envPrefix + "ISSUERS"
 
 	tlsServeCertPathFlagName  = "tls-serve-cert"
 	tlsServeCertPathFlagUsage = "Path to the server certificate to use when serving HTTPS." +
@@ -198,12 +210,14 @@ func Cmd(server server) (*cobra.Command, error) {
 type agentParameters struct {
 	logID             int64
 	autoInitTree      bool
+	issuers           []string
 	host              string
 	logEndpoint       string
 	keyID             string
 	keyType           kms.KeyType
 	datasourceName    string
 	datasourceTimeout uint64
+	trillianTimeout   uint64
 	databasePrefix    string
 	kmsEndpoint       string
 	kmsStoreEndpoint  string
@@ -261,10 +275,22 @@ func createStartCMD(server server) *cobra.Command { // nolint: funlen
 			datasourceName := getUserSetVarOptional(cmd, datasourceNameFlagName, datasourceNameEnvKey)
 			databasePrefix := getUserSetVarOptional(cmd, databasePrefixFlagName, databasePrefixEnvKey)
 			datasourceTimeoutStr := getUserSetVarOptional(cmd, datasourceTimeoutFlagName, datasourceTimeoutEnvKey)
+			trillianTimeoutStr := getUserSetVarOptional(cmd, trillianTimeoutFlagName, trillianTimeoutEnvKey)
+			issuersStr := getUserSetVarOptional(cmd, issuersFlagName, issuersEnvKey)
+
+			var issuers []string
+			if issuersStr != "" {
+				issuers = strings.Split(issuersStr, ",")
+			}
 
 			datasourceTimeout, err := strconv.ParseUint(datasourceTimeoutStr, 10, 64)
 			if err != nil {
 				return fmt.Errorf("timeout is not a number(positive): %w", err)
+			}
+
+			trillianTimeout, err := strconv.ParseUint(trillianTimeoutStr, 10, 64)
+			if err != nil {
+				return fmt.Errorf("trillian timeout is not a number(positive): %w", err)
 			}
 
 			tlsParams, err := getTLS(cmd)
@@ -275,8 +301,10 @@ func createStartCMD(server server) *cobra.Command { // nolint: funlen
 			parameters := &agentParameters{
 				server:            server,
 				autoInitTree:      autoInitTree,
+				issuers:           issuers,
 				host:              host,
 				logID:             logID,
+				trillianTimeout:   trillianTimeout,
 				logEndpoint:       logEndpoint,
 				kmsStoreEndpoint:  kmsStoreEndpoint,
 				kmsEndpoint:       kmsEndpoint,
@@ -418,12 +446,20 @@ func startAgent(parameters *agentParameters) error { // nolint: funlen
 	if parameters.autoInitTree {
 		var tree *trillian.Tree
 
-		tree, err = createTreeAndInit(conn, configStore)
+		tree, err = createTreeAndInit(conn, configStore, parameters.trillianTimeout)
 		if err != nil {
 			return fmt.Errorf("create tree: %w", err)
 		}
 
 		parameters.logID = tree.TreeId
+	}
+
+	// TODO: Use storage (store batch of contexts: not implemented)
+	loader, err := jsonld.NewDocumentLoader(mem.NewProvider(),
+		jsonld.WithRemoteDocumentLoader(ld.NewDefaultDocumentLoader(httpClient)),
+	)
+	if err != nil {
+		return fmt.Errorf("new document loader: %w", err)
 	}
 
 	cmd, err := command.New(&command.Config{
@@ -439,7 +475,8 @@ func startAgent(parameters *agentParameters) error { // nolint: funlen
 			ID:   parameters.keyID,
 			Type: parameters.keyType,
 		},
-		Issuers: []string{},
+		DocumentLoader: loader,
+		Issuers:        parameters.issuers,
 	})
 	if err != nil {
 		return fmt.Errorf("create command instance: %w", err)
@@ -473,26 +510,38 @@ func (w *webVDR) Read(didID string, opts ...vdrapi.DIDMethodOption) (*did.DocRes
 	return w.VDR.Read(didID, append(opts, vdrapi.WithOption(vdrweb.HTTPClientOpt, w.http))...) // nolint: wrapcheck
 }
 
-func createTreeAndInit(conn *grpc.ClientConn, cfg storage.Store) (*trillian.Tree, error) {
+func createTreeAndInit(conn *grpc.ClientConn, cfg storage.Store, timeout uint64) (*trillian.Tree, error) {
 	var tree *trillian.Tree
 
 	err := getOrInit(cfg, treeLogKey, &tree, func() (interface{}, error) {
-		createdTree, err := trillian.NewTrillianAdminClient(conn).CreateTree(context.Background(),
-			&trillian.CreateTreeRequest{
-				Tree: &trillian.Tree{
-					TreeState:          trillian.TreeState_ACTIVE,
-					TreeType:           trillian.TreeType_LOG,
-					HashStrategy:       trillian.HashStrategy_RFC6962_SHA256,
-					HashAlgorithm:      sigpb.DigitallySigned_SHA256,
-					SignatureAlgorithm: sigpb.DigitallySigned_ECDSA,
-					MaxRootDuration:    durationpb.New(time.Hour),
-				},
-				KeySpec: &keyspb.Specification{
-					Params: &keyspb.Specification_EcdsaParams{
-						EcdsaParams: &keyspb.Specification_ECDSA{},
+		var (
+			createdTree *trillian.Tree
+			err         error
+		)
+
+		err = backoff.RetryNotify(func() error {
+			createdTree, err = trillian.NewTrillianAdminClient(conn).CreateTree(context.Background(),
+				&trillian.CreateTreeRequest{
+					Tree: &trillian.Tree{
+						TreeState:          trillian.TreeState_ACTIVE,
+						TreeType:           trillian.TreeType_LOG,
+						HashStrategy:       trillian.HashStrategy_RFC6962_SHA256,
+						HashAlgorithm:      sigpb.DigitallySigned_SHA256,
+						SignatureAlgorithm: sigpb.DigitallySigned_ECDSA,
+						MaxRootDuration:    durationpb.New(time.Hour),
 					},
-				},
-			})
+					KeySpec: &keyspb.Specification{
+						Params: &keyspb.Specification_EcdsaParams{
+							EcdsaParams: &keyspb.Specification_ECDSA{},
+						},
+					},
+				})
+
+			return err // nolint: wrapcheck
+		}, backoff.WithMaxRetries(backoff.NewConstantBackOff(time.Second), timeout), func(err error, duration time.Duration) {
+			logger.Warnf("create tree failed, will sleep for %v before trying again: %v", duration, err)
+		})
+
 		if err != nil {
 			return nil, fmt.Errorf("create tree: %w", err)
 		}
@@ -567,11 +616,13 @@ func createFlags(startCmd *cobra.Command) {
 	startCmd.Flags().StringP(datasourceNameFlagName, datasourceNameFlagShorthand, "mem://test", datasourceNameFlagUsage)
 	startCmd.Flags().String(databasePrefixFlagName, "", databasePrefixFlagUsage)
 	startCmd.Flags().String(datasourceTimeoutFlagName, "30", datasourceTimeoutFlagUsage)
+	startCmd.Flags().String(trillianTimeoutFlagName, "0", trillianTimeoutFlagUsage)
 	startCmd.Flags().String(tlsSystemCertPoolFlagName, "false", tlsSystemCertPoolFlagUsage)
 	startCmd.Flags().String(tlsCACertsFlagName, "", tlsCACertsFlagUsage)
 	startCmd.Flags().String(tlsServeCertPathFlagName, "", tlsServeCertPathFlagUsage)
 	startCmd.Flags().String(tlsServeKeyPathFlagName, "", tlsServeKeyPathFlagUsage)
 	startCmd.Flags().String(autoInitTreeFlagName, "false", autoInitTreeFlagUsage)
+	startCmd.Flags().String(issuersFlagName, "", issuersFlagUsage)
 }
 
 func getTLS(cmd *cobra.Command) (*tlsParameters, error) {

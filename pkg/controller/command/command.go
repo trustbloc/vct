@@ -19,6 +19,7 @@ import (
 	"github.com/google/trillian"
 	"github.com/google/trillian/types"
 	"github.com/hyperledger/aries-framework-go/pkg/crypto"
+	"github.com/hyperledger/aries-framework-go/pkg/doc/jsonld"
 	"github.com/hyperledger/aries-framework-go/pkg/doc/verifiable"
 	"github.com/hyperledger/aries-framework-go/pkg/framework/aries/api/vdr"
 	"github.com/hyperledger/aries-framework-go/pkg/kms"
@@ -55,28 +56,30 @@ type Key struct {
 
 // Cmd is a controller for commands.
 type Cmd struct {
-	logID         int64
-	VCLogID       [32]byte
-	kh            interface{}
-	vdr           vdr.Registry
-	client        TrillianLogClient
-	kms           KeyManager
-	crypto        crypto.Crypto
-	issuers       map[string]struct{}
-	uniqueIssuers []string
-	PubKey        []byte
-	alg           *SignatureAndHashAlgorithm
+	logID          int64
+	VCLogID        [32]byte
+	kh             interface{}
+	vdr            vdr.Registry
+	client         TrillianLogClient
+	kms            KeyManager
+	crypto         crypto.Crypto
+	issuers        map[string]struct{}
+	uniqueIssuers  []string
+	PubKey         []byte
+	documentLoader *jsonld.DocumentLoader
+	alg            *SignatureAndHashAlgorithm
 }
 
 // Config for the Cmd.
 type Config struct {
-	Trillian TrillianLogClient
-	KMS      KeyManager
-	Crypto   crypto.Crypto
-	VDR      vdr.Registry
-	LogID    int64
-	Key      Key
-	Issuers  []string
+	Trillian       TrillianLogClient
+	KMS            KeyManager
+	Crypto         crypto.Crypto
+	VDR            vdr.Registry
+	LogID          int64
+	Key            Key
+	Issuers        []string
+	DocumentLoader *jsonld.DocumentLoader
 }
 
 // New returns commands controller.
@@ -111,17 +114,18 @@ func New(cfg *Config) (*Cmd, error) {
 	}
 
 	return &Cmd{
-		client:        cfg.Trillian,
-		vdr:           cfg.VDR,
-		PubKey:        pubBytes,
-		VCLogID:       sha256.Sum256(pubBytes),
-		logID:         cfg.LogID,
-		kms:           cfg.KMS,
-		kh:            kh,
-		crypto:        cfg.Crypto,
-		issuers:       setOfIssuers,
-		uniqueIssuers: uniqueIssuers,
-		alg:           alg,
+		client:         cfg.Trillian,
+		documentLoader: cfg.DocumentLoader,
+		vdr:            cfg.VDR,
+		PubKey:         pubBytes,
+		VCLogID:        sha256.Sum256(pubBytes),
+		logID:          cfg.LogID,
+		kms:            cfg.KMS,
+		kh:             kh,
+		crypto:         cfg.Crypto,
+		issuers:        setOfIssuers,
+		uniqueIssuers:  uniqueIssuers,
+		alg:            alg,
 	}, nil
 }
 
@@ -150,16 +154,11 @@ func (c *Cmd) GetPublicKey(w io.Writer, _ io.Reader) error {
 }
 
 // CreateLeaf creates MerkleTreeLeaf.
-func CreateLeaf(timestamp uint64, credential []byte) (*MerkleTreeLeaf, error) {
-	vc, err := verifiable.ParseCredential(credential,
-		verifiable.WithDisabledProofCheck(),
-		verifiable.WithNoCustomSchemaCheck(),
-	)
-	if err != nil {
-		return nil, fmt.Errorf("parse credential: %w", err)
-	}
-
+func CreateLeaf(timestamp uint64, vc *verifiable.Credential) (*MerkleTreeLeaf, error) {
+	proofs := vc.Proofs
 	vc.Proofs = nil
+
+	defer func() { vc.Proofs = proofs }()
 
 	credentialWithoutProofs, err := json.Marshal(vc)
 	if err != nil {
@@ -188,7 +187,7 @@ func (c *Cmd) AddVC(w io.Writer, r io.Reader) error { // nolint: funlen
 
 	vc, err := verifiable.ParseCredential(dest.Bytes(), verifiable.WithPublicKeyFetcher(
 		verifiable.NewVDRKeyResolver(c.vdr).PublicKeyFetcher(),
-	))
+	), verifiable.WithJSONLDDocumentLoader(c.documentLoader))
 	if err != nil {
 		return errors.NewBadRequestError(fmt.Errorf("parse credential: %w", err))
 	}
@@ -197,7 +196,7 @@ func (c *Cmd) AddVC(w io.Writer, r io.Reader) error { // nolint: funlen
 		return fmt.Errorf("%w: issuer %s is not in a list", errors.ErrBadRequest, vc.Issuer.ID)
 	}
 
-	leaf, err := CreateLeaf(uint64(time.Now().UnixNano()/int64(time.Millisecond)), dest.Bytes())
+	leaf, err := CreateLeaf(uint64(time.Now().UnixNano()/int64(time.Millisecond)), vc)
 	if err != nil {
 		return fmt.Errorf("create leaf: %w", err)
 	}

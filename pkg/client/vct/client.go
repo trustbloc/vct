@@ -189,26 +189,8 @@ func (c *Client) GetEntryAndProof(ctx context.Context, leafIndex, treeSize uint6
 	return result, nil
 }
 
-// CalculateLeafHashFromBytes calculates hash for given credentials.
-func CalculateLeafHashFromBytes(timestamp uint64, credential []byte) (string, error) {
-	vc, err := verifiable.ParseCredential(credential,
-		verifiable.WithDisabledProofCheck(),
-		verifiable.WithNoCustomSchemaCheck(),
-	)
-	if err != nil {
-		return "", fmt.Errorf("parse credential: %w", err)
-	}
-
-	return CalculateLeafHash(timestamp, vc)
-}
-
 // CalculateLeafHash calculates hash for given credentials.
-func CalculateLeafHash(timestamp uint64, credential *verifiable.Credential) (string, error) {
-	vc, err := json.Marshal(credential)
-	if err != nil {
-		return "", fmt.Errorf("marshal credential: %w", err)
-	}
-
+func CalculateLeafHash(timestamp uint64, vc *verifiable.Credential) (string, error) {
 	leaf, err := command.CreateLeaf(timestamp, vc)
 	if err != nil {
 		return "", fmt.Errorf("create leaf: %w", err)
@@ -223,16 +205,11 @@ func CalculateLeafHash(timestamp uint64, credential *verifiable.Credential) (str
 }
 
 // VerifyVCTimestampSignature verifies VC timestamp signature.
-func VerifyVCTimestampSignature(signature, pubKey []byte, timestamp uint64, credential *verifiable.Credential) error {
+func VerifyVCTimestampSignature(signature, pubKey []byte, timestamp uint64, vc *verifiable.Credential) error {
 	var sig *command.DigitallySigned
 
 	if err := json.Unmarshal(signature, &sig); err != nil {
 		return fmt.Errorf("unmarshal signature: %w", err)
-	}
-
-	vc, err := json.Marshal(credential)
-	if err != nil {
-		return fmt.Errorf("marshal credential: %w", err)
 	}
 
 	leaf, err := command.CreateLeaf(timestamp, vc)
@@ -251,19 +228,6 @@ func VerifyVCTimestampSignature(signature, pubKey []byte, timestamp uint64, cred
 	}
 
 	return (&tinkcrypto.Crypto{}).Verify(sig.Signature, data, kh) // nolint: wrapcheck
-}
-
-// VerifyVCTimestampSignatureFromBytes verifies VC timestamp signature.
-func VerifyVCTimestampSignatureFromBytes(signature, pubKey []byte, timestamp uint64, credential []byte) error {
-	vc, err := verifiable.ParseCredential(credential,
-		verifiable.WithDisabledProofCheck(),
-		verifiable.WithNoCustomSchemaCheck(),
-	)
-	if err != nil {
-		return fmt.Errorf("parse credential: %w", err)
-	}
-
-	return VerifyVCTimestampSignature(signature, pubKey, timestamp, vc)
 }
 
 type options struct {
