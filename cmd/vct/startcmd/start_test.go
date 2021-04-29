@@ -12,7 +12,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	. "github.com/trustbloc/vct/cmd/vct/startcmd"
+	"github.com/trustbloc/vct/cmd/vct/startcmd"
 )
 
 const (
@@ -27,6 +27,7 @@ const (
 	datasourceTimeoutFlagName = "dsn-timeout"
 	tlsCACertsFlagName        = "tls-cacerts"
 	autoInitTreeFlagName      = "auto-init-tree"
+	issuersFlagName           = "issuers"
 )
 
 type mockServer struct{}
@@ -36,7 +37,7 @@ func (s *mockServer) ListenAndServe(host string, handler http.Handler, certFile,
 }
 
 func TestStartCmdContents(t *testing.T) {
-	startCmd, err := Cmd(&mockServer{})
+	startCmd, err := startcmd.Cmd(&mockServer{})
 	require.NoError(t, err)
 
 	require.Equal(t, "start", startCmd.Use)
@@ -45,13 +46,13 @@ func TestStartCmdContents(t *testing.T) {
 }
 
 func TestBuildKMSURL(t *testing.T) {
-	require.Equal(t, BuildKMSURL("https://kms.com", "/keys"), "https://kms.com/keys")
-	require.Equal(t, BuildKMSURL("oops", "https://kms.com/keys"), "https://kms.com/keys")
+	require.Equal(t, startcmd.BuildKMSURL("https://kms.com", "/keys"), "https://kms.com/keys")
+	require.Equal(t, startcmd.BuildKMSURL("oops", "https://kms.com/keys"), "https://kms.com/keys")
 }
 
 func TestCmd(t *testing.T) {
 	t.Run("No api-host", func(t *testing.T) {
-		startCmd, err := Cmd(&mockServer{})
+		startCmd, err := startcmd.Cmd(&mockServer{})
 		require.NoError(t, err)
 
 		startCmd.SetArgs(nil)
@@ -62,7 +63,7 @@ func TestCmd(t *testing.T) {
 	})
 
 	t.Run("No log-id", func(t *testing.T) {
-		startCmd, err := Cmd(&mockServer{})
+		startCmd, err := startcmd.Cmd(&mockServer{})
 		require.NoError(t, err)
 
 		args := []string{
@@ -76,7 +77,7 @@ func TestCmd(t *testing.T) {
 	})
 
 	t.Run("Parse test tree", func(t *testing.T) {
-		startCmd, err := Cmd(&mockServer{})
+		startCmd, err := startcmd.Cmd(&mockServer{})
 		require.NoError(t, err)
 
 		args := []string{
@@ -92,7 +93,7 @@ func TestCmd(t *testing.T) {
 	})
 
 	t.Run("Create tree (unavailable)", func(t *testing.T) {
-		startCmd, err := Cmd(&mockServer{})
+		startCmd, err := startcmd.Cmd(&mockServer{})
 		require.NoError(t, err)
 
 		args := []string{
@@ -108,7 +109,7 @@ func TestCmd(t *testing.T) {
 	})
 
 	t.Run("No log-id is not valid", func(t *testing.T) {
-		startCmd, err := Cmd(&mockServer{})
+		startCmd, err := startcmd.Cmd(&mockServer{})
 		require.NoError(t, err)
 
 		args := []string{
@@ -123,7 +124,7 @@ func TestCmd(t *testing.T) {
 	})
 
 	t.Run("No log-endpoint", func(t *testing.T) {
-		startCmd, err := Cmd(&mockServer{})
+		startCmd, err := startcmd.Cmd(&mockServer{})
 		require.NoError(t, err)
 
 		args := []string{
@@ -138,13 +139,14 @@ func TestCmd(t *testing.T) {
 	})
 
 	t.Run("Success", func(t *testing.T) {
-		startCmd, err := Cmd(&mockServer{})
+		startCmd, err := startcmd.Cmd(&mockServer{})
 		require.NoError(t, err)
 
 		args := []string{
 			"--" + agentHostFlagName, ":98989",
 			"--" + logIDFlagName, "11111",
-			"--" + logEndpointFlagName, "http://vct.example.com",
+			"--" + issuersFlagName, "issuer",
+			"--" + logEndpointFlagName, "https://vct.example.com",
 		}
 		startCmd.SetArgs(args)
 
@@ -152,14 +154,14 @@ func TestCmd(t *testing.T) {
 	})
 
 	t.Run("KMS fails (web-key-store)", func(t *testing.T) {
-		startCmd, err := Cmd(&mockServer{})
+		startCmd, err := startcmd.Cmd(&mockServer{})
 		require.NoError(t, err)
 
 		args := []string{
 			"--" + agentHostFlagName, ":98989",
 			"--" + logIDFlagName, "11111",
-			"--" + logEndpointFlagName, "http://vct.example.com",
-			"--" + kmsEndpointFlagName, "http://vct.example.com",
+			"--" + logEndpointFlagName, "https://vct.example.com",
+			"--" + kmsEndpointFlagName, "https://vct.example.com",
 		}
 		startCmd.SetArgs(args)
 
@@ -169,14 +171,14 @@ func TestCmd(t *testing.T) {
 	})
 
 	t.Run("KMS fails (create kid)", func(t *testing.T) {
-		startCmd, err := Cmd(&mockServer{})
+		startCmd, err := startcmd.Cmd(&mockServer{})
 		require.NoError(t, err)
 
 		args := []string{
 			"--" + agentHostFlagName, ":98989",
 			"--" + logIDFlagName, "11111",
-			"--" + logEndpointFlagName, "http://vct.example.com",
-			"--" + kmsStoreEndpointFlagName, "http://vct.example.com",
+			"--" + logEndpointFlagName, "https://vct.example.com",
+			"--" + kmsStoreEndpointFlagName, "https://vct.example.com",
 		}
 		startCmd.SetArgs(args)
 
@@ -186,13 +188,13 @@ func TestCmd(t *testing.T) {
 	})
 
 	t.Run("Create command (supported key)", func(t *testing.T) {
-		startCmd, err := Cmd(&mockServer{})
+		startCmd, err := startcmd.Cmd(&mockServer{})
 		require.NoError(t, err)
 
 		args := []string{
 			"--" + agentHostFlagName, ":98989",
 			"--" + logIDFlagName, "11111",
-			"--" + logEndpointFlagName, "http://vct.example.com",
+			"--" + logEndpointFlagName, "https://vct.example.com",
 			"--" + keyTypeFlagName, "BLS12381G2",
 		}
 		startCmd.SetArgs(args)
@@ -203,13 +205,13 @@ func TestCmd(t *testing.T) {
 	})
 
 	t.Run("Key type unrecognized", func(t *testing.T) {
-		startCmd, err := Cmd(&mockServer{})
+		startCmd, err := startcmd.Cmd(&mockServer{})
 		require.NoError(t, err)
 
 		args := []string{
 			"--" + agentHostFlagName, ":98989",
 			"--" + logIDFlagName, "11111",
-			"--" + logEndpointFlagName, "http://vct.example.com",
+			"--" + logEndpointFlagName, "https://vct.example.com",
 			"--" + keyTypeFlagName, "unknown",
 		}
 		startCmd.SetArgs(args)
@@ -220,13 +222,13 @@ func TestCmd(t *testing.T) {
 	})
 
 	t.Run("Wrong cert pool flag (TLS)", func(t *testing.T) {
-		startCmd, err := Cmd(&mockServer{})
+		startCmd, err := startcmd.Cmd(&mockServer{})
 		require.NoError(t, err)
 
 		args := []string{
 			"--" + agentHostFlagName, ":98989",
 			"--" + logIDFlagName, "11111",
-			"--" + logEndpointFlagName, "http://vct.example.com",
+			"--" + logEndpointFlagName, "https://vct.example.com",
 			"--" + tlsSystemCertPoolFlagName, "invalid",
 		}
 		startCmd.SetArgs(args)
@@ -237,13 +239,13 @@ func TestCmd(t *testing.T) {
 	})
 
 	t.Run("Unsupported driver (DSN)", func(t *testing.T) {
-		startCmd, err := Cmd(&mockServer{})
+		startCmd, err := startcmd.Cmd(&mockServer{})
 		require.NoError(t, err)
 
 		args := []string{
 			"--" + agentHostFlagName, ":98989",
 			"--" + logIDFlagName, "11111",
-			"--" + logEndpointFlagName, "http://vct.example.com",
+			"--" + logEndpointFlagName, "https://vct.example.com",
 			"--" + datasourceNameFlagName, "mem1://test",
 		}
 		startCmd.SetArgs(args)
@@ -254,13 +256,13 @@ func TestCmd(t *testing.T) {
 	})
 
 	t.Run("Invalid URL (DSN)", func(t *testing.T) {
-		startCmd, err := Cmd(&mockServer{})
+		startCmd, err := startcmd.Cmd(&mockServer{})
 		require.NoError(t, err)
 
 		args := []string{
 			"--" + agentHostFlagName, ":98989",
 			"--" + logIDFlagName, "11111",
-			"--" + logEndpointFlagName, "http://vct.example.com",
+			"--" + logEndpointFlagName, "https://vct.example.com",
 			"--" + datasourceNameFlagName, "mem",
 		}
 		startCmd.SetArgs(args)
@@ -271,13 +273,13 @@ func TestCmd(t *testing.T) {
 	})
 
 	t.Run("Bad timeout (DSN)", func(t *testing.T) {
-		startCmd, err := Cmd(&mockServer{})
+		startCmd, err := startcmd.Cmd(&mockServer{})
 		require.NoError(t, err)
 
 		args := []string{
 			"--" + agentHostFlagName, ":98989",
 			"--" + logIDFlagName, "11111",
-			"--" + logEndpointFlagName, "http://vct.example.com",
+			"--" + logEndpointFlagName, "https://vct.example.com",
 			"--" + datasourceNameFlagName, "mem://test",
 			"--" + datasourceTimeoutFlagName, "w1",
 		}
@@ -289,13 +291,13 @@ func TestCmd(t *testing.T) {
 	})
 
 	t.Run("No cert (TLS)", func(t *testing.T) {
-		startCmd, err := Cmd(&mockServer{})
+		startCmd, err := startcmd.Cmd(&mockServer{})
 		require.NoError(t, err)
 
 		args := []string{
 			"--" + agentHostFlagName, ":98989",
 			"--" + logIDFlagName, "11111",
-			"--" + logEndpointFlagName, "http://vct.example.com",
+			"--" + logEndpointFlagName, "https://vct.example.com",
 			"--" + datasourceNameFlagName, "mem://test",
 			"--" + tlsCACertsFlagName, "invalid",
 		}

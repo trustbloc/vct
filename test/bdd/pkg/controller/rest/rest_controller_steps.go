@@ -18,6 +18,10 @@ import (
 
 	"github.com/cenkalti/backoff/v4"
 	"github.com/cucumber/godog"
+	"github.com/hyperledger/aries-framework-go/component/storageutil/mem"
+	"github.com/hyperledger/aries-framework-go/pkg/doc/jsonld"
+	"github.com/hyperledger/aries-framework-go/pkg/doc/verifiable"
+	"github.com/piprate/json-gold/ld"
 
 	"github.com/trustbloc/vct/pkg/client/vct"
 	"github.com/trustbloc/vct/pkg/controller/command"
@@ -86,7 +90,16 @@ func (s *Steps) addVC(file string) error {
 		return fmt.Errorf("get public key: %w", err)
 	}
 
-	err = vct.VerifyVCTimestampSignatureFromBytes(resp.Signature, pubKey, resp.Timestamp, src)
+	vc, err := verifiable.ParseCredential(src,
+		verifiable.WithDisabledProofCheck(),
+		verifiable.WithNoCustomSchemaCheck(),
+		verifiable.WithJSONLDDocumentLoader(getLoader()),
+	)
+	if err != nil {
+		return fmt.Errorf("parse credential: %w", err)
+	}
+
+	err = vct.VerifyVCTimestampSignature(resp.Signature, pubKey, resp.Timestamp, vc)
 	if err != nil {
 		return fmt.Errorf("verify VC Timestamp signature: %w", err)
 	}
@@ -108,7 +121,16 @@ func (s *Steps) getProofByHash(file string) error {
 		return err
 	}
 
-	hash, err := vct.CalculateLeafHashFromBytes(s.state.AddedCredentials[file].Timestamp, src)
+	vc, err := verifiable.ParseCredential(src,
+		verifiable.WithDisabledProofCheck(),
+		verifiable.WithNoCustomSchemaCheck(),
+		verifiable.WithJSONLDDocumentLoader(getLoader()),
+	)
+	if err != nil {
+		return fmt.Errorf("parse credential: %w", err)
+	}
+
+	hash, err := vct.CalculateLeafHash(s.state.AddedCredentials[file].Timestamp, vc)
 	if err != nil {
 		return fmt.Errorf("calculate leaf hash from bytes: %w", err)
 	}
@@ -197,6 +219,17 @@ func (s *Steps) getSTH(treeSize string) error {
 
 		return nil
 	}, backoff.WithMaxRetries(backoff.NewConstantBackOff(time.Second), 15))
+}
+
+func getLoader() *jsonld.DocumentLoader {
+	loader, err := jsonld.NewDocumentLoader(mem.NewProvider(),
+		jsonld.WithRemoteDocumentLoader(ld.NewDefaultDocumentLoader(&http.Client{})),
+	)
+	if err != nil {
+		panic(err)
+	}
+
+	return loader
 }
 
 func readFile(msgFile string) ([]byte, error) {

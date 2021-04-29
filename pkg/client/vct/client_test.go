@@ -18,7 +18,11 @@ import (
 	"testing"
 
 	"github.com/golang/mock/gomock"
+	"github.com/hyperledger/aries-framework-go/component/storageutil/mem"
+	"github.com/hyperledger/aries-framework-go/pkg/doc/jsonld"
+	"github.com/hyperledger/aries-framework-go/pkg/doc/util"
 	"github.com/hyperledger/aries-framework-go/pkg/doc/verifiable"
+	"github.com/piprate/json-gold/ld"
 	"github.com/stretchr/testify/require"
 
 	"github.com/trustbloc/vct/pkg/client/vct"
@@ -449,36 +453,26 @@ func TestClient_GetEntryAndProof(t *testing.T) {
 	})
 }
 
-const simpleVC = `{
-   "@context":[
-      "https://www.w3.org/2018/credentials/v1"
-   ],
-   "credentialSubject":{
-      "id":"did:key:123"
-   },
-   "issuer":"did:key:123",
-   "issuanceDate":"2020-03-10T04:24:12.164Z",
-   "type":[
-      "VerifiableCredential"
-   ]
-}`
+var simpleVC = &verifiable.Credential{ // nolint: gochecknoglobals // global vc
+	Context: []string{"https://www.w3.org/2018/credentials/v1"},
+	Subject: "did:key:123",
+	Issuer:  verifiable.Issuer{ID: "did:key:123"},
+	Issued: func() *util.TimeWithTrailingZeroMsec {
+		res := &util.TimeWithTrailingZeroMsec{}
 
-func TestCalculateLeafHashFromBytes(t *testing.T) {
+		json.Unmarshal([]byte("\"2020-03-10T04:24:12.164Z\""), &res) // nolint: errcheck,gosec
+
+		return res
+	}(),
+	Types:  []string{"VerifiableCredential"},
+	Proofs: []verifiable.Proof{{}, {}},
+}
+
+func TestCalculateLeafHash(t *testing.T) {
 	t.Run("Success", func(t *testing.T) {
-		hash, err := vct.CalculateLeafHashFromBytes(12345, []byte(simpleVC))
+		hash, err := vct.CalculateLeafHash(12345, simpleVC)
 		require.NoError(t, err)
 		require.Equal(t, "IamzE8Fm5W3ToLgZWlqVHPqgBLiBompVIyGLWDo0SP8=", hash)
-	})
-	t.Run("Error", func(t *testing.T) {
-		_, err := vct.CalculateLeafHashFromBytes(12345, []byte(`{}`))
-		require.Error(t, err)
-		require.Contains(t, err.Error(), "parse credential")
-	})
-
-	t.Run("Create leaf", func(t *testing.T) {
-		_, err := vct.CalculateLeafHash(12345, &verifiable.Credential{})
-		require.Error(t, err)
-		require.Contains(t, err.Error(), "create leaf: parse credential: build new credential")
 	})
 
 	t.Run("Marshal credential", func(t *testing.T) {
@@ -491,6 +485,13 @@ func TestCalculateLeafHashFromBytes(t *testing.T) {
 }
 
 func TestVerifyVCTimestampSignature(t *testing.T) {
+	bachelorDegree, err := verifiable.ParseCredential(vcBachelorDegree,
+		verifiable.WithDisabledProofCheck(),
+		verifiable.WithNoCustomSchemaCheck(),
+		verifiable.WithJSONLDDocumentLoader(getLoader(t)),
+	)
+	require.NoError(t, err)
+
 	t.Run("Success", func(t *testing.T) {
 		const signature = `{
 		   "algorithm":{
@@ -507,33 +508,21 @@ func TestVerifyVCTimestampSignature(t *testing.T) {
 			156, 109, 160, 211, 29, 245, 44, 128, 46, 88, 117, 88, 240, 223, 241, 24, 209, 87, 214, 115, 101,
 		}
 
-		require.NoError(t, vct.VerifyVCTimestampSignatureFromBytes(
-			[]byte(signature), pubKey, 1619006293939, vcBachelorDegree,
+		require.NoError(t, vct.VerifyVCTimestampSignature(
+			[]byte(signature), pubKey, 1619006293939, bachelorDegree,
 		))
 	})
 
 	t.Run("Unmarshal signature error", func(t *testing.T) {
-		require.Contains(t, vct.VerifyVCTimestampSignatureFromBytes(
-			[]byte(`[]`), []byte(`[]`), 1617977793917, vcBachelorDegree,
+		require.Contains(t, vct.VerifyVCTimestampSignature(
+			[]byte(`[]`), []byte(`[]`), 1617977793917, bachelorDegree,
 		).Error(), "unmarshal signature")
 	})
 
 	t.Run("Wrong public key", func(t *testing.T) {
-		require.Contains(t, vct.VerifyVCTimestampSignatureFromBytes(
-			[]byte(`{}`), []byte(`[]`), 1617977793917, vcBachelorDegree,
-		).Error(), "pub key to handle: error")
-	})
-
-	t.Run("Parse credential error", func(t *testing.T) {
-		require.Contains(t, vct.VerifyVCTimestampSignatureFromBytes(
-			[]byte(`{}`), []byte(`[]`), 1617977793917, []byte(`[]`),
-		).Error(), "parse credential: unmarshal new credential")
-	})
-
-	t.Run("Create leaf", func(t *testing.T) {
 		require.Contains(t, vct.VerifyVCTimestampSignature(
-			[]byte(`{}`), []byte(`[]`), 1617977793917, &verifiable.Credential{},
-		).Error(), "create leaf: parse credential: build new credential")
+			[]byte(`{}`), []byte(`[]`), 1617977793917, bachelorDegree,
+		).Error(), "pub key to handle: error")
 	})
 
 	t.Run("Marshal credential", func(t *testing.T) {
@@ -541,4 +530,15 @@ func TestVerifyVCTimestampSignature(t *testing.T) {
 			[]byte(`{}`), []byte(`[]`), 1617977793917, &verifiable.Credential{Subject: make(chan int)},
 		).Error(), "marshal credential")
 	})
+}
+
+func getLoader(t *testing.T) *jsonld.DocumentLoader {
+	t.Helper()
+
+	loader, err := jsonld.NewDocumentLoader(mem.NewProvider(),
+		jsonld.WithRemoteDocumentLoader(ld.NewDefaultDocumentLoader(&http.Client{})),
+	)
+	require.NoError(t, err)
+
+	return loader
 }

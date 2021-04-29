@@ -14,6 +14,7 @@ import (
 	_ "embed"
 	"encoding/json"
 	"io"
+	"net/http"
 	"testing"
 
 	"github.com/golang/mock/gomock"
@@ -21,6 +22,9 @@ import (
 	"github.com/hyperledger/aries-framework-go/component/storageutil/mem"
 	"github.com/hyperledger/aries-framework-go/pkg/crypto"
 	"github.com/hyperledger/aries-framework-go/pkg/crypto/tinkcrypto"
+	"github.com/hyperledger/aries-framework-go/pkg/doc/jsonld"
+	"github.com/hyperledger/aries-framework-go/pkg/doc/util"
+	"github.com/hyperledger/aries-framework-go/pkg/doc/verifiable"
 	"github.com/hyperledger/aries-framework-go/pkg/kms"
 	"github.com/hyperledger/aries-framework-go/pkg/kms/localkms"
 	"github.com/hyperledger/aries-framework-go/pkg/secretlock"
@@ -28,6 +32,7 @@ import (
 	"github.com/hyperledger/aries-framework-go/pkg/vdr"
 	"github.com/hyperledger/aries-framework-go/pkg/vdr/key"
 	"github.com/hyperledger/aries-framework-go/spi/storage"
+	"github.com/piprate/json-gold/ld"
 	"github.com/stretchr/testify/require"
 
 	. "github.com/trustbloc/vct/pkg/controller/command"
@@ -1047,10 +1052,19 @@ func TestCmd_GetEntryAndProof(t *testing.T) {
 }
 
 func TestCreateLeaf(t *testing.T) {
-	leaf, err := CreateLeaf(1, []byte(`[]`))
-	require.Error(t, err)
-	require.Contains(t, err.Error(), "parse credential: unmarshal new credential")
-	require.Nil(t, leaf)
+	simpleVC := &verifiable.Credential{
+		Context: []string{"https://www.w3.org/2018/credentials/v1"},
+		Subject: "did:key:123",
+		Issuer:  verifiable.Issuer{ID: "did:key:123"},
+		Issued:  &util.TimeWithTrailingZeroMsec{},
+		Types:   []string{"VerifiableCredential"},
+		Proofs:  []verifiable.Proof{{}, {}},
+	}
+
+	_, err := CreateLeaf(1, simpleVC)
+	require.NoError(t, err)
+
+	require.Len(t, simpleVC.Proofs, 2)
 }
 
 func TestCmd_AddVC(t *testing.T) {
@@ -1078,11 +1092,12 @@ func TestCmd_AddVC(t *testing.T) {
 		).Times(2)
 
 		cmd, err := New(&Config{
-			KMS:      km,
-			Crypto:   cr,
-			LogID:    logID,
-			Trillian: client,
-			VDR:      vdr.New(vdr.WithVDR(key.New())),
+			KMS:            km,
+			Crypto:         cr,
+			LogID:          logID,
+			Trillian:       client,
+			VDR:            vdr.New(vdr.WithVDR(key.New())),
+			DocumentLoader: getLoader(t),
 			Key: Key{
 				ID:   newKID,
 				Type: keyType,
@@ -1175,10 +1190,11 @@ func TestCmd_AddVC(t *testing.T) {
 		km.EXPECT().ExportPubKeyBytes(kid).Return([]byte(`public key`), nil)
 
 		cmd, err := New(&Config{
-			KMS:     km,
-			LogID:   logID,
-			VDR:     vdr.New(vdr.WithVDR(key.New())),
-			Issuers: []string{"issuer_a"},
+			KMS:            km,
+			LogID:          logID,
+			VDR:            vdr.New(vdr.WithVDR(key.New())),
+			Issuers:        []string{"issuer_a"},
+			DocumentLoader: getLoader(t),
 			Key: Key{
 				ID:   kid,
 				Type: keyType,
@@ -1204,10 +1220,11 @@ func TestCmd_AddVC(t *testing.T) {
 		client.EXPECT().QueueLeaf(gomock.Any(), gomock.Any()).Return(nil, errors.New("error")).Times(2)
 
 		cmd, err := New(&Config{
-			KMS:      km,
-			LogID:    logID,
-			Trillian: client,
-			VDR:      vdr.New(vdr.WithVDR(key.New())),
+			KMS:            km,
+			LogID:          logID,
+			Trillian:       client,
+			VDR:            vdr.New(vdr.WithVDR(key.New())),
+			DocumentLoader: getLoader(t),
 			Key: Key{
 				ID:   kid,
 				Type: keyType,
@@ -1233,10 +1250,11 @@ func TestCmd_AddVC(t *testing.T) {
 		client.EXPECT().QueueLeaf(gomock.Any(), gomock.Any()).Return(&trillian.QueueLeafResponse{}, nil).Times(2)
 
 		cmd, err := New(&Config{
-			KMS:      km,
-			LogID:    logID,
-			Trillian: client,
-			VDR:      vdr.New(vdr.WithVDR(key.New())),
+			KMS:            km,
+			LogID:          logID,
+			Trillian:       client,
+			VDR:            vdr.New(vdr.WithVDR(key.New())),
+			DocumentLoader: getLoader(t),
 			Key: Key{
 				ID:   kid,
 				Type: keyType,
@@ -1268,10 +1286,11 @@ func TestCmd_AddVC(t *testing.T) {
 		}, nil).Times(2)
 
 		cmd, err := New(&Config{
-			KMS:      km,
-			LogID:    logID,
-			Trillian: client,
-			VDR:      vdr.New(vdr.WithVDR(key.New())),
+			KMS:            km,
+			LogID:          logID,
+			Trillian:       client,
+			VDR:            vdr.New(vdr.WithVDR(key.New())),
+			DocumentLoader: getLoader(t),
 			Key: Key{
 				ID:   kid,
 				Type: keyType,
@@ -1306,11 +1325,12 @@ func TestCmd_AddVC(t *testing.T) {
 		}, nil).Times(2)
 
 		cmd, err := New(&Config{
-			KMS:      km,
-			LogID:    logID,
-			Trillian: client,
-			Crypto:   cr,
-			VDR:      vdr.New(vdr.WithVDR(key.New())),
+			KMS:            km,
+			LogID:          logID,
+			Trillian:       client,
+			Crypto:         cr,
+			VDR:            vdr.New(vdr.WithVDR(key.New())),
+			DocumentLoader: getLoader(t),
 			Key: Key{
 				ID:   kid,
 				Type: keyType,
@@ -1339,6 +1359,17 @@ func lookupHandler(t *testing.T, cmd *Cmd, name string) Exec {
 	return func(rw io.Writer, req io.Reader) error {
 		return nil
 	}
+}
+
+func getLoader(t *testing.T) *jsonld.DocumentLoader {
+	t.Helper()
+
+	loader, err := jsonld.NewDocumentLoader(mem.NewProvider(),
+		jsonld.WithRemoteDocumentLoader(ld.NewDefaultDocumentLoader(&http.Client{})),
+	)
+	require.NoError(t, err)
+
+	return loader
 }
 
 func createKMSAndCrypto(t *testing.T) (kms.KeyManager, crypto.Crypto) {
