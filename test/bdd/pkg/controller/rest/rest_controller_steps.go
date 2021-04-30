@@ -21,9 +21,9 @@ import (
 	"github.com/hyperledger/aries-framework-go/component/storageutil/mem"
 	"github.com/hyperledger/aries-framework-go/pkg/doc/jsonld"
 	"github.com/hyperledger/aries-framework-go/pkg/doc/verifiable"
-	"github.com/piprate/json-gold/ld"
 
 	"github.com/trustbloc/vct/pkg/client/vct"
+	"github.com/trustbloc/vct/pkg/context/loader"
 	"github.com/trustbloc/vct/pkg/controller/command"
 )
 
@@ -222,14 +222,20 @@ func (s *Steps) getSTH(treeSize string) error {
 }
 
 func getLoader() *jsonld.DocumentLoader {
-	loader, err := jsonld.NewDocumentLoader(mem.NewProvider(),
-		jsonld.WithRemoteDocumentLoader(ld.NewDefaultDocumentLoader(&http.Client{})),
+	documentLoader, err := jsonld.NewDocumentLoader(mem.NewProvider(),
+		jsonld.WithExtraContexts(jsonld.ContextDocument{
+			URL:     loader.AnchorContextURIV1,
+			Content: []byte(loader.AnchorContextV1),
+		}, jsonld.ContextDocument{
+			URL:     loader.JwsContextURIV1,
+			Content: []byte(loader.JwsContextV1),
+		}),
 	)
 	if err != nil {
 		panic(err)
 	}
 
-	return loader
+	return documentLoader
 }
 
 func readFile(msgFile string) ([]byte, error) {

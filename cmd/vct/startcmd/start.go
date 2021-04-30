@@ -43,12 +43,12 @@ import (
 	vdrkey "github.com/hyperledger/aries-framework-go/pkg/vdr/key"
 	vdrweb "github.com/hyperledger/aries-framework-go/pkg/vdr/web"
 	"github.com/hyperledger/aries-framework-go/spi/storage"
-	"github.com/piprate/json-gold/ld"
 	"github.com/spf13/cobra"
 	tlsutils "github.com/trustbloc/edge-core/pkg/utils/tls"
 	"google.golang.org/grpc"
 	"google.golang.org/protobuf/types/known/durationpb"
 
+	"github.com/trustbloc/vct/pkg/context/loader"
 	"github.com/trustbloc/vct/pkg/controller/command"
 	"github.com/trustbloc/vct/pkg/controller/rest"
 )
@@ -455,8 +455,14 @@ func startAgent(parameters *agentParameters) error { // nolint: funlen
 	}
 
 	// TODO: Use storage (store batch of contexts: not implemented)
-	loader, err := jsonld.NewDocumentLoader(mem.NewProvider(),
-		jsonld.WithRemoteDocumentLoader(ld.NewDefaultDocumentLoader(httpClient)),
+	documentLoader, err := jsonld.NewDocumentLoader(mem.NewProvider(),
+		jsonld.WithExtraContexts(jsonld.ContextDocument{
+			URL:     loader.AnchorContextURIV1,
+			Content: []byte(loader.AnchorContextV1),
+		}, jsonld.ContextDocument{
+			URL:     loader.JwsContextURIV1,
+			Content: []byte(loader.JwsContextV1),
+		}),
 	)
 	if err != nil {
 		return fmt.Errorf("new document loader: %w", err)
@@ -475,7 +481,7 @@ func startAgent(parameters *agentParameters) error { // nolint: funlen
 			ID:   parameters.keyID,
 			Type: parameters.keyType,
 		},
-		DocumentLoader: loader,
+		DocumentLoader: documentLoader,
 		Issuers:        parameters.issuers,
 	})
 	if err != nil {
