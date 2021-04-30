@@ -22,10 +22,10 @@ import (
 	"github.com/hyperledger/aries-framework-go/pkg/doc/jsonld"
 	"github.com/hyperledger/aries-framework-go/pkg/doc/util"
 	"github.com/hyperledger/aries-framework-go/pkg/doc/verifiable"
-	"github.com/piprate/json-gold/ld"
 	"github.com/stretchr/testify/require"
 
 	"github.com/trustbloc/vct/pkg/client/vct"
+	"github.com/trustbloc/vct/pkg/context/loader"
 	"github.com/trustbloc/vct/pkg/controller/command"
 	"github.com/trustbloc/vct/pkg/controller/rest"
 )
@@ -535,10 +535,16 @@ func TestVerifyVCTimestampSignature(t *testing.T) {
 func getLoader(t *testing.T) *jsonld.DocumentLoader {
 	t.Helper()
 
-	loader, err := jsonld.NewDocumentLoader(mem.NewProvider(),
-		jsonld.WithRemoteDocumentLoader(ld.NewDefaultDocumentLoader(&http.Client{})),
+	documentLoader, err := jsonld.NewDocumentLoader(mem.NewProvider(),
+		jsonld.WithExtraContexts(jsonld.ContextDocument{
+			URL:     loader.AnchorContextURIV1,
+			Content: []byte(loader.AnchorContextV1),
+		}, jsonld.ContextDocument{
+			URL:     loader.JwsContextURIV1,
+			Content: []byte(loader.JwsContextV1),
+		}),
 	)
 	require.NoError(t, err)
 
-	return loader
+	return documentLoader
 }

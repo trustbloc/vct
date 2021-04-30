@@ -14,7 +14,6 @@ import (
 	_ "embed"
 	"encoding/json"
 	"io"
-	"net/http"
 	"testing"
 
 	"github.com/golang/mock/gomock"
@@ -32,9 +31,9 @@ import (
 	"github.com/hyperledger/aries-framework-go/pkg/vdr"
 	"github.com/hyperledger/aries-framework-go/pkg/vdr/key"
 	"github.com/hyperledger/aries-framework-go/spi/storage"
-	"github.com/piprate/json-gold/ld"
 	"github.com/stretchr/testify/require"
 
+	"github.com/trustbloc/vct/pkg/context/loader"
 	. "github.com/trustbloc/vct/pkg/controller/command"
 	"github.com/trustbloc/vct/pkg/controller/errors"
 )
@@ -1364,12 +1363,18 @@ func lookupHandler(t *testing.T, cmd *Cmd, name string) Exec {
 func getLoader(t *testing.T) *jsonld.DocumentLoader {
 	t.Helper()
 
-	loader, err := jsonld.NewDocumentLoader(mem.NewProvider(),
-		jsonld.WithRemoteDocumentLoader(ld.NewDefaultDocumentLoader(&http.Client{})),
+	documentLoader, err := jsonld.NewDocumentLoader(mem.NewProvider(),
+		jsonld.WithExtraContexts(jsonld.ContextDocument{
+			URL:     loader.AnchorContextURIV1,
+			Content: []byte(loader.AnchorContextV1),
+		}, jsonld.ContextDocument{
+			URL:     loader.JwsContextURIV1,
+			Content: []byte(loader.JwsContextV1),
+		}),
 	)
 	require.NoError(t, err)
 
-	return loader
+	return documentLoader
 }
 
 func createKMSAndCrypto(t *testing.T) (kms.KeyManager, crypto.Crypto) {
