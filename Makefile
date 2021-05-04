@@ -52,9 +52,13 @@ build-vct:
 build-vct-dist:
 	@echo "Building verifiable credentials transparency (vct)"
 	@CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o build/dist/bin/vct-linux-amd64 cmd/vct/main.go
+	@cd build/dist/bin;tar cvzf vct-linux-amd64.tar.gz vct-linux-amd64;rm -rf vct-linux-amd64
 	@CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build -o build/dist/bin/vct-linux-arm64 cmd/vct/main.go
+	@cd build/dist/bin;tar cvzf vct-linux-arm64.tar.gz vct-linux-arm64;rm -rf vct-linux-arm64
 	@CGO_ENABLED=0 GOOS=darwin GOARCH=arm64 go build -o build/dist/bin/vct-darwin-arm64 cmd/vct/main.go
+	@cd build/dist/bin;tar cvzf vct-darwin-arm64.tar.gz vct-darwin-arm64;rm -rf vct-darwin-arm64
 	@CGO_ENABLED=0 GOOS=darwin GOARCH=amd64 go build -o build/dist/bin/vct-darwin-amd64 cmd/vct/main.go
+	@cd build/dist/bin;tar cvzf vct-darwin-amd64.tar.gz vct-darwin-amd64;rm -rf vct-darwin-amd64
 	@for f in build/dist/bin/vct*; do shasum -a 256 $$f > $$f.sha256; done
 
 .PHONY: build-vct-docker
