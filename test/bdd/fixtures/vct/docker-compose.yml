@@ -23,36 +23,49 @@ services:
     ports:
       - 3306:3306
 
-  # Tags can be found here
-  # https://console.cloud.google.com/gcr/images/trillian-opensource-ci
+  vct.postgres:
+    container_name: vct.postgres
+    image: postgres:13
+    restart: always
+    volumes:
+      - ./postgres-config/postgres_config.sql:/docker-entrypoint-initdb.d/postgres_config.sql
+    environment:
+      - POSTGRES_PASSWORD=password
+    ports:
+      - 5432:5432
+    networks:
+      - witness_ledger_net
+
   vct.trillian.log.server:
     container_name: vct.trillian.log.server
-    image: gcr.io/trillian-opensource-ci/log_server:latest 
+    image: ghcr.io/trustbloc/vct-log-server:latest
     restart: always
     command:
-      - --mysql_uri=root@tcp(vct.mysql:3306)/test
+      - --quota_system=noop
+      - --storage_system=postgres
+      - --pg_conn_str=user=postgres host=vct.postgres password=password dbname=test port=5432 sslmode=disable
       - --rpc_endpoint=0.0.0.0:8090
-      - --alsologtostderr
+      - --logtostderr
     depends_on:
-      - vct.mysql
+      - vct.postgres
     networks:
       - witness_ledger_net
     ports:
       - 8090:8090
 
-  # Tags can be found here
-  # https://console.cloud.google.com/gcr/images/trillian-opensource-ci
   vct.trillian.log.signer:
     container_name: vct.trillian.log.signer
-    image: gcr.io/trillian-opensource-ci/log_signer:latest
+    image: ghcr.io/trustbloc/vct-log-signer:latest
     restart: always
     command:
-      - --mysql_uri=root@tcp(vct.mysql:3306)/test
+      - --quota_system=noop
+      - --storage_system=postgres
+      - --pg_conn_str=user=postgres host=vct.postgres password=password dbname=test port=5432 sslmode=disable
       - --http_endpoint=0.0.0.0:8091
       - --force_master=true
-      - --alsologtostderr
+      - --logtostderr
     depends_on:
-      - vct.mysql
+      - vct.postgres
     networks:
       - witness_ledger_net
     ports:

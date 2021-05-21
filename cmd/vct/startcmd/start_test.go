@@ -8,6 +8,7 @@ package startcmd_test
 
 import (
 	"net/http"
+	"os"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -282,6 +283,25 @@ func TestCmd(t *testing.T) {
 			"--" + logEndpointFlagName, "https://vct.example.com",
 			"--" + datasourceNameFlagName, "mem://test",
 			"--" + datasourceTimeoutFlagName, "w1",
+		}
+		startCmd.SetArgs(args)
+
+		err = startCmd.Execute()
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "timeout is not a number")
+	})
+
+	t.Run("Bad timeout (DSN ENV)", func(t *testing.T) {
+		startCmd, err := startcmd.Cmd(&mockServer{})
+		require.NoError(t, err)
+		require.NoError(t, os.Setenv("VCT_DSN_TIMEOUT", "w1"))
+		defer func() { require.NoError(t, os.Unsetenv("VCT_DSN_TIMEOUT")) }()
+
+		args := []string{
+			"--" + agentHostFlagName, ":98989",
+			"--" + logIDFlagName, "11111",
+			"--" + logEndpointFlagName, "https://vct.example.com",
+			"--" + datasourceNameFlagName, "mem://test",
 		}
 		startCmd.SetArgs(args)
 

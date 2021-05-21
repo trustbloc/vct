@@ -460,7 +460,7 @@ var simpleVC = &verifiable.Credential{ // nolint: gochecknoglobals // global vc
 	Issued: func() *util.TimeWithTrailingZeroMsec {
 		res := &util.TimeWithTrailingZeroMsec{}
 
-		json.Unmarshal([]byte("\"2020-03-10T04:24:12.164Z\""), &res) // nolint: errcheck,gosec
+		json.Unmarshal([]byte("\"2020-03-10T04:24:12.164Z\""), &res) // nolint: errcheck, gosec
 
 		return res
 	}(),
