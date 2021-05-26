@@ -84,6 +84,7 @@ linters:
     - interfacer # linter is deprecated (repository has been archived)
     - scopelint  # linter is deprecated (repository has been archived)
     - goerr113
+    - wrapcheck
     - paralleltest
     - exhaustivestruct
 
@@ -102,6 +103,12 @@ issues:
         - gomnd
         - goconst
         - lll
+    - source: "Source:"
+      linters:
+        - lll
+    - source: "flag\\."
+      linters:
+        - gochecknoglobals
 
   exclude:
     -  Line contains TODO/BUG/FIXME

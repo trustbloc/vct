@@ -98,7 +98,9 @@ jobs:
         run: |
           VERSION=$(git rev-parse --short=7 HEAD)
           echo "IMAGE_TAG"=v${{ steps.bump_version.outputs.next-version }}-snapshot-$VERSION >> $GITHUB_ENV
-          echo "IMAGE_PREFIX"=ghcr.io/trustbloc-cicd/vct >> $GITHUB_ENV
+          echo "IMAGE_PREFIX_VCT"=ghcr.io/trustbloc-cicd/vct >> $GITHUB_ENV
+          echo "IMAGE_PREFIX_LOG_SERVER"=ghcr.io/trustbloc-cicd/vct-log-server >> $GITHUB_ENV
+          echo "IMAGE_PREFIX_LOG_SIGNER"=ghcr.io/trustbloc-cicd/vct-log-signer >> $GITHUB_ENV
 
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v1
@@ -113,7 +115,7 @@ jobs:
           username: ${{ secrets.CR_USER }}
           password: ${{ secrets.CR_PAT }}
 
-      - name: Build and Push container images
+      - name: Build and Push container images (vct)
         uses: docker/build-push-action@v2
         with:
           context: .
@@ -122,7 +124,38 @@ jobs:
           build-args: |
             ALPINE_VER=3.12
             GO_VER=1.16
+            APP_FOLDER=vct
           push: true
           tags: |
-            ${{ env.IMAGE_PREFIX }}:${{ env.IMAGE_TAG }}
-            ${{ env.IMAGE_PREFIX }}:latest
+            ${{ env.IMAGE_PREFIX_VCT }}:${{ env.IMAGE_TAG }}
+            ${{ env.IMAGE_PREFIX_VCT }}:latest
+
+      - name: Build and Push container images (log-server)
+        uses: docker/build-push-action@v2
+        with:
+          context: .
+          file: ./images/vct/Dockerfile
+          platforms: linux/amd64,linux/arm64
+          build-args: |
+            ALPINE_VER=3.12
+            GO_VER=1.16
+            APP_FOLDER=log_server
+          push: true
+          tags: |
+            ${{ env.IMAGE_PREFIX_LOG_SERVER }}:${{ env.IMAGE_TAG }}
+            ${{ env.IMAGE_PREFIX_LOG_SERVER }}:latest
+
+      - name: Build and Push container images (log-signer)
+        uses: docker/build-push-action@v2
+        with:
+          context: .
+          file: ./images/vct/Dockerfile
+          platforms: linux/amd64,linux/arm64
+          build-args: |
+            ALPINE_VER=3.12
+            GO_VER=1.16
+            APP_FOLDER=log_signer
+          push: true
+          tags: |
+            ${{ env.IMAGE_PREFIX_LOG_SIGNER }}:${{ env.IMAGE_TAG }}
+            ${{ env.IMAGE_PREFIX_LOG_SIGNER }}:latest

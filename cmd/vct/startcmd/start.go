@@ -20,8 +20,6 @@ import (
 
 	"github.com/cenkalti/backoff/v4"
 	"github.com/google/trillian"
-	"github.com/google/trillian/crypto/keyspb"
-	"github.com/google/trillian/crypto/sigpb"
 	"github.com/google/uuid"
 	"github.com/gorilla/mux"
 	"github.com/hyperledger/aries-framework-go-ext/component/storage/couchdb"
@@ -529,17 +527,9 @@ func createTreeAndInit(conn *grpc.ClientConn, cfg storage.Store, timeout uint64)
 			createdTree, err = trillian.NewTrillianAdminClient(conn).CreateTree(context.Background(),
 				&trillian.CreateTreeRequest{
 					Tree: &trillian.Tree{
-						TreeState:          trillian.TreeState_ACTIVE,
-						TreeType:           trillian.TreeType_LOG,
-						HashStrategy:       trillian.HashStrategy_RFC6962_SHA256,
-						HashAlgorithm:      sigpb.DigitallySigned_SHA256,
-						SignatureAlgorithm: sigpb.DigitallySigned_ECDSA,
-						MaxRootDuration:    durationpb.New(time.Hour),
-					},
-					KeySpec: &keyspb.Specification{
-						Params: &keyspb.Specification_EcdsaParams{
-							EcdsaParams: &keyspb.Specification_ECDSA{},
-						},
+						TreeState:       trillian.TreeState_ACTIVE,
+						TreeType:        trillian.TreeType_LOG,
+						MaxRootDuration: durationpb.New(time.Hour),
 					},
 				})
 
