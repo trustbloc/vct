@@ -9,9 +9,6 @@
 #
 # MySQL / MariaDB version of the tree schema
 
-CREATE DATABASE test;
-USE test;
-
 -- ---------------------------------------------
 -- Tree stuff here
 -- ---------------------------------------------
