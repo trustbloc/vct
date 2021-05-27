@@ -7,9 +7,6 @@
 --
 -- SPDX-License-Identifier: Apache-2.0
 
-CREATE DATABASE test;
-\c test;
-
 -- Postgres impl of storage
 -- ---------------------------------------------
 -- Tree stuff here
