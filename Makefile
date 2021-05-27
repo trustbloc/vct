@@ -66,28 +66,28 @@ build-vct-dist:
 .PHONY: build-log-server-dist
 build-log-server-dist:
 	@echo "Building log server (log-server)"
-	@CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o build/dist/bin/vct-log-server-linux-amd64 cmd/log_server/main.go
+	@CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o build/dist/bin/log-server-linux-amd64 cmd/log_server/main.go
 	@cd build/dist/bin;tar cvzf log-server-linux-amd64.tar.gz log-server-linux-amd64;rm -rf log-server-linux-amd64
-	@CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build -o build/dist/bin/vct-log-server-linux-arm64 cmd/log_server/main.go
+	@CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build -o build/dist/bin/log-server-linux-arm64 cmd/log_server/main.go
 	@cd build/dist/bin;tar cvzf log-server-linux-arm64.tar.gz log-server-linux-arm64;rm -rf log-server-linux-arm64
-	@CGO_ENABLED=0 GOOS=darwin GOARCH=arm64 go build -o build/dist/bin/vct-log-server-darwin-arm64 cmd/log_server/main.go
+	@CGO_ENABLED=0 GOOS=darwin GOARCH=arm64 go build -o build/dist/bin/log-server-darwin-arm64 cmd/log_server/main.go
 	@cd build/dist/bin;tar cvzf log-server-darwin-arm64.tar.gz log-server-darwin-arm64;rm -rf log-server-darwin-arm64
-	@CGO_ENABLED=0 GOOS=darwin GOARCH=amd64 go build -o build/dist/bin/vct-log-server-darwin-amd64 cmd/log_server/main.go
+	@CGO_ENABLED=0 GOOS=darwin GOARCH=amd64 go build -o build/dist/bin/log-server-darwin-amd64 cmd/log_server/main.go
 	@cd build/dist/bin;tar cvzf log-server-darwin-amd64.tar.gz log-server-darwin-amd64;rm -rf log-server-darwin-amd64
-	@for f in build/dist/bin/vct-log-server*; do shasum -a 256 $$f > $$f.sha256; done
+	@for f in build/dist/bin/log-server*; do shasum -a 256 $$f > $$f.sha256; done
 
 .PHONY: build-log-signer-dist
 build-log-signer-dist:
 	@echo "Building log signer (log-signer)"
-	@CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o build/dist/bin/vct-log-signer-linux-amd64 cmd/log_signer/main.go
+	@CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o build/dist/bin/log-signer-linux-amd64 cmd/log_signer/main.go
 	@cd build/dist/bin;tar cvzf log-signer-linux-amd64.tar.gz log-signer-linux-amd64;rm -rf log-signer-linux-amd64
-	@CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build -o build/dist/bin/vct-log-signer-linux-arm64 cmd/log_signer/main.go
+	@CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build -o build/dist/bin/log-signer-linux-arm64 cmd/log_signer/main.go
 	@cd build/dist/bin;tar cvzf log-signer-linux-arm64.tar.gz log-signer-linux-arm64;rm -rf log-signer-linux-arm64
-	@CGO_ENABLED=0 GOOS=darwin GOARCH=arm64 go build -o build/dist/bin/vct-log-signer-darwin-arm64 cmd/log_signer/main.go
+	@CGO_ENABLED=0 GOOS=darwin GOARCH=arm64 go build -o build/dist/bin/log-signer-darwin-arm64 cmd/log_signer/main.go
 	@cd build/dist/bin;tar cvzf log-signer-darwin-arm64.tar.gz log-signer-darwin-arm64;rm -rf log-signer-darwin-arm64
-	@CGO_ENABLED=0 GOOS=darwin GOARCH=amd64 go build -o build/dist/bin/vct-log-signer-darwin-amd64 cmd/log_signer/main.go
+	@CGO_ENABLED=0 GOOS=darwin GOARCH=amd64 go build -o build/dist/bin/log-signer-darwin-amd64 cmd/log_signer/main.go
 	@cd build/dist/bin;tar cvzf log-signer-darwin-amd64.tar.gz log-signer-darwin-amd64;rm -rf log-signer-darwin-amd64
-	@for f in build/dist/bin/vct-log-signer*; do shasum -a 256 $$f > $$f.sha256; done
+	@for f in build/dist/bin/log-signer*; do shasum -a 256 $$f > $$f.sha256; done
 
 .PHONY: build-vct-docker
 build-vct-docker:

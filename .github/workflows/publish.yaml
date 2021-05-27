@@ -97,4 +97,4 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          asset_paths: '["./build/dist/bin/vct*"]'
+          asset_paths: '["./build/dist/bin/vct*", "./build/dist/bin/log-server*", "./build/dist/bin/log-signer*"]'
