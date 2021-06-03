@@ -72,6 +72,32 @@ func TestOperation_AddVC(t *testing.T) {
 	})
 }
 
+func TestOperation_AddLdContext(t *testing.T) {
+	t.Run("Success", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		defer ctrl.Finish()
+
+		const dummyPayload = `{"documents":[]}`
+
+		cmd := NewMockCmd(ctrl)
+		cmd.EXPECT().AddLdContext(gomock.Any(), gomock.Any()).Do(func(_ io.Writer, r io.Reader) {
+			payload, err := io.ReadAll(r)
+			require.NoError(t, err)
+
+			require.Equal(t, dummyPayload, string(payload))
+		}).Return(nil)
+
+		operation := New(cmd)
+
+		_, code := sendRequestToHandler(t,
+			handlerLookup(t, operation, AddContextPath),
+			bytes.NewBufferString(dummyPayload), AddContextPath,
+		)
+
+		require.Equal(t, http.StatusOK, code)
+	})
+}
+
 func TestOperation_GetSTH(t *testing.T) {
 	t.Run("Success", func(t *testing.T) {
 		ctrl := gomock.NewController(t)

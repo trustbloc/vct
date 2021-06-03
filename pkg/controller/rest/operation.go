@@ -16,6 +16,7 @@ import (
 	"time"
 
 	"github.com/hyperledger/aries-framework-go/pkg/common/log"
+	ldctxrest "github.com/hyperledger/aries-framework-go/pkg/controller/rest/jsonld/context"
 
 	"github.com/trustbloc/vct/pkg/controller/command"
 	"github.com/trustbloc/vct/pkg/controller/errors"
@@ -34,6 +35,7 @@ const (
 	GetIssuersPath        = basePath + "/get-issuers"
 	GetEntryAndProofPath  = basePath + "/get-entry-and-proof"
 	GetPublicKeyPath      = basePath + "/get-public-key"
+	AddContextPath        = ldctxrest.AddContextPath
 	HealthCheckPath       = "/healthcheck"
 )
 
@@ -52,6 +54,7 @@ type Cmd interface {
 	GetEntries(io.Writer, io.Reader) error
 	GetEntryAndProof(io.Writer, io.Reader) error
 	GetPublicKey(io.Writer, io.Reader) error
+	AddLdContext(io.Writer, io.Reader) error
 }
 
 // Operation represents REST API controller.
@@ -76,7 +79,14 @@ func (c *Operation) GetRESTHandlers() []Handler {
 		NewHTTPHandler(GetPublicKeyPath, http.MethodGet, c.GetPublicKey),
 		NewHTTPHandler(GetEntryAndProofPath, http.MethodGet, c.GetEntryAndProof),
 		NewHTTPHandler(HealthCheckPath, http.MethodGet, c.HealthCheck),
+		// JSON-LD contexts API
+		NewHTTPHandler(AddContextPath, http.MethodPost, c.AddLdContext),
 	}
+}
+
+// AddLdContext adds jsonld context.
+func (c *Operation) AddLdContext(w http.ResponseWriter, r *http.Request) {
+	execute(c.cmd.AddLdContext, w, r.Body)
 }
 
 // AddVC adds verifiable credential to log.

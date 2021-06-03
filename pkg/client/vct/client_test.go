@@ -24,8 +24,8 @@ import (
 	"github.com/hyperledger/aries-framework-go/pkg/doc/verifiable"
 	"github.com/stretchr/testify/require"
 
+	"github.com/trustbloc/vct/internal/pkg/ldcontext"
 	"github.com/trustbloc/vct/pkg/client/vct"
-	"github.com/trustbloc/vct/pkg/context/loader"
 	"github.com/trustbloc/vct/pkg/controller/command"
 	"github.com/trustbloc/vct/pkg/controller/rest"
 )
@@ -93,6 +93,42 @@ func TestClient_AddVC(t *testing.T) {
 		client := vct.New(endpoint, vct.WithHTTPClient(httpClient))
 		_, err = client.AddVC(context.Background(), []byte{})
 		require.EqualError(t, err, "add VC: error")
+	})
+}
+
+func TestClient_AddJSONLDContexts(t *testing.T) {
+	t.Run("Success", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		defer ctrl.Finish()
+
+		httpClient := NewMockHTTPClient(ctrl)
+		httpClient.EXPECT().Do(gomock.Any()).Return(&http.Response{
+			Body:       ioutil.NopCloser(bytes.NewBuffer([]byte(`{}`))),
+			StatusCode: http.StatusOK,
+		}, nil)
+
+		client := vct.New(endpoint, vct.WithHTTPClient(httpClient))
+		require.NoError(t, client.AddJSONLDContexts(context.Background(), jsonld.ContextDocument{}))
+	})
+
+	t.Run("Error", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		defer ctrl.Finish()
+
+		expected := rest.ErrorResponse{Message: "error"}
+
+		fakeResp, err := json.Marshal(expected)
+		require.NoError(t, err)
+
+		httpClient := NewMockHTTPClient(ctrl)
+		httpClient.EXPECT().Do(gomock.Any()).Return(&http.Response{
+			Body:       ioutil.NopCloser(bytes.NewBuffer(fakeResp)),
+			StatusCode: http.StatusInternalServerError,
+		}, nil)
+
+		client := vct.New(endpoint, vct.WithHTTPClient(httpClient))
+		err = client.AddJSONLDContexts(context.Background(), jsonld.ContextDocument{})
+		require.EqualError(t, err, "add JSON ld contexts: error")
 	})
 }
 
@@ -536,13 +572,7 @@ func getLoader(t *testing.T) *jsonld.DocumentLoader {
 	t.Helper()
 
 	documentLoader, err := jsonld.NewDocumentLoader(mem.NewProvider(),
-		jsonld.WithExtraContexts(jsonld.ContextDocument{
-			URL:     loader.AnchorContextURIV1,
-			Content: []byte(loader.AnchorContextV1),
-		}, jsonld.ContextDocument{
-			URL:     loader.JwsContextURIV1,
-			Content: []byte(loader.JwsContextV1),
-		}),
+		jsonld.WithExtraContexts(ldcontext.MustGetAll()...),
 	)
 	require.NoError(t, err)
 
