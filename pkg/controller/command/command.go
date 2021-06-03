@@ -18,11 +18,13 @@ import (
 
 	"github.com/google/trillian"
 	"github.com/google/trillian/types"
+	cmdcontext "github.com/hyperledger/aries-framework-go/pkg/controller/command/jsonld/context"
 	"github.com/hyperledger/aries-framework-go/pkg/crypto"
 	"github.com/hyperledger/aries-framework-go/pkg/doc/jsonld"
 	"github.com/hyperledger/aries-framework-go/pkg/doc/verifiable"
 	"github.com/hyperledger/aries-framework-go/pkg/framework/aries/api/vdr"
 	"github.com/hyperledger/aries-framework-go/pkg/kms"
+	"github.com/hyperledger/aries-framework-go/spi/storage"
 
 	"github.com/trustbloc/vct/pkg/controller/errors"
 )
@@ -37,7 +39,11 @@ const (
 	GetIssuers        = "getIssuers"
 	GetPublicKey      = "getPublicKey"
 	AddVC             = "addVC"
+	AddLdContext      = "addLdContext"
 )
+
+// StorageProvider represents a storage provider.
+type StorageProvider storage.Provider
 
 // KeyManager manages keys and their storage.
 type KeyManager kms.KeyManager
@@ -68,18 +74,25 @@ type Cmd struct {
 	PubKey         []byte
 	documentLoader *jsonld.DocumentLoader
 	alg            *SignatureAndHashAlgorithm
+	ctxCmd         *cmdcontext.Command
 }
 
 // Config for the Cmd.
 type Config struct {
-	Trillian       TrillianLogClient
-	KMS            KeyManager
-	Crypto         crypto.Crypto
-	VDR            vdr.Registry
-	LogID          int64
-	Key            Key
-	Issuers        []string
-	DocumentLoader *jsonld.DocumentLoader
+	Trillian        TrillianLogClient
+	KMS             KeyManager
+	StorageProvider StorageProvider
+	Crypto          crypto.Crypto
+	VDR             vdr.Registry
+	LogID           int64
+	Key             Key
+	Issuers         []string
+}
+
+type storageProviderFn func() storage.Provider
+
+func (spf storageProviderFn) StorageProvider() storage.Provider {
+	return spf()
 }
 
 // New returns commands controller.
@@ -113,9 +126,19 @@ func New(cfg *Config) (*Cmd, error) {
 		uniqueIssuers = append(uniqueIssuers, issuer)
 	}
 
+	ctxCmd, err := cmdcontext.New(storageProviderFn(func() storage.Provider { return cfg.StorageProvider }))
+	if err != nil {
+		return nil, fmt.Errorf("new cmd context: %w", err)
+	}
+
+	documentLoader, err := jsonld.NewDocumentLoader(cfg.StorageProvider)
+	if err != nil {
+		return nil, fmt.Errorf("new document loader: %w", err)
+	}
+
 	return &Cmd{
 		client:         cfg.Trillian,
-		documentLoader: cfg.DocumentLoader,
+		documentLoader: documentLoader,
 		vdr:            cfg.VDR,
 		PubKey:         pubBytes,
 		VCLogID:        sha256.Sum256(pubBytes),
@@ -126,6 +149,7 @@ func New(cfg *Config) (*Cmd, error) {
 		issuers:        setOfIssuers,
 		uniqueIssuers:  uniqueIssuers,
 		alg:            alg,
+		ctxCmd:         ctxCmd,
 	}, nil
 }
 
@@ -140,7 +164,13 @@ func (c *Cmd) GetHandlers() []Handler {
 		NewCmdHandler(GetIssuers, c.GetIssuers),
 		NewCmdHandler(GetPublicKey, c.GetPublicKey),
 		NewCmdHandler(AddVC, c.AddVC),
+		NewCmdHandler(AddLdContext, c.AddLdContext),
 	}
+}
+
+// AddLdContext adds jsonld context.
+func (c *Cmd) AddLdContext(w io.Writer, r io.Reader) error {
+	return c.ctxCmd.Add(w, r) // nolint: wrapcheck
 }
 
 // GetIssuers returns issuers.

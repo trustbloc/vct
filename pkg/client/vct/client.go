@@ -20,7 +20,9 @@ import (
 	"time"
 
 	"github.com/google/trillian/merkle/rfc6962/hasher"
+	cmdcontext "github.com/hyperledger/aries-framework-go/pkg/controller/command/jsonld/context"
 	"github.com/hyperledger/aries-framework-go/pkg/crypto/tinkcrypto"
+	"github.com/hyperledger/aries-framework-go/pkg/doc/jsonld"
 	"github.com/hyperledger/aries-framework-go/pkg/doc/verifiable"
 	"github.com/hyperledger/aries-framework-go/pkg/kms/localkms"
 
@@ -77,6 +79,21 @@ func (c *Client) AddVC(ctx context.Context, credential []byte) (*command.AddVCRe
 	}
 
 	return result, nil
+}
+
+// AddJSONLDContexts imports extra contexts for the service.
+func (c *Client) AddJSONLDContexts(ctx context.Context, docs ...jsonld.ContextDocument) error {
+	body, err := json.Marshal(cmdcontext.AddRequest{Documents: docs})
+	if err != nil {
+		return fmt.Errorf("marshal AddRequest for JSONLDContexts: %w", err)
+	}
+
+	err = c.do(ctx, rest.AddContextPath, nil, withMethod(http.MethodPost), withBody(body))
+	if err != nil {
+		return fmt.Errorf("add JSON ld contexts: %w", err)
+	}
+
+	return nil
 }
 
 // GetPublicKey returns public key.

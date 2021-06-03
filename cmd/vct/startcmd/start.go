@@ -30,7 +30,6 @@ import (
 	"github.com/hyperledger/aries-framework-go/pkg/crypto/tinkcrypto"
 	webcrypto "github.com/hyperledger/aries-framework-go/pkg/crypto/webkms"
 	"github.com/hyperledger/aries-framework-go/pkg/doc/did"
-	"github.com/hyperledger/aries-framework-go/pkg/doc/jsonld"
 	vdrapi "github.com/hyperledger/aries-framework-go/pkg/framework/aries/api/vdr"
 	"github.com/hyperledger/aries-framework-go/pkg/kms"
 	"github.com/hyperledger/aries-framework-go/pkg/kms/localkms"
@@ -46,7 +45,6 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/protobuf/types/known/durationpb"
 
-	"github.com/trustbloc/vct/pkg/context/loader"
 	"github.com/trustbloc/vct/pkg/controller/command"
 	"github.com/trustbloc/vct/pkg/controller/rest"
 )
@@ -452,20 +450,6 @@ func startAgent(parameters *agentParameters) error { // nolint: funlen
 		parameters.logID = tree.TreeId
 	}
 
-	// TODO: Use storage (store batch of contexts: not implemented)
-	documentLoader, err := jsonld.NewDocumentLoader(mem.NewProvider(),
-		jsonld.WithExtraContexts(jsonld.ContextDocument{
-			URL:     loader.AnchorContextURIV1,
-			Content: []byte(loader.AnchorContextV1),
-		}, jsonld.ContextDocument{
-			URL:     loader.JwsContextURIV1,
-			Content: []byte(loader.JwsContextV1),
-		}),
-	)
-	if err != nil {
-		return fmt.Errorf("new document loader: %w", err)
-	}
-
 	cmd, err := command.New(&command.Config{
 		Trillian: trillian.NewTrillianLogClient(conn),
 		KMS:      km,
@@ -479,8 +463,8 @@ func startAgent(parameters *agentParameters) error { // nolint: funlen
 			ID:   parameters.keyID,
 			Type: parameters.keyType,
 		},
-		DocumentLoader: documentLoader,
-		Issuers:        parameters.issuers,
+		StorageProvider: store,
+		Issuers:         parameters.issuers,
 	})
 	if err != nil {
 		return fmt.Errorf("create command instance: %w", err)

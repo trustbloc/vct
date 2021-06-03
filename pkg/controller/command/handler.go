@@ -17,9 +17,9 @@ type Exec func(rw io.Writer, req io.Reader) error
 
 // Handler for each controller command.
 type Handler interface {
-	// method name of the command
+	// Method method name of the command
 	Method() string
-	// execute function of the command
+	// Handle execute function of the command
 	Handle() Exec
 }
 

@@ -10,7 +10,7 @@ services:
 
   vct.mysql:
     container_name: vct.mysql
-    image: mysql:latest
+    image: mysql:8.0.2
     restart: always
     cap_add:
       - SYS_NICE
@@ -125,7 +125,7 @@ services:
       - VCT_LOG_ENDPOINT=vct.trillian.log.server:8090
       - VCT_KMS_ENDPOINT=http://vct.kms:7878
       - VCT_TRILLIAN_TIMEOUT=60
-      - VCT_DSN=mysql://root@tcp(vct.mysql:3306)/test
+      - VCT_DSN=mysql://root@tcp(vct.mysql:3306)/test?interpolateParams=true&multiStatements=true
       - VCT_ISSUERS=did:key:zUC724vuGvHpnCGFG1qqpXb81SiBLu3KLSqVzenwEZNPoY35i2Bscb8DLaVwHvRFs6F2NkNNXRcPWvqnPDUd9ukdjLkjZd3u9zzL4wDZDUpkPAatLDGLEYVo8kkAzuAKJQMr7N2
       - VCT_TLS_CACERTS=/etc/tls/vct.local.crt
     volumes:

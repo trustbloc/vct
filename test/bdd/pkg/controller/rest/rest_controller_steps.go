@@ -22,8 +22,8 @@ import (
 	"github.com/hyperledger/aries-framework-go/pkg/doc/jsonld"
 	"github.com/hyperledger/aries-framework-go/pkg/doc/verifiable"
 
+	"github.com/trustbloc/vct/internal/pkg/ldcontext"
 	"github.com/trustbloc/vct/pkg/client/vct"
-	"github.com/trustbloc/vct/pkg/context/loader"
 	"github.com/trustbloc/vct/pkg/controller/command"
 )
 
@@ -67,10 +67,13 @@ func (s *Steps) setVCTClient(endpoint string) error {
 
 	return backoff.Retry(func() error { // nolint: wrapcheck
 		resp, err := s.vct.GetSTH(context.Background())
+		if err != nil {
+			return err
+		}
 
 		s.state.GetSTHResponse = resp
 
-		return err // nolint: wrapcheck
+		return s.vct.AddJSONLDContexts(context.Background(), ldcontext.MustGetAll()...) // nolint: wrapcheck
 	}, backoff.WithMaxRetries(backoff.NewConstantBackOff(time.Second), 60))
 }
 
@@ -223,13 +226,7 @@ func (s *Steps) getSTH(treeSize string) error {
 
 func getLoader() *jsonld.DocumentLoader {
 	documentLoader, err := jsonld.NewDocumentLoader(mem.NewProvider(),
-		jsonld.WithExtraContexts(jsonld.ContextDocument{
-			URL:     loader.AnchorContextURIV1,
-			Content: []byte(loader.AnchorContextV1),
-		}, jsonld.ContextDocument{
-			URL:     loader.JwsContextURIV1,
-			Content: []byte(loader.JwsContextV1),
-		}),
+		jsonld.WithExtraContexts(ldcontext.MustGetAll()...),
 	)
 	if err != nil {
 		panic(err)
