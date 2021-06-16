@@ -15,6 +15,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/golang/mock/gomock"
@@ -26,6 +27,8 @@ import (
 	"github.com/trustbloc/vct/pkg/controller/errors"
 	. "github.com/trustbloc/vct/pkg/controller/rest"
 )
+
+const alias = `maple2021`
 
 func TestOperation_AddVC(t *testing.T) {
 	t.Run("Success", func(t *testing.T) {
@@ -39,17 +42,28 @@ func TestOperation_AddVC(t *testing.T) {
 			payload, err := io.ReadAll(r)
 			require.NoError(t, err)
 
-			require.Equal(t, dummyVC, string(payload))
+			require.Equal(t, `{"alias":"maple2021","vc_entry":"e2NyZWRlbnRpYWxzfQ=="}`, string(payload))
 		}).Return(nil)
 
 		operation := New(cmd)
 
 		_, code := sendRequestToHandler(t,
 			handlerLookup(t, operation, AddVCPath),
-			bytes.NewBufferString(dummyVC), AddVCPath,
+			bytes.NewBufferString(dummyVC), strings.Replace(AddVCPath, "{alias}", alias, 1),
 		)
 
 		require.Equal(t, http.StatusOK, code)
+	})
+
+	t.Run("Bad request", func(t *testing.T) {
+		operation := New(nil)
+
+		_, code := sendRequestToHandler(t,
+			handlerLookup(t, operation, AddVCPath),
+			&readerMock{errors.New("EOF")}, AddVCPath,
+		)
+
+		require.Equal(t, http.StatusInternalServerError, code)
 	})
 
 	t.Run("Bad request", func(t *testing.T) {
@@ -105,12 +119,17 @@ func TestOperation_GetSTH(t *testing.T) {
 
 		cmd := NewMockCmd(ctrl)
 		cmd.EXPECT().GetSTH(gomock.Any(), gomock.Any()).Do(func(_ io.Writer, r io.Reader) {
-			require.Nil(t, r)
+			payload, err := io.ReadAll(r)
+			require.NoError(t, err)
+
+			require.Equal(t, `"maple2021"`, string(payload))
 		}).Return(nil)
 
 		operation := New(cmd)
 
-		_, code := sendRequestToHandler(t, handlerLookup(t, operation, GetSTHPath), nil, GetSTHPath)
+		_, code := sendRequestToHandler(t, handlerLookup(t, operation, GetSTHPath), nil,
+			strings.Replace(GetSTHPath, "{alias}", alias, 1),
+		)
 
 		require.Equal(t, http.StatusOK, code)
 	})
@@ -123,12 +142,17 @@ func TestOperation_GetIssuers(t *testing.T) {
 
 		cmd := NewMockCmd(ctrl)
 		cmd.EXPECT().GetIssuers(gomock.Any(), gomock.Any()).Do(func(_ io.Writer, r io.Reader) {
-			require.Nil(t, r)
+			payload, err := io.ReadAll(r)
+			require.NoError(t, err)
+
+			require.Equal(t, `"maple2021"`, string(payload))
 		}).Return(nil)
 
 		operation := New(cmd)
 
-		_, code := sendRequestToHandler(t, handlerLookup(t, operation, GetIssuersPath), nil, GetIssuersPath)
+		_, code := sendRequestToHandler(t, handlerLookup(t, operation, GetIssuersPath), nil,
+			strings.Replace(GetIssuersPath, "{alias}", alias, 1),
+		)
 
 		require.Equal(t, http.StatusOK, code)
 	})
@@ -173,13 +197,14 @@ func TestOperation_GetSTHConsistency(t *testing.T) {
 			require.NoError(t, json.NewDecoder(r).Decode(&req))
 			require.Equal(t, int64(1), req.FirstTreeSize)
 			require.Equal(t, int64(2), req.SecondTreeSize)
+			require.Equal(t, alias, req.Alias)
 		}).Return(nil)
 
 		operation := New(cmd)
 
 		_, code := sendRequestToHandler(t,
 			handlerLookup(t, operation, GetSTHConsistencyPath), nil,
-			GetSTHConsistencyPath+"?first=1&second=2",
+			strings.Replace(GetSTHConsistencyPath, "{alias}", alias, 1)+"?first=1&second=2",
 		)
 
 		require.Equal(t, http.StatusOK, code)
@@ -227,13 +252,14 @@ func TestOperation_GetEntries(t *testing.T) {
 			require.NoError(t, json.NewDecoder(r).Decode(&req))
 			require.Equal(t, int64(1), req.Start)
 			require.Equal(t, int64(2), req.End)
+			require.Equal(t, alias, req.Alias)
 		}).Return(nil)
 
 		operation := New(cmd)
 
 		_, code := sendRequestToHandler(t,
 			handlerLookup(t, operation, GetEntriesPath), nil,
-			GetEntriesPath+"?start=1&end=2",
+			strings.Replace(GetEntriesPath, "{alias}", alias, 1)+"?start=1&end=2",
 		)
 
 		require.Equal(t, http.StatusOK, code)
@@ -281,13 +307,14 @@ func TestOperation_GetProofByHash(t *testing.T) {
 			require.NoError(t, json.NewDecoder(r).Decode(&req))
 			require.Equal(t, int64(1), req.TreeSize)
 			require.Equal(t, "hash", req.Hash)
+			require.Equal(t, alias, req.Alias)
 		}).Return(nil)
 
 		operation := New(cmd)
 
 		_, code := sendRequestToHandler(t,
 			handlerLookup(t, operation, GetProofByHashPath), nil,
-			GetProofByHashPath+"?hash=hash&tree_size=1",
+			strings.Replace(GetProofByHashPath, "{alias}", alias, 1)+"?hash=hash&tree_size=1",
 		)
 
 		require.Equal(t, http.StatusOK, code)
@@ -320,13 +347,14 @@ func TestOperation_GetEntryAndProof(t *testing.T) {
 			require.NoError(t, json.NewDecoder(r).Decode(&req))
 			require.Equal(t, int64(1), req.LeafIndex)
 			require.Equal(t, int64(2), req.TreeSize)
+			require.Equal(t, alias, req.Alias)
 		}).Return(nil)
 
 		operation := New(cmd)
 
 		_, code := sendRequestToHandler(t,
 			handlerLookup(t, operation, GetEntryAndProofPath), nil,
-			GetEntryAndProofPath+"?leaf_index=1&tree_size=2",
+			strings.Replace(GetEntryAndProofPath, "{alias}", alias, 1)+"?leaf_index=1&tree_size=2",
 		)
 
 		require.Equal(t, http.StatusOK, code)
@@ -400,4 +428,10 @@ func sendRequestToHandler(t *testing.T, handler rest.Handler, requestBody io.Rea
 	router.ServeHTTP(rr, req)
 
 	return rr.Body, rr.Code
+}
+
+type readerMock struct{ err error }
+
+func (r *readerMock) Read(p []byte) (n int, err error) {
+	return 0, r.err
 }

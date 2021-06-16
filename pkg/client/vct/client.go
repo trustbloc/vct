@@ -17,6 +17,7 @@ import (
 	"net/http"
 	"net/url"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/google/trillian/merkle/rfc6962/hasher"
@@ -278,6 +279,8 @@ func (c *Client) do(ctx context.Context, path string, v interface{}, opts ...opt
 	for _, fn := range opts {
 		fn(op)
 	}
+
+	path = strings.Replace(path, rest.AliasPath, "", 1)
 
 	req, err := http.NewRequestWithContext(ctx, op.method, c.endpoint+path+"?"+op.values.Encode(), op.body)
 	if err != nil {

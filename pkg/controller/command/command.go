@@ -7,7 +7,6 @@ SPDX-License-Identifier: Apache-2.0
 package command
 
 import (
-	"bytes"
 	"context"
 	"crypto/sha256"
 	"encoding/base64"
@@ -62,31 +61,44 @@ type Key struct {
 
 // Cmd is a controller for commands.
 type Cmd struct {
-	logID          int64
+	logs           map[string]Log
 	VCLogID        [32]byte
 	kh             interface{}
 	vdr            vdr.Registry
-	client         TrillianLogClient
 	kms            KeyManager
 	crypto         crypto.Crypto
-	issuers        map[string]struct{}
-	uniqueIssuers  []string
 	PubKey         []byte
 	documentLoader *jsonld.DocumentLoader
 	alg            *SignatureAndHashAlgorithm
 	ctxCmd         *cmdcontext.Command
 }
 
+type permission int32
+
+const (
+	read  permission = 'r'
+	write permission = 'w'
+)
+
+// Log represents the log.
+type Log struct {
+	// ID trillian`s log id.
+	ID         int64
+	Alias      string
+	Permission string
+	Endpoint   string
+	Issuers    []string
+	Client     TrillianLogClient
+}
+
 // Config for the Cmd.
 type Config struct {
-	Trillian        TrillianLogClient
 	KMS             KeyManager
 	StorageProvider StorageProvider
 	Crypto          crypto.Crypto
 	VDR             vdr.Registry
-	LogID           int64
+	Logs            []Log
 	Key             Key
-	Issuers         []string
 }
 
 type storageProviderFn func() storage.Provider
@@ -112,20 +124,6 @@ func New(cfg *Config) (*Cmd, error) {
 		return nil, fmt.Errorf("export pub key bytes: %w", err)
 	}
 
-	setOfIssuers := map[string]struct{}{}
-	uniqueIssuers := make([]string, 0, len(cfg.Issuers))
-
-	for _, issuer := range cfg.Issuers {
-		_, ok := setOfIssuers[issuer]
-		if ok {
-			continue
-		}
-
-		setOfIssuers[issuer] = struct{}{}
-
-		uniqueIssuers = append(uniqueIssuers, issuer)
-	}
-
 	ctxCmd, err := cmdcontext.New(storageProviderFn(func() storage.Provider { return cfg.StorageProvider }))
 	if err != nil {
 		return nil, fmt.Errorf("new cmd context: %w", err)
@@ -136,18 +134,20 @@ func New(cfg *Config) (*Cmd, error) {
 		return nil, fmt.Errorf("new document loader: %w", err)
 	}
 
+	logs := make(map[string]Log)
+	for _, log := range cfg.Logs {
+		logs[log.Alias] = log
+	}
+
 	return &Cmd{
-		client:         cfg.Trillian,
 		documentLoader: documentLoader,
 		vdr:            cfg.VDR,
 		PubKey:         pubBytes,
 		VCLogID:        sha256.Sum256(pubBytes),
-		logID:          cfg.LogID,
+		logs:           logs,
 		kms:            cfg.KMS,
 		kh:             kh,
 		crypto:         cfg.Crypto,
-		issuers:        setOfIssuers,
-		uniqueIssuers:  uniqueIssuers,
 		alg:            alg,
 		ctxCmd:         ctxCmd,
 	}, nil
@@ -174,8 +174,18 @@ func (c *Cmd) AddLdContext(w io.Writer, r io.Reader) error {
 }
 
 // GetIssuers returns issuers.
-func (c *Cmd) GetIssuers(w io.Writer, _ io.Reader) error {
-	return json.NewEncoder(w).Encode(c.uniqueIssuers) // nolint: wrapcheck
+func (c *Cmd) GetIssuers(w io.Writer, r io.Reader) error {
+	var alias string
+
+	if err := json.NewDecoder(r).Decode(&alias); err != nil {
+		return fmt.Errorf("%w: decode alias failed", errors.ErrInternal)
+	}
+
+	if err := c.hasPermissions(alias, read); err != nil {
+		return fmt.Errorf("has permissions: %w", err)
+	}
+
+	return json.NewEncoder(w).Encode(c.logs[alias].Issuers) // nolint: wrapcheck
 }
 
 // GetPublicKey returns public key.
@@ -206,23 +216,40 @@ func CreateLeaf(timestamp uint64, vc *verifiable.Credential) (*MerkleTreeLeaf, e
 	}, nil
 }
 
-// AddVC adds verifiable credential to log.
-func (c *Cmd) AddVC(w io.Writer, r io.Reader) error { // nolint: funlen
-	var dest bytes.Buffer
-
-	_, err := io.Copy(&dest, r)
-	if err != nil {
-		return fmt.Errorf("%w: copy vc failed", errors.ErrInternal)
+func (c *Cmd) hasPermissions(alias string, perm permission) error {
+	if _, ok := c.logs[alias]; !ok {
+		return errors.NewNotFoundError(fmt.Errorf("alias %q is not supported", alias))
 	}
 
-	vc, err := verifiable.ParseCredential(dest.Bytes(), verifiable.WithPublicKeyFetcher(
+	for _, _perm := range c.logs[alias].Permission {
+		if perm == permission(_perm) {
+			return nil
+		}
+	}
+
+	return errors.NewBadRequestError(fmt.Errorf("action forbidden for %q", alias))
+}
+
+// AddVC adds verifiable credential to log.
+func (c *Cmd) AddVC(w io.Writer, r io.Reader) error { // nolint: funlen
+	var req AddVCRequest
+
+	if err := json.NewDecoder(r).Decode(&req); err != nil {
+		return fmt.Errorf("decode AddVC request: %w", errors.ErrInternal)
+	}
+
+	if err := c.hasPermissions(req.Alias, write); err != nil {
+		return fmt.Errorf("has permissions: %w", err)
+	}
+
+	vc, err := verifiable.ParseCredential(req.VCEntry, verifiable.WithPublicKeyFetcher(
 		verifiable.NewVDRKeyResolver(c.vdr).PublicKeyFetcher(),
 	), verifiable.WithJSONLDDocumentLoader(c.documentLoader))
 	if err != nil {
 		return errors.NewBadRequestError(fmt.Errorf("parse credential: %w", err))
 	}
 
-	if _, ok := c.issuers[vc.Issuer.ID]; len(c.issuers) > 0 && !ok {
+	if len(c.logs[req.Alias].Issuers) > 0 && !contains(c.logs[req.Alias].Issuers, vc.Issuer.ID) {
 		return fmt.Errorf("%w: issuer %s is not in a list", errors.ErrBadRequest, vc.Issuer.ID)
 	}
 
@@ -243,8 +270,8 @@ func (c *Cmd) AddVC(w io.Writer, r io.Reader) error { // nolint: funlen
 
 	leafIDHash := sha256.Sum256(leaf.TimestampedEntry.VCEntry)
 
-	resp, err := c.client.QueueLeaf(context.Background(), &trillian.QueueLeafRequest{
-		LogId: c.logID,
+	resp, err := c.logs[req.Alias].Client.QueueLeaf(context.Background(), &trillian.QueueLeafRequest{
+		LogId: c.logs[req.Alias].ID,
 		Leaf: &trillian.LogLeaf{
 			LeafValue:        leafData,
 			ExtraData:        extraData,
@@ -284,10 +311,20 @@ func (c *Cmd) AddVC(w io.Writer, r io.Reader) error { // nolint: funlen
 }
 
 // GetSTH retrieves latest signed tree head.
-func (c *Cmd) GetSTH(w io.Writer, _ io.Reader) error {
-	req := trillian.GetLatestSignedLogRootRequest{LogId: c.logID}
+func (c *Cmd) GetSTH(w io.Writer, r io.Reader) error {
+	var alias string
 
-	resp, err := c.client.GetLatestSignedLogRoot(context.Background(), &req)
+	if err := json.NewDecoder(r).Decode(&alias); err != nil {
+		return fmt.Errorf("%w: decode alias failed", errors.ErrInternal)
+	}
+
+	if err := c.hasPermissions(alias, read); err != nil {
+		return fmt.Errorf("has permissions: %w", err)
+	}
+
+	req := trillian.GetLatestSignedLogRootRequest{LogId: c.logs[alias].ID}
+
+	resp, err := c.logs[alias].Client.GetLatestSignedLogRoot(context.Background(), &req)
 	if err != nil {
 		return fmt.Errorf("get latest signed log root: %w", err)
 	}
@@ -333,17 +370,21 @@ func (c *Cmd) GetEntries(w io.Writer, r io.Reader) error { // nolint: funlen
 		return fmt.Errorf("validate GetEntries request: %w", err)
 	}
 
+	if err := c.hasPermissions(request.Alias, read); err != nil {
+		return fmt.Errorf("has permissions: %w", err)
+	}
+
 	if request.End-request.Start+1 > maxRange {
 		request.End = request.Start + maxRange - 1
 	}
 
 	req := trillian.GetLeavesByRangeRequest{
-		LogId:      c.logID,
+		LogId:      c.logs[request.Alias].ID,
 		StartIndex: request.Start,
 		Count:      request.End + 1 - request.Start,
 	}
 
-	resp, err := c.client.GetLeavesByRange(context.Background(), &req)
+	resp, err := c.logs[request.Alias].Client.GetLeavesByRange(context.Background(), &req)
 	if err != nil {
 		return fmt.Errorf("get leaves by range: %w", err)
 	}
@@ -397,13 +438,17 @@ func (c *Cmd) GetEntryAndProof(w io.Writer, r io.Reader) error {
 		return fmt.Errorf("validate GetEntryAndProof request: %w", err)
 	}
 
+	if err := c.hasPermissions(request.Alias, read); err != nil {
+		return fmt.Errorf("has permissions: %w", err)
+	}
+
 	req := trillian.GetEntryAndProofRequest{
-		LogId:     c.logID,
+		LogId:     c.logs[request.Alias].ID,
 		LeafIndex: request.LeafIndex,
 		TreeSize:  request.TreeSize,
 	}
 
-	resp, err := c.client.GetEntryAndProof(context.Background(), &req)
+	resp, err := c.logs[request.Alias].Client.GetEntryAndProof(context.Background(), &req)
 	if err != nil {
 		return fmt.Errorf("get entry and proof: %w", err)
 	}
@@ -439,11 +484,15 @@ func (c *Cmd) GetProofByHash(w io.Writer, r io.Reader) error {
 	var request *GetProofByHashRequest
 
 	if err := json.NewDecoder(r).Decode(&request); err != nil {
-		return fmt.Errorf("decode GetEntries request: %w", err)
+		return fmt.Errorf("decode GetProofByHash request: %w", err)
 	}
 
 	if err := request.Validate(); err != nil {
 		return fmt.Errorf("validate GetProofByHash request: %w", err)
+	}
+
+	if err := c.hasPermissions(request.Alias, read); err != nil {
+		return fmt.Errorf("has permissions: %w", err)
 	}
 
 	leafHash, err := base64.StdEncoding.DecodeString(request.Hash)
@@ -452,13 +501,13 @@ func (c *Cmd) GetProofByHash(w io.Writer, r io.Reader) error {
 	}
 
 	req := trillian.GetInclusionProofByHashRequest{
-		LogId:           c.logID,
+		LogId:           c.logs[request.Alias].ID,
 		LeafHash:        leafHash,
 		TreeSize:        request.TreeSize,
 		OrderBySequence: true,
 	}
 
-	resp, err := c.client.GetInclusionProofByHash(context.Background(), &req)
+	resp, err := c.logs[request.Alias].Client.GetInclusionProofByHash(context.Background(), &req)
 	if err != nil {
 		return fmt.Errorf("get leaves by range: %w", err)
 	}
@@ -489,11 +538,15 @@ func (c *Cmd) GetSTHConsistency(w io.Writer, r io.Reader) error {
 	var request *GetSTHConsistencyRequest
 
 	if err := json.NewDecoder(r).Decode(&request); err != nil {
-		return fmt.Errorf("decode STHConsistency request: %w", err)
+		return fmt.Errorf("decode GetSTHConsistency request: %w", err)
 	}
 
 	if err := request.Validate(); err != nil {
-		return fmt.Errorf("validate STHConsistency request: %w", err)
+		return fmt.Errorf("validate GetSTHConsistency request: %w", err)
+	}
+
+	if err := c.hasPermissions(request.Alias, read); err != nil {
+		return fmt.Errorf("has permissions: %w", err)
 	}
 
 	// TODO: if FirstTreeSize is zero rpc returns bad request (rpc error: code = InvalidArgument
@@ -504,12 +557,12 @@ func (c *Cmd) GetSTHConsistency(w io.Writer, r io.Reader) error {
 	}
 
 	req := trillian.GetConsistencyProofRequest{
-		LogId:          c.logID,
+		LogId:          c.logs[request.Alias].ID,
 		FirstTreeSize:  request.FirstTreeSize,
 		SecondTreeSize: request.SecondTreeSize,
 	}
 
-	resp, err := c.client.GetConsistencyProof(context.Background(), &req)
+	resp, err := c.logs[request.Alias].Client.GetConsistencyProof(context.Background(), &req)
 	if err != nil {
 		return fmt.Errorf("get consistency proof: %w", err)
 	}
@@ -600,4 +653,14 @@ func signatureAndHashAlgorithmByKeyType(keyType kms.KeyType) (*SignatureAndHashA
 	default:
 		return nil, fmt.Errorf("%w: key type %v is not supported", errors.ErrInternal, keyType)
 	}
+}
+
+func contains(s []string, e string) bool {
+	for i := range s {
+		if s[i] == e {
+			return true
+		}
+	}
+
+	return false
 }
