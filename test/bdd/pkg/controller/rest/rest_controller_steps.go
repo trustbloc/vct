@@ -27,7 +27,7 @@ import (
 	"github.com/trustbloc/vct/pkg/controller/command"
 )
 
-//go:embed testdata/*.json
+//go:embed testdata/**/*.json
 var fs embed.FS // nolint: gochecknoglobals
 
 // Steps represents BDD test steps.
@@ -55,11 +55,57 @@ func New() *Steps {
 func (s *Steps) RegisterSteps(suite *godog.Suite) {
 	suite.Step(`VCT agent is running on "([^"]*)"$`, s.setVCTClient)
 	suite.Step(`Add verifiable credential "([^"]*)" to Log$`, s.addVC)
+	suite.Step(`No permissions to write$`, s.noWritePerm)
+	suite.Step(`No permissions to read$`, s.noReadPerm)
 	suite.Step(`Retrieve latest signed tree head and check that tree_size is "([^"]*)"$`, s.getSTH)
 	suite.Step(`Retrieve merkle consistency proof between signed tree heads$`, s.getSTHConsistency)
 	suite.Step(`Retrieve entries from log and check that len is "([^"]*)"$`, s.getEntries)
 	suite.Step(`Use timestamp from "([^"]*)" for "([^"]*)"$`, s.setTimestamp)
 	suite.Step(`Retrieve merkle audit proof from log by leaf hash for "([^"]*)"$`, s.getProofByHash)
+	suite.Step(`The issuer "([^"]*)" is supported$`, s.issuerIsSupported)
+	suite.Step(`The issuer "([^"]*)" is not supported$`, s.issuerIsNotSupported)
+}
+
+func (s *Steps) issuerIsSupported(issuer string) error {
+	return backoff.Retry(func() error { // nolint: wrapcheck
+		resp, err := s.vct.GetIssuers(context.Background())
+		if err != nil {
+			return fmt.Errorf("get issuers: %w", err)
+		}
+
+		if len(resp) == 0 {
+			return nil
+		}
+
+		for i := range resp {
+			if resp[i] == issuer {
+				return nil
+			}
+		}
+
+		return fmt.Errorf("issuer %q is not supported", issuer)
+	}, backoff.WithMaxRetries(backoff.NewConstantBackOff(time.Second), 15))
+}
+
+func (s *Steps) issuerIsNotSupported(issuer string) error {
+	return backoff.Retry(func() error { // nolint: wrapcheck
+		resp, err := s.vct.GetIssuers(context.Background())
+		if err != nil {
+			return fmt.Errorf("get issuers: %w", err)
+		}
+
+		if len(resp) == 0 {
+			return fmt.Errorf("issuer %q is supported", issuer)
+		}
+
+		for i := range resp {
+			if resp[i] == issuer {
+				return fmt.Errorf("issuer %q is supported", issuer)
+			}
+		}
+
+		return nil
+	}, backoff.WithMaxRetries(backoff.NewConstantBackOff(time.Second), 15))
 }
 
 func (s *Steps) setVCTClient(endpoint string) error {
@@ -67,7 +113,8 @@ func (s *Steps) setVCTClient(endpoint string) error {
 
 	return backoff.Retry(func() error { // nolint: wrapcheck
 		resp, err := s.vct.GetSTH(context.Background())
-		if err != nil {
+		// ignores the error if it is a permission issue
+		if err != nil && !strings.Contains(err.Error(), "action forbidden for") {
 			return err
 		}
 
@@ -75,6 +122,77 @@ func (s *Steps) setVCTClient(endpoint string) error {
 
 		return s.vct.AddJSONLDContexts(context.Background(), ldcontext.MustGetAll()...) // nolint: wrapcheck
 	}, backoff.WithMaxRetries(backoff.NewConstantBackOff(time.Second), 220))
+}
+
+func (s *Steps) noWritePerm() error {
+	_, err := s.vct.AddVC(context.Background(), []byte(`{}`))
+	if err == nil {
+		return fmt.Errorf("credentials were successfully added")
+	}
+
+	if strings.Contains(err.Error(), "action forbidden for") {
+		return nil
+	}
+
+	return err
+}
+
+func (s *Steps) noReadPerm() error {
+	_, err := s.vct.GetIssuers(context.Background())
+	if err == nil {
+		return fmt.Errorf("retrieved issuers successfully")
+	}
+
+	if !strings.Contains(err.Error(), "action forbidden for") {
+		return err
+	}
+
+	_, err = s.vct.GetSTH(context.Background())
+	if err == nil {
+		return fmt.Errorf("retrieved STH successfully")
+	}
+
+	if !strings.Contains(err.Error(), "action forbidden for") {
+		return err
+	}
+
+	_, err = s.vct.GetSTHConsistency(context.Background(), 1, 2)
+	if err == nil {
+		return fmt.Errorf("retrieved STH Consistency successfully")
+	}
+
+	if !strings.Contains(err.Error(), "action forbidden for") {
+		return err
+	}
+
+	_, err = s.vct.GetProofByHash(context.Background(), "", 1)
+	if err == nil {
+		return fmt.Errorf("retrieved proof by hash successfully")
+	}
+
+	if !strings.Contains(err.Error(), "action forbidden for") {
+		return err
+	}
+
+	_, err = s.vct.GetEntries(context.Background(), 1, 2)
+	if err == nil {
+		return fmt.Errorf("retrieved entries successfully")
+	}
+
+	if !strings.Contains(err.Error(), "action forbidden for") {
+		return err
+	}
+
+	_, err = s.vct.GetEntryAndProof(context.Background(), 1, 2)
+	if err == nil {
+		return fmt.Errorf("retrieved entry and proof successfully")
+	}
+
+	if !strings.Contains(err.Error(), "action forbidden for") {
+		return err
+	}
+
+	return nil
 }
 
 func (s *Steps) addVC(file string) error {
