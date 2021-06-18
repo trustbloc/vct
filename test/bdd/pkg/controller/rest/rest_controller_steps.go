@@ -74,7 +74,7 @@ func (s *Steps) setVCTClient(endpoint string) error {
 		s.state.GetSTHResponse = resp
 
 		return s.vct.AddJSONLDContexts(context.Background(), ldcontext.MustGetAll()...) // nolint: wrapcheck
-	}, backoff.WithMaxRetries(backoff.NewConstantBackOff(time.Second), 60))
+	}, backoff.WithMaxRetries(backoff.NewConstantBackOff(time.Second), 220))
 }
 
 func (s *Steps) addVC(file string) error {

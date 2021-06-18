@@ -50,6 +50,7 @@ services:
       - --logtostderr
     depends_on:
       - vct.postgres
+      - vct.trillian.log.signer
     networks:
       - witness_ledger_net
     ports:
@@ -121,12 +122,11 @@ services:
     restart: always
     environment:
       - VCT_API_HOST=0.0.0.0:56565
-      - VCT_AUTO_INIT_TREE=true
-      - VCT_LOG_ENDPOINT=vct.trillian.log.server:8090
+      - VCT_LOGS=maple2021:rw@vct.trillian.log.server:8090
       - VCT_KMS_ENDPOINT=http://vct.kms:7878
       - VCT_TRILLIAN_TIMEOUT=60
       - VCT_DSN=mysql://root@tcp(vct.mysql:3306)/test?interpolateParams=true&multiStatements=true
-      - VCT_ISSUERS=did:key:zUC724vuGvHpnCGFG1qqpXb81SiBLu3KLSqVzenwEZNPoY35i2Bscb8DLaVwHvRFs6F2NkNNXRcPWvqnPDUd9ukdjLkjZd3u9zzL4wDZDUpkPAatLDGLEYVo8kkAzuAKJQMr7N2
+      - VCT_ISSUERS=maple2021@did:key:zUC724vuGvHpnCGFG1qqpXb81SiBLu3KLSqVzenwEZNPoY35i2Bscb8DLaVwHvRFs6F2NkNNXRcPWvqnPDUd9ukdjLkjZd3u9zzL4wDZDUpkPAatLDGLEYVo8kkAzuAKJQMr7N2
       - VCT_TLS_CACERTS=/etc/tls/vct.local.crt
     volumes:
       - ./keys/tls:/etc/tls

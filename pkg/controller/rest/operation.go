@@ -15,8 +15,8 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/gorilla/mux"
 	"github.com/hyperledger/aries-framework-go/pkg/common/log"
-	ldctxrest "github.com/hyperledger/aries-framework-go/pkg/controller/rest/jsonld/context"
 
 	"github.com/trustbloc/vct/pkg/controller/command"
 	"github.com/trustbloc/vct/pkg/controller/errors"
@@ -26,7 +26,9 @@ var logger = log.New("controller/rest")
 
 // API endpoints.
 const (
-	basePath              = "/ct/v1"
+	aliasVarName          = "alias"
+	AliasPath             = "/{" + aliasVarName + "}"
+	basePath              = AliasPath + "/v1"
 	AddVCPath             = basePath + "/add-vc"
 	GetSTHPath            = basePath + "/get-sth"
 	GetSTHConsistencyPath = basePath + "/get-sth-consistency"
@@ -35,7 +37,7 @@ const (
 	GetIssuersPath        = basePath + "/get-issuers"
 	GetEntryAndProofPath  = basePath + "/get-entry-and-proof"
 	GetPublicKeyPath      = basePath + "/get-public-key"
-	AddContextPath        = ldctxrest.AddContextPath
+	AddContextPath        = basePath + "/context/add"
 	HealthCheckPath       = "/healthcheck"
 )
 
@@ -91,17 +93,36 @@ func (c *Operation) AddLdContext(w http.ResponseWriter, r *http.Request) {
 
 // AddVC adds verifiable credential to log.
 func (c *Operation) AddVC(w http.ResponseWriter, r *http.Request) {
-	execute(c.cmd.AddVC, w, r.Body)
+	var vcEntry bytes.Buffer
+
+	_, err := io.Copy(&vcEntry, r.Body)
+	if err != nil {
+		sendError(w, fmt.Errorf("%w: copy vc", errors.ErrInternal))
+
+		return
+	}
+
+	req, err := json.Marshal(command.AddVCRequest{
+		Alias:   mux.Vars(r)[aliasVarName],
+		VCEntry: vcEntry.Bytes(),
+	})
+	if err != nil {
+		sendError(w, fmt.Errorf("%w: marshal AddVCRequest", errors.ErrInternal))
+
+		return
+	}
+
+	execute(c.cmd.AddVC, w, bytes.NewBuffer(req))
 }
 
 // GetSTH retrieves latest signed tree head.
-func (c *Operation) GetSTH(w http.ResponseWriter, _ *http.Request) {
-	execute(c.cmd.GetSTH, w, nil)
+func (c *Operation) GetSTH(w http.ResponseWriter, r *http.Request) {
+	execute(c.cmd.GetSTH, w, bytes.NewBufferString(fmt.Sprintf("%q", mux.Vars(r)[aliasVarName])))
 }
 
 // GetIssuers returns issuers.
-func (c *Operation) GetIssuers(w http.ResponseWriter, _ *http.Request) {
-	execute(c.cmd.GetIssuers, w, nil)
+func (c *Operation) GetIssuers(w http.ResponseWriter, r *http.Request) {
+	execute(c.cmd.GetIssuers, w, bytes.NewBufferString(fmt.Sprintf("%q", mux.Vars(r)[aliasVarName])))
 }
 
 // HealthCheck returns status.
@@ -141,6 +162,7 @@ func (c *Operation) GetSTHConsistency(w http.ResponseWriter, r *http.Request) {
 	}
 
 	req, err := json.Marshal(command.GetSTHConsistencyRequest{
+		Alias:          mux.Vars(r)[aliasVarName],
 		FirstTreeSize:  first,
 		SecondTreeSize: second,
 	})
@@ -168,6 +190,7 @@ func (c *Operation) GetProofByHash(w http.ResponseWriter, r *http.Request) {
 	}
 
 	req, err := json.Marshal(command.GetProofByHashRequest{
+		Alias:    mux.Vars(r)[aliasVarName],
 		Hash:     r.FormValue(hashParamName),
 		TreeSize: treeSize,
 	})
@@ -202,6 +225,7 @@ func (c *Operation) GetEntries(w http.ResponseWriter, r *http.Request) {
 	}
 
 	req, err := json.Marshal(command.GetEntriesRequest{
+		Alias: mux.Vars(r)[aliasVarName],
 		Start: start,
 		End:   end,
 	})
@@ -236,6 +260,7 @@ func (c *Operation) GetEntryAndProof(w http.ResponseWriter, r *http.Request) {
 	}
 
 	req, err := json.Marshal(command.GetEntryAndProofRequest{
+		Alias:     mux.Vars(r)[aliasVarName],
 		LeafIndex: leafIndex,
 		TreeSize:  treeSize,
 	})

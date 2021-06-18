@@ -13,6 +13,7 @@ import (
 	"bytes"
 	_ "embed"
 	"encoding/json"
+	"fmt"
 	"io"
 	"testing"
 
@@ -52,6 +53,8 @@ var (
 		33, 217, 5, 110, 22, 113, 38, 217, 80, 195, 119, 97, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0,
 	}
 )
+
+const alias = "maple2021"
 
 func TestNew(t *testing.T) {
 	const kid = "kid"
@@ -173,7 +176,6 @@ func TestCmd_AddLdContext(t *testing.T) {
 			ID:   kid,
 			Type: kms.ECDSAP256TypeIEEEP1363,
 		},
-		Issuers:         []string{"issuer_a", "issuer_b", "issuer_a"},
 		StorageProvider: mem.NewProvider(),
 	})
 	require.NoError(t, err)
@@ -191,34 +193,108 @@ func TestCmd_AddLdContext(t *testing.T) {
 func TestCmd_GetIssuers(t *testing.T) {
 	const kid = "kid"
 
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
+	t.Run("Success", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		defer ctrl.Finish()
 
-	km := NewMockKeyManager(ctrl)
-	km.EXPECT().Get(kid).Return(nil, nil)
-	km.EXPECT().ExportPubKeyBytes(kid).Return([]byte(`public key`), nil)
+		km := NewMockKeyManager(ctrl)
+		km.EXPECT().Get(kid).Return(nil, nil)
+		km.EXPECT().ExportPubKeyBytes(kid).Return([]byte(`public key`), nil)
 
-	cmd, err := New(&Config{
-		KMS: km, Key: Key{
-			ID:   kid,
-			Type: kms.ECDSAP256TypeIEEEP1363,
-		},
-		Issuers:         []string{"issuer_a", "issuer_b", "issuer_a"},
-		StorageProvider: mem.NewProvider(),
+		cmd, err := New(&Config{
+			KMS: km, Key: Key{
+				ID:   kid,
+				Type: kms.ECDSAP256TypeIEEEP1363,
+			},
+			Logs: []Log{{
+				Alias:      alias,
+				Permission: "r",
+				Issuers:    []string{"issuer_a", "issuer_b"},
+			}},
+			StorageProvider: mem.NewProvider(),
+		})
+		require.NoError(t, err)
+		require.NotNil(t, cmd)
+
+		var fr bytes.Buffer
+
+		require.NoError(t, cmd.GetIssuers(&fr,
+			bytes.NewBufferString(fmt.Sprintf("%q", alias))))
+
+		var hr bytes.Buffer
+
+		require.NoError(t, lookupHandler(t, cmd, GetIssuers)(&hr,
+			bytes.NewBufferString(fmt.Sprintf("%q", alias))))
+
+		require.Equal(t, fr.String(), hr.String())
+		require.Equal(t, `["issuer_a","issuer_b"]`+"\n", fr.String())
 	})
-	require.NoError(t, err)
-	require.NotNil(t, cmd)
 
-	var fr bytes.Buffer
+	t.Run("Action forbidden", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		defer ctrl.Finish()
 
-	require.NoError(t, cmd.GetIssuers(&fr, nil))
+		km := NewMockKeyManager(ctrl)
+		km.EXPECT().Get(kid).Return(nil, nil)
+		km.EXPECT().ExportPubKeyBytes(kid).Return([]byte(`public key`), nil)
 
-	var hr bytes.Buffer
+		cmd, err := New(&Config{
+			KMS: km, Key: Key{
+				ID:   kid,
+				Type: kms.ECDSAP256TypeIEEEP1363,
+			},
+			Logs: []Log{{
+				Alias:      alias,
+				Permission: "w",
+				Issuers:    []string{"issuer_a", "issuer_b"},
+			}},
+			StorageProvider: mem.NewProvider(),
+		})
+		require.NoError(t, err)
+		require.NotNil(t, cmd)
 
-	require.NoError(t, lookupHandler(t, cmd, GetIssuers)(&hr, nil))
+		require.EqualError(t, cmd.GetIssuers(nil,
+			bytes.NewBufferString(fmt.Sprintf("%q", alias))),
+			"has permissions: action forbidden for \"maple2021\"",
+		)
+		require.EqualError(t, lookupHandler(t, cmd, GetIssuers)(nil,
+			bytes.NewBufferString(fmt.Sprintf("%q", alias))),
+			"has permissions: action forbidden for \"maple2021\"",
+		)
+	})
 
-	require.Equal(t, fr.String(), hr.String())
-	require.Equal(t, `["issuer_a","issuer_b"]`+"\n", fr.String())
+	t.Run("Decode alias failed", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		defer ctrl.Finish()
+
+		km := NewMockKeyManager(ctrl)
+		km.EXPECT().Get(kid).Return(nil, nil)
+		km.EXPECT().ExportPubKeyBytes(kid).Return([]byte(`public key`), nil)
+
+		cmd, err := New(&Config{
+			KMS: km, Key: Key{
+				ID:   kid,
+				Type: kms.ECDSAP256TypeIEEEP1363,
+			},
+			Logs: []Log{{
+				Alias:      alias,
+				Permission: "w",
+				Issuers:    []string{"issuer_a", "issuer_b"},
+			}},
+			StorageProvider: mem.NewProvider(),
+		})
+		require.NoError(t, err)
+		require.NotNil(t, cmd)
+
+		require.EqualError(t, cmd.GetIssuers(nil,
+			bytes.NewBufferString("2021")),
+			"internal error: decode alias failed",
+		)
+		require.EqualError(t, lookupHandler(t, cmd, GetIssuers)(nil,
+			bytes.NewBufferString("2021")),
+			"internal error: decode alias failed",
+		)
+	})
 }
 
 func TestCmd_GetPublicKey(t *testing.T) {
@@ -255,9 +331,8 @@ func TestCmd_GetPublicKey(t *testing.T) {
 
 func TestCmd_GetEntries(t *testing.T) {
 	const (
-		kid           = "kid"
-		logID   int64 = 123
-		keyType       = kms.ECDSAP256TypeIEEEP1363
+		kid     = "kid"
+		keyType = kms.ECDSAP256TypeIEEEP1363
 	)
 
 	t.Run("Success", func(t *testing.T) {
@@ -277,13 +352,16 @@ func TestCmd_GetEntries(t *testing.T) {
 		).Times(2)
 
 		cmd, err := New(&Config{
-			KMS:      km,
-			LogID:    logID,
-			Trillian: client,
+			KMS: km,
 			Key: Key{
 				ID:   kid,
 				Type: keyType,
 			},
+			Logs: []Log{{
+				Alias:      alias,
+				Permission: "r",
+				Client:     client,
+			}},
 			StorageProvider: mem.NewProvider(),
 		})
 		require.NoError(t, err)
@@ -291,12 +369,12 @@ func TestCmd_GetEntries(t *testing.T) {
 
 		fr, frs := bytes.Buffer{}, GetEntriesResponse{}
 
-		require.NoError(t, cmd.GetEntries(&fr, bytes.NewBufferString(`{}`)))
+		require.NoError(t, cmd.GetEntries(&fr, bytes.NewBufferString(`{"alias":"maple2021"}`)))
 		require.NoError(t, json.Unmarshal(fr.Bytes(), &frs))
 
 		hr, hrs := bytes.Buffer{}, GetEntriesResponse{}
 
-		require.NoError(t, lookupHandler(t, cmd, GetEntries)(&hr, bytes.NewBufferString(`{}`)))
+		require.NoError(t, lookupHandler(t, cmd, GetEntries)(&hr, bytes.NewBufferString(`{"alias":"maple2021"}`)))
 		require.NoError(t, json.Unmarshal(hr.Bytes(), &hrs))
 
 		require.Equal(t, frs.Entries, hrs.Entries)
@@ -313,8 +391,7 @@ func TestCmd_GetEntries(t *testing.T) {
 		km.EXPECT().ExportPubKeyBytes(kid).Return([]byte(`public key`), nil)
 
 		cmd, err := New(&Config{
-			KMS:   km,
-			LogID: logID,
+			KMS: km,
 			Key: Key{
 				ID:   kid,
 				Type: keyType,
@@ -339,8 +416,7 @@ func TestCmd_GetEntries(t *testing.T) {
 		km.EXPECT().ExportPubKeyBytes(kid).Return([]byte(`public key`), nil)
 
 		cmd, err := New(&Config{
-			KMS:   km,
-			LogID: logID,
+			KMS: km,
 			Key: Key{
 				ID:   kid,
 				Type: keyType,
@@ -372,13 +448,16 @@ func TestCmd_GetEntries(t *testing.T) {
 		client.EXPECT().GetLeavesByRange(gomock.Any(), gomock.Any()).Return(nil, errors.New("error")).Times(2)
 
 		cmd, err := New(&Config{
-			KMS:      km,
-			LogID:    logID,
-			Trillian: client,
+			KMS: km,
 			Key: Key{
 				ID:   kid,
 				Type: keyType,
 			},
+			Logs: []Log{{
+				Alias:      alias,
+				Permission: "r",
+				Client:     client,
+			}},
 			StorageProvider: mem.NewProvider(),
 		})
 		require.NoError(t, err)
@@ -386,8 +465,8 @@ func TestCmd_GetEntries(t *testing.T) {
 
 		const expErr = "get leaves by range: error"
 
-		require.EqualError(t, cmd.GetEntries(nil, bytes.NewBufferString(`{}`)), expErr)
-		require.EqualError(t, lookupHandler(t, cmd, GetEntries)(nil, bytes.NewBufferString(`{}`)), expErr)
+		require.EqualError(t, cmd.GetEntries(nil, bytes.NewBufferString(`{"alias":"maple2021"}`)), expErr)
+		require.EqualError(t, lookupHandler(t, cmd, GetEntries)(nil, bytes.NewBufferString(`{"alias":"maple2021"}`)), expErr)
 	})
 
 	t.Run("Unmarshal binary error", func(t *testing.T) {
@@ -406,9 +485,12 @@ func TestCmd_GetEntries(t *testing.T) {
 		).Times(2)
 
 		cmd, err := New(&Config{
-			KMS:      km,
-			LogID:    logID,
-			Trillian: client,
+			KMS: km,
+			Logs: []Log{{
+				Alias:      alias,
+				Permission: "r",
+				Client:     client,
+			}},
 			Key: Key{
 				ID:   kid,
 				Type: keyType,
@@ -420,8 +502,8 @@ func TestCmd_GetEntries(t *testing.T) {
 
 		const expErr = "internal error: unmarshal binary: [0]"
 
-		require.EqualError(t, cmd.GetEntries(nil, bytes.NewBufferString(`{}`)), expErr)
-		require.EqualError(t, lookupHandler(t, cmd, GetEntries)(nil, bytes.NewBufferString(`{}`)), expErr)
+		require.EqualError(t, cmd.GetEntries(nil, bytes.NewBufferString(`{"alias":"maple2021"}`)), expErr)
+		require.EqualError(t, lookupHandler(t, cmd, GetEntries)(nil, bytes.NewBufferString(`{"alias":"maple2021"}`)), expErr)
 	})
 
 	t.Run("Tree size error", func(t *testing.T) {
@@ -442,9 +524,12 @@ func TestCmd_GetEntries(t *testing.T) {
 		).Times(2)
 
 		cmd, err := New(&Config{
-			KMS:      km,
-			LogID:    logID,
-			Trillian: client,
+			KMS: km,
+			Logs: []Log{{
+				Alias:      alias,
+				Permission: "r",
+				Client:     client,
+			}},
 			Key: Key{
 				ID:   kid,
 				Type: keyType,
@@ -457,10 +542,10 @@ func TestCmd_GetEntries(t *testing.T) {
 		const expErr = "internal error: need tree size: 4 to get leaves but only got: 1"
 
 		require.EqualError(t, cmd.GetEntries(nil,
-			bytes.NewBufferString(`{"start":3,"end":4}`),
+			bytes.NewBufferString(`{"alias":"maple2021","start":3,"end":4}`),
 		), expErr)
 		require.EqualError(t, lookupHandler(t, cmd, GetEntries)(nil,
-			bytes.NewBufferString(`{"start":3,"end":4}`),
+			bytes.NewBufferString(`{"alias":"maple2021","start":3,"end":4}`),
 		), expErr)
 	})
 
@@ -481,9 +566,12 @@ func TestCmd_GetEntries(t *testing.T) {
 		).Times(2)
 
 		cmd, err := New(&Config{
-			KMS:      km,
-			LogID:    logID,
-			Trillian: client,
+			KMS: km,
+			Logs: []Log{{
+				Alias:      alias,
+				Permission: "r",
+				Client:     client,
+			}},
 			Key: Key{
 				ID:   kid,
 				Type: keyType,
@@ -495,16 +583,43 @@ func TestCmd_GetEntries(t *testing.T) {
 
 		const expErr = "internal error: unexpected leaf index: rsp.Leaves[0].LeafIndex=10 for range [0,0]"
 
-		require.EqualError(t, cmd.GetEntries(nil, bytes.NewBufferString(`{}`)), expErr)
-		require.EqualError(t, lookupHandler(t, cmd, GetEntries)(nil, bytes.NewBufferString(`{}`)), expErr)
+		require.EqualError(t, cmd.GetEntries(nil, bytes.NewBufferString(`{"alias":"maple2021"}`)), expErr)
+		require.EqualError(t, lookupHandler(t, cmd, GetEntries)(nil, bytes.NewBufferString(`{"alias":"maple2021"}`)), expErr)
+	})
+
+	t.Run("Action forbidden", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		defer ctrl.Finish()
+
+		km := NewMockKeyManager(ctrl)
+		km.EXPECT().Get(kid).Return(nil, nil)
+		km.EXPECT().ExportPubKeyBytes(kid).Return([]byte(`public key`), nil)
+
+		cmd, err := New(&Config{
+			KMS: km,
+			Logs: []Log{{
+				Alias: alias,
+			}},
+			Key: Key{
+				ID:   kid,
+				Type: keyType,
+			},
+			StorageProvider: mem.NewProvider(),
+		})
+		require.NoError(t, err)
+		require.NotNil(t, cmd)
+
+		const expErr = "has permissions: action forbidden for \"maple2021\""
+
+		require.EqualError(t, cmd.GetEntries(nil, bytes.NewBufferString(`{"alias":"maple2021"}`)), expErr)
+		require.EqualError(t, lookupHandler(t, cmd, GetEntries)(nil, bytes.NewBufferString(`{"alias":"maple2021"}`)), expErr)
 	})
 }
 
 func TestCmd_GetProofByHash(t *testing.T) {
 	const (
-		kid           = "kid"
-		logID   int64 = 123
-		keyType       = kms.ECDSAP256TypeIEEEP1363
+		kid     = "kid"
+		keyType = kms.ECDSAP256TypeIEEEP1363
 	)
 
 	t.Run("Success", func(t *testing.T) {
@@ -524,9 +639,12 @@ func TestCmd_GetProofByHash(t *testing.T) {
 		).Times(2)
 
 		cmd, err := New(&Config{
-			KMS:      km,
-			LogID:    logID,
-			Trillian: client,
+			KMS: km,
+			Logs: []Log{{
+				Alias:      alias,
+				Permission: "r",
+				Client:     client,
+			}},
 			Key: Key{
 				ID:   kid,
 				Type: keyType,
@@ -538,12 +656,14 @@ func TestCmd_GetProofByHash(t *testing.T) {
 
 		fr, frs := bytes.Buffer{}, GetProofByHashResponse{}
 
-		require.NoError(t, cmd.GetProofByHash(&fr, bytes.NewBufferString(`{"tree_size": 1}`)))
+		require.NoError(t, cmd.GetProofByHash(&fr,
+			bytes.NewBufferString(`{"alias":"maple2021","tree_size": 1}`)))
 		require.NoError(t, json.Unmarshal(fr.Bytes(), &frs))
 
 		hr, hrs := bytes.Buffer{}, GetProofByHashResponse{}
 
-		require.NoError(t, lookupHandler(t, cmd, GetProofByHash)(&hr, bytes.NewBufferString(`{"tree_size": 1}`)))
+		require.NoError(t, lookupHandler(t, cmd, GetProofByHash)(&hr,
+			bytes.NewBufferString(`{"alias":"maple2021","tree_size": 1}`)))
 		require.NoError(t, json.Unmarshal(hr.Bytes(), &hrs))
 
 		require.Equal(t, frs.AuditPath, hrs.AuditPath)
@@ -561,8 +681,7 @@ func TestCmd_GetProofByHash(t *testing.T) {
 		km.EXPECT().ExportPubKeyBytes(kid).Return([]byte(`public key`), nil)
 
 		cmd, err := New(&Config{
-			KMS:   km,
-			LogID: logID,
+			KMS: km,
 			Key: Key{
 				ID:   kid,
 				Type: keyType,
@@ -572,7 +691,7 @@ func TestCmd_GetProofByHash(t *testing.T) {
 		require.NoError(t, err)
 		require.NotNil(t, cmd)
 
-		const expErr = "decode GetEntries request: EOF"
+		const expErr = "decode GetProofByHash request: EOF"
 
 		require.EqualError(t, cmd.GetProofByHash(nil, bytes.NewBuffer(nil)), expErr)
 		require.EqualError(t, lookupHandler(t, cmd, GetProofByHash)(nil, bytes.NewBuffer(nil)), expErr)
@@ -587,8 +706,7 @@ func TestCmd_GetProofByHash(t *testing.T) {
 		km.EXPECT().ExportPubKeyBytes(kid).Return([]byte(`public key`), nil)
 
 		cmd, err := New(&Config{
-			KMS:   km,
-			LogID: logID,
+			KMS: km,
 			Key: Key{
 				ID:   kid,
 				Type: keyType,
@@ -625,9 +743,12 @@ func TestCmd_GetProofByHash(t *testing.T) {
 		).Times(2)
 
 		cmd, err := New(&Config{
-			KMS:      km,
-			LogID:    logID,
-			Trillian: client,
+			KMS: km,
+			Logs: []Log{{
+				Alias:      alias,
+				Permission: "r",
+				Client:     client,
+			}},
 			Key: Key{
 				ID:   kid,
 				Type: keyType,
@@ -640,19 +761,18 @@ func TestCmd_GetProofByHash(t *testing.T) {
 		const expErr = "internal error: unmarshal binary: [0]"
 
 		require.EqualError(t, cmd.GetProofByHash(nil,
-			bytes.NewBufferString(`{"tree_size": 1}`),
+			bytes.NewBufferString(`{"alias":"maple2021","tree_size": 1}`),
 		), expErr)
 		require.EqualError(t, lookupHandler(t, cmd, GetProofByHash)(nil,
-			bytes.NewBufferString(`{"tree_size": 1}`),
+			bytes.NewBufferString(`{"alias":"maple2021","tree_size": 1}`),
 		), expErr)
 	})
 }
 
 func TestCmd_GetSTHConsistency(t *testing.T) {
 	const (
-		kid           = "kid"
-		logID   int64 = 123
-		keyType       = kms.ECDSAP256TypeIEEEP1363
+		kid     = "kid"
+		keyType = kms.ECDSAP256TypeIEEEP1363
 	)
 
 	t.Run("Success", func(t *testing.T) {
@@ -672,9 +792,12 @@ func TestCmd_GetSTHConsistency(t *testing.T) {
 		).Times(2)
 
 		cmd, err := New(&Config{
-			KMS:      km,
-			LogID:    logID,
-			Trillian: client,
+			KMS: km,
+			Logs: []Log{{
+				Alias:      alias,
+				Permission: "r",
+				Client:     client,
+			}},
 			Key: Key{
 				ID:   kid,
 				Type: keyType,
@@ -687,14 +810,14 @@ func TestCmd_GetSTHConsistency(t *testing.T) {
 		fr, frs := bytes.Buffer{}, GetSTHConsistencyResponse{}
 
 		require.NoError(t, cmd.GetSTHConsistency(&fr,
-			bytes.NewBufferString(`{"first_tree_size": 1, "second_tree_size": 1}`),
+			bytes.NewBufferString(`{"alias":"maple2021","first_tree_size": 1, "second_tree_size": 1}`),
 		))
 		require.NoError(t, json.Unmarshal(fr.Bytes(), &frs))
 
 		hr, hrs := bytes.Buffer{}, GetSTHConsistencyResponse{}
 
 		require.NoError(t, lookupHandler(t, cmd, GetSTHConsistency)(&hr,
-			bytes.NewBufferString(`{"first_tree_size": 1, "second_tree_size": 1}`),
+			bytes.NewBufferString(`{"alias":"maple2021","first_tree_size": 1, "second_tree_size": 1}`),
 		))
 		require.NoError(t, json.Unmarshal(hr.Bytes(), &hrs))
 
@@ -711,12 +834,15 @@ func TestCmd_GetSTHConsistency(t *testing.T) {
 		km.EXPECT().ExportPubKeyBytes(kid).Return([]byte(`public key`), nil)
 
 		cmd, err := New(&Config{
-			KMS:   km,
-			LogID: logID,
+			KMS: km,
 			Key: Key{
 				ID:   kid,
 				Type: keyType,
 			},
+			Logs: []Log{{
+				Alias:      alias,
+				Permission: "r",
+			}},
 			StorageProvider: mem.NewProvider(),
 		})
 		require.NoError(t, err)
@@ -725,14 +851,14 @@ func TestCmd_GetSTHConsistency(t *testing.T) {
 		fr, frs := bytes.Buffer{}, GetSTHConsistencyResponse{}
 
 		require.NoError(t, cmd.GetSTHConsistency(&fr,
-			bytes.NewBufferString(`{}`),
+			bytes.NewBufferString(`{"alias":"maple2021"}`),
 		))
 		require.NoError(t, json.Unmarshal(fr.Bytes(), &frs))
 
 		hr, hrs := bytes.Buffer{}, GetSTHConsistencyResponse{}
 
 		require.NoError(t, lookupHandler(t, cmd, GetSTHConsistency)(&hr,
-			bytes.NewBufferString(`{}`),
+			bytes.NewBufferString(`{"alias":"maple2021"}`),
 		))
 		require.NoError(t, json.Unmarshal(hr.Bytes(), &hrs))
 
@@ -749,8 +875,7 @@ func TestCmd_GetSTHConsistency(t *testing.T) {
 		km.EXPECT().ExportPubKeyBytes(kid).Return([]byte(`public key`), nil)
 
 		cmd, err := New(&Config{
-			KMS:   km,
-			LogID: logID,
+			KMS: km,
 			Key: Key{
 				ID:   kid,
 				Type: keyType,
@@ -760,7 +885,7 @@ func TestCmd_GetSTHConsistency(t *testing.T) {
 		require.NoError(t, err)
 		require.NotNil(t, cmd)
 
-		const expErr = "decode STHConsistency request: EOF"
+		const expErr = "decode GetSTHConsistency request: EOF"
 
 		require.EqualError(t, cmd.GetSTHConsistency(nil, bytes.NewBuffer(nil)), expErr)
 		require.EqualError(t, lookupHandler(t, cmd, GetSTHConsistency)(nil, bytes.NewBuffer(nil)), expErr)
@@ -775,8 +900,7 @@ func TestCmd_GetSTHConsistency(t *testing.T) {
 		km.EXPECT().ExportPubKeyBytes(kid).Return([]byte(`public key`), nil)
 
 		cmd, err := New(&Config{
-			KMS:   km,
-			LogID: logID,
+			KMS: km,
 			Key: Key{
 				ID:   kid,
 				Type: keyType,
@@ -786,7 +910,7 @@ func TestCmd_GetSTHConsistency(t *testing.T) {
 		require.NoError(t, err)
 		require.NotNil(t, cmd)
 
-		const expErr = "validate STHConsistency request: validation failed: first_tree_size -1 and second_tree_size 0 values must be >= 0" // nolint: lll
+		const expErr = "validate GetSTHConsistency request: validation failed: first_tree_size -1 and second_tree_size 0 values must be >= 0" // nolint: lll
 
 		require.EqualError(t, cmd.GetSTHConsistency(nil,
 			bytes.NewBufferString(`{"first_tree_size": -1}`),
@@ -813,9 +937,12 @@ func TestCmd_GetSTHConsistency(t *testing.T) {
 		).Times(2)
 
 		cmd, err := New(&Config{
-			KMS:      km,
-			LogID:    logID,
-			Trillian: client,
+			KMS: km,
+			Logs: []Log{{
+				Alias:      alias,
+				Permission: "r",
+				Client:     client,
+			}},
 			Key: Key{
 				ID:   kid,
 				Type: keyType,
@@ -828,10 +955,39 @@ func TestCmd_GetSTHConsistency(t *testing.T) {
 		const expErr = "internal error: unmarshal binary: [0]"
 
 		require.EqualError(t, cmd.GetSTHConsistency(nil,
-			bytes.NewBufferString(`{"first_tree_size": 1, "second_tree_size": 1}`),
+			bytes.NewBufferString(`{"alias":"maple2021","first_tree_size": 1, "second_tree_size": 1}`),
 		), expErr)
 		require.EqualError(t, lookupHandler(t, cmd, GetSTHConsistency)(nil,
-			bytes.NewBufferString(`{"first_tree_size": 1, "second_tree_size": 1}`),
+			bytes.NewBufferString(`{"alias":"maple2021","first_tree_size": 1, "second_tree_size": 1}`),
+		), expErr)
+	})
+
+	t.Run("Alias maple2021 is not supported", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		defer ctrl.Finish()
+
+		km := NewMockKeyManager(ctrl)
+		km.EXPECT().Get(kid).Return(nil, nil)
+		km.EXPECT().ExportPubKeyBytes(kid).Return([]byte(`public key`), nil)
+
+		cmd, err := New(&Config{
+			KMS: km,
+			Key: Key{
+				ID:   kid,
+				Type: keyType,
+			},
+			StorageProvider: mem.NewProvider(),
+		})
+		require.NoError(t, err)
+		require.NotNil(t, cmd)
+
+		const expErr = "has permissions: alias \"maple2021\" is not supported"
+
+		require.EqualError(t, cmd.GetSTHConsistency(nil,
+			bytes.NewBufferString(`{"alias":"maple2021","first_tree_size": 1, "second_tree_size": 1}`),
+		), expErr)
+		require.EqualError(t, lookupHandler(t, cmd, GetSTHConsistency)(nil,
+			bytes.NewBufferString(`{"alias":"maple2021","first_tree_size": 1, "second_tree_size": 1}`),
 		), expErr)
 	})
 }
@@ -859,10 +1015,13 @@ func TestCmd_GetSTH(t *testing.T) {
 		).Times(2)
 
 		cmd, err := New(&Config{
-			KMS:      km,
-			Crypto:   cr,
-			LogID:    logID,
-			Trillian: client,
+			KMS:    km,
+			Crypto: cr,
+			Logs: []Log{{
+				Alias:      alias,
+				Permission: "r",
+				Client:     client,
+			}},
 			Key: Key{
 				ID:   newKID,
 				Type: keyType,
@@ -874,12 +1033,12 @@ func TestCmd_GetSTH(t *testing.T) {
 
 		fr, frs := bytes.Buffer{}, GetSTHResponse{}
 
-		require.NoError(t, cmd.GetSTH(&fr, nil))
+		require.NoError(t, cmd.GetSTH(&fr, bytes.NewBufferString(fmt.Sprintf("%q", alias))))
 		require.NoError(t, json.Unmarshal(fr.Bytes(), &frs))
 
 		hr, hrs := bytes.Buffer{}, GetSTHResponse{}
 
-		require.NoError(t, lookupHandler(t, cmd, GetSTH)(&hr, nil))
+		require.NoError(t, lookupHandler(t, cmd, GetSTH)(&hr, bytes.NewBufferString(fmt.Sprintf("%q", alias))))
 		require.NoError(t, json.Unmarshal(hr.Bytes(), &hrs))
 
 		require.Equal(t, frs.TreeSize, hrs.TreeSize)
@@ -904,9 +1063,12 @@ func TestCmd_GetSTH(t *testing.T) {
 		).Return(nil, errors.New("error")).Times(2)
 
 		cmd, err := New(&Config{
-			KMS:      km,
-			LogID:    logID,
-			Trillian: client,
+			KMS: km,
+			Logs: []Log{{
+				Alias:      alias,
+				Permission: "r",
+				Client:     client,
+			}},
 			Key: Key{
 				ID:   kid,
 				Type: keyType,
@@ -917,8 +1079,8 @@ func TestCmd_GetSTH(t *testing.T) {
 		require.NotNil(t, cmd)
 
 		const expErr = "get latest signed log root: error"
-		require.EqualError(t, cmd.GetSTH(nil, nil), expErr)
-		require.EqualError(t, lookupHandler(t, cmd, GetSTH)(nil, nil), expErr)
+		require.EqualError(t, cmd.GetSTH(nil, bytes.NewBufferString(fmt.Sprintf("%q", alias))), expErr)
+		require.EqualError(t, lookupHandler(t, cmd, GetSTH)(nil, bytes.NewBufferString(fmt.Sprintf("%q", alias))), expErr)
 	})
 
 	t.Run("No signed log root", func(t *testing.T) {
@@ -935,9 +1097,12 @@ func TestCmd_GetSTH(t *testing.T) {
 		).Return(nil, nil).Times(2)
 
 		cmd, err := New(&Config{
-			KMS:      km,
-			LogID:    logID,
-			Trillian: client,
+			KMS: km,
+			Logs: []Log{{
+				Alias:      alias,
+				Permission: "r",
+				Client:     client,
+			}},
 			Key: Key{
 				ID:   kid,
 				Type: keyType,
@@ -948,8 +1113,8 @@ func TestCmd_GetSTH(t *testing.T) {
 		require.NotNil(t, cmd)
 
 		const expErr = "internal error: no signed log root returned"
-		require.EqualError(t, cmd.GetSTH(nil, nil), expErr)
-		require.EqualError(t, lookupHandler(t, cmd, GetSTH)(nil, nil), expErr)
+		require.EqualError(t, cmd.GetSTH(nil, bytes.NewBufferString(fmt.Sprintf("%q", alias))), expErr)
+		require.EqualError(t, lookupHandler(t, cmd, GetSTH)(nil, bytes.NewBufferString(fmt.Sprintf("%q", alias))), expErr)
 	})
 
 	t.Run("Corrupted bytes (unmarshal binary)", func(t *testing.T) {
@@ -968,9 +1133,12 @@ func TestCmd_GetSTH(t *testing.T) {
 		).Times(2)
 
 		cmd, err := New(&Config{
-			KMS:      km,
-			LogID:    logID,
-			Trillian: client,
+			KMS: km,
+			Logs: []Log{{
+				Alias:      alias,
+				Permission: "r",
+				Client:     client,
+			}},
 			Key: Key{
 				ID:   kid,
 				Type: keyType,
@@ -981,8 +1149,8 @@ func TestCmd_GetSTH(t *testing.T) {
 		require.NotNil(t, cmd)
 
 		const expErr = "unmarshal binary: logRootBytes too short"
-		require.EqualError(t, cmd.GetSTH(nil, nil), expErr)
-		require.EqualError(t, lookupHandler(t, cmd, GetSTH)(nil, nil), expErr)
+		require.EqualError(t, cmd.GetSTH(nil, bytes.NewBufferString(fmt.Sprintf("%q", alias))), expErr)
+		require.EqualError(t, lookupHandler(t, cmd, GetSTH)(nil, bytes.NewBufferString(fmt.Sprintf("%q", alias))), expErr)
 	})
 
 	t.Run("Sign error", func(t *testing.T) {
@@ -1004,10 +1172,13 @@ func TestCmd_GetSTH(t *testing.T) {
 		).Times(2)
 
 		cmd, err := New(&Config{
-			KMS:      km,
-			Crypto:   cr,
-			LogID:    logID,
-			Trillian: client,
+			KMS:    km,
+			Crypto: cr,
+			Logs: []Log{{
+				Alias:      alias,
+				Permission: "r",
+				Client:     client,
+			}},
 			Key: Key{
 				ID:   kid,
 				Type: keyType,
@@ -1018,8 +1189,8 @@ func TestCmd_GetSTH(t *testing.T) {
 		require.NotNil(t, cmd)
 
 		const expErr = "sign tree head (v1): sign TreeHeadSignature: error"
-		require.EqualError(t, cmd.GetSTH(nil, nil), expErr)
-		require.EqualError(t, lookupHandler(t, cmd, GetSTH)(nil, nil), expErr)
+		require.EqualError(t, cmd.GetSTH(nil, bytes.NewBufferString(fmt.Sprintf("%q", alias))), expErr)
+		require.EqualError(t, lookupHandler(t, cmd, GetSTH)(nil, bytes.NewBufferString(fmt.Sprintf("%q", alias))), expErr)
 	})
 }
 
@@ -1049,10 +1220,13 @@ func TestCmd_GetEntryAndProof(t *testing.T) {
 		).Times(2)
 
 		cmd, err := New(&Config{
-			KMS:      km,
-			Crypto:   cr,
-			LogID:    logID,
-			Trillian: client,
+			KMS:    km,
+			Crypto: cr,
+			Logs: []Log{{
+				Alias:      alias,
+				Permission: "r",
+				Client:     client,
+			}},
 			Key: Key{
 				ID:   newKID,
 				Type: keyType,
@@ -1064,12 +1238,14 @@ func TestCmd_GetEntryAndProof(t *testing.T) {
 
 		fr, frs := bytes.Buffer{}, GetEntryAndProofResponse{}
 
-		require.NoError(t, cmd.GetEntryAndProof(&fr, bytes.NewBufferString(`{"tree_size": 1}`)))
+		require.NoError(t, cmd.GetEntryAndProof(&fr,
+			bytes.NewBufferString(`{"alias":"maple2021","tree_size": 1}`)))
 		require.NoError(t, json.Unmarshal(fr.Bytes(), &frs))
 
 		hr, hrs := bytes.Buffer{}, GetEntryAndProofResponse{}
 
-		require.NoError(t, lookupHandler(t, cmd, GetEntryAndProof)(&hr, bytes.NewBufferString(`{"tree_size": 1}`)))
+		require.NoError(t, lookupHandler(t, cmd, GetEntryAndProof)(&hr,
+			bytes.NewBufferString(`{"alias":"maple2021","tree_size": 1}`)))
 		require.NoError(t, json.Unmarshal(hr.Bytes(), &hrs))
 
 		require.Equal(t, frs.AuditPath, hrs.AuditPath)
@@ -1097,10 +1273,13 @@ func TestCmd_GetEntryAndProof(t *testing.T) {
 		).Times(2)
 
 		cmd, err := New(&Config{
-			KMS:      km,
-			Crypto:   cr,
-			LogID:    logID,
-			Trillian: client,
+			KMS:    km,
+			Crypto: cr,
+			Logs: []Log{{
+				Alias:      alias,
+				Permission: "r",
+				Client:     client,
+			}},
 			Key: Key{
 				ID:   newKID,
 				Type: keyType,
@@ -1113,10 +1292,10 @@ func TestCmd_GetEntryAndProof(t *testing.T) {
 		const expErr = "bad request: need tree size: 2 for proof, got: 1"
 
 		require.EqualError(t, cmd.GetEntryAndProof(nil,
-			bytes.NewBufferString(`{"tree_size": 2}`),
+			bytes.NewBufferString(`{"alias":"maple2021","tree_size": 2}`),
 		), expErr)
 		require.EqualError(t, lookupHandler(t, cmd, GetEntryAndProof)(nil,
-			bytes.NewBufferString(`{"tree_size": 2}`),
+			bytes.NewBufferString(`{"alias":"maple2021","tree_size": 2}`),
 		), expErr)
 	})
 
@@ -1136,10 +1315,13 @@ func TestCmd_GetEntryAndProof(t *testing.T) {
 		).Times(2)
 
 		cmd, err := New(&Config{
-			KMS:      km,
-			Crypto:   cr,
-			LogID:    logID,
-			Trillian: client,
+			KMS:    km,
+			Crypto: cr,
+			Logs: []Log{{
+				Alias:      alias,
+				Permission: "r",
+				Client:     client,
+			}},
 			Key: Key{
 				ID:   newKID,
 				Type: keyType,
@@ -1152,10 +1334,10 @@ func TestCmd_GetEntryAndProof(t *testing.T) {
 		const expErr = "internal error: corrupted data received: signed_log_root:{log_root:\"\\x00\\x01\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x01 \\xb68\\xe6z\\xa0\\xa6\\xe0\\xacN\\xde\\x1fO1\\xbcYH\\xbb\\xbe\\\\\\xc8r\\xc6pJ\\xb8\\x00\\x88\\xf7!\\xd9\\x05n\\x16q&\\xd9P\\xc3wa\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x01\\x00\\x00\"}" // nolint: lll
 
 		require.EqualError(t, cmd.GetEntryAndProof(nil,
-			bytes.NewBufferString(`{"tree_size": 1}`),
+			bytes.NewBufferString(`{"alias":"maple2021","tree_size": 1}`),
 		), expErr)
 		require.EqualError(t, lookupHandler(t, cmd, GetEntryAndProof)(nil,
-			bytes.NewBufferString(`{"tree_size": 1}`),
+			bytes.NewBufferString(`{"alias":"maple2021","tree_size": 1}`),
 		), expErr)
 	})
 }
@@ -1178,9 +1360,8 @@ func TestCreateLeaf(t *testing.T) {
 
 func TestCmd_AddVC(t *testing.T) {
 	const (
-		kid           = "kid"
-		logID   int64 = 123
-		keyType       = kms.ECDSAP256TypeIEEEP1363
+		kid     = "kid"
+		keyType = kms.ECDSAP256TypeIEEEP1363
 	)
 
 	t.Run("Success", func(t *testing.T) {
@@ -1204,11 +1385,14 @@ func TestCmd_AddVC(t *testing.T) {
 		loadContexts(t, db)
 
 		cmd, err := New(&Config{
-			KMS:      km,
-			Crypto:   cr,
-			LogID:    logID,
-			Trillian: client,
-			VDR:      vdr.New(vdr.WithVDR(key.New())),
+			KMS:    km,
+			Crypto: cr,
+			Logs: []Log{{
+				Alias:      alias,
+				Permission: "w",
+				Client:     client,
+			}},
+			VDR: vdr.New(vdr.WithVDR(key.New())),
 			Key: Key{
 				ID:   newKID,
 				Type: keyType,
@@ -1220,12 +1404,18 @@ func TestCmd_AddVC(t *testing.T) {
 
 		fr, frs := bytes.Buffer{}, AddVCResponse{}
 
-		require.NoError(t, cmd.AddVC(&fr, bytes.NewBuffer(verifiableCredential)))
+		req, err := json.Marshal(AddVCRequest{
+			Alias:   alias,
+			VCEntry: verifiableCredential,
+		})
+		require.NoError(t, err)
+
+		require.NoError(t, cmd.AddVC(&fr, bytes.NewBuffer(req)))
 		require.NoError(t, json.Unmarshal(fr.Bytes(), &frs))
 
 		hr, hrs := bytes.Buffer{}, AddVCResponse{}
 
-		require.NoError(t, lookupHandler(t, cmd, AddVC)(&hr, bytes.NewBuffer(verifiableCredential)))
+		require.NoError(t, lookupHandler(t, cmd, AddVC)(&hr, bytes.NewBuffer(req)))
 		require.NoError(t, json.Unmarshal(hr.Bytes(), &hrs))
 
 		require.Equal(t, frs.Timestamp, hrs.Timestamp)
@@ -1254,8 +1444,7 @@ func TestCmd_AddVC(t *testing.T) {
 		km.EXPECT().ExportPubKeyBytes(kid).Return([]byte(`public key`), nil)
 
 		cmd, err := New(&Config{
-			KMS:   km,
-			LogID: logID,
+			KMS: km,
 			Key: Key{
 				ID:   kid,
 				Type: keyType,
@@ -1265,7 +1454,7 @@ func TestCmd_AddVC(t *testing.T) {
 		require.NoError(t, err)
 		require.NotNil(t, cmd)
 
-		const expErr = "internal error: copy vc failed"
+		const expErr = "decode AddVC request: internal error"
 		require.EqualError(t, cmd.AddVC(nil, &readerMock{errors.New("EOF")}), expErr)
 		require.EqualError(t, lookupHandler(t, cmd, AddVC)(nil, &readerMock{errors.New("EOF")}), expErr)
 	})
@@ -1279,20 +1468,23 @@ func TestCmd_AddVC(t *testing.T) {
 		km.EXPECT().ExportPubKeyBytes(kid).Return([]byte(`public key`), nil)
 
 		cmd, err := New(&Config{
-			KMS:   km,
-			LogID: logID,
+			KMS: km,
 			Key: Key{
 				ID:   kid,
 				Type: keyType,
 			},
+			Logs: []Log{{
+				Alias:      alias,
+				Permission: "w",
+			}},
 			StorageProvider: mem.NewProvider(),
 		})
 		require.NoError(t, err)
 		require.NotNil(t, cmd)
 
 		const expErr = "parse credential: decode new credential: embedded proof is not JSON: unexpected end of JSON input"
-		require.EqualError(t, cmd.AddVC(nil, bytes.NewBuffer(nil)), expErr)
-		require.EqualError(t, lookupHandler(t, cmd, AddVC)(nil, bytes.NewBuffer(nil)), expErr)
+		require.EqualError(t, cmd.AddVC(nil, bytes.NewBufferString(`{"alias":"maple2021"}`)), expErr)
+		require.EqualError(t, lookupHandler(t, cmd, AddVC)(nil, bytes.NewBufferString(`{"alias":"maple2021"}`)), expErr)
 	})
 
 	t.Run("Issuer is not trusted", func(t *testing.T) {
@@ -1307,10 +1499,13 @@ func TestCmd_AddVC(t *testing.T) {
 		loadContexts(t, db)
 
 		cmd, err := New(&Config{
-			KMS:     km,
-			LogID:   logID,
-			VDR:     vdr.New(vdr.WithVDR(key.New())),
-			Issuers: []string{"issuer_a"},
+			KMS: km,
+			Logs: []Log{{
+				Alias:      alias,
+				Permission: "w",
+				Issuers:    []string{"issuer_a"},
+			}},
+			VDR: vdr.New(vdr.WithVDR(key.New())),
 			Key: Key{
 				ID:   kid,
 				Type: keyType,
@@ -1320,9 +1515,15 @@ func TestCmd_AddVC(t *testing.T) {
 		require.NoError(t, err)
 		require.NotNil(t, cmd)
 
+		req, err := json.Marshal(AddVCRequest{
+			Alias:   alias,
+			VCEntry: verifiableCredential,
+		})
+		require.NoError(t, err)
+
 		const expErr = "bad request: issuer did:key:zUC724vuGvHpnCGFG1qqpXb81SiBLu3KLSqVzenwEZNPoY35i2Bscb8DLaVwHvRFs6F2NkNNXRcPWvqnPDUd9ukdjLkjZd3u9zzL4wDZDUpkPAatLDGLEYVo8kkAzuAKJQMr7N2 is not in a list" // nolint: lll
-		require.EqualError(t, cmd.AddVC(nil, bytes.NewBuffer(verifiableCredential)), expErr)
-		require.EqualError(t, lookupHandler(t, cmd, AddVC)(nil, bytes.NewBuffer(verifiableCredential)), expErr)
+		require.EqualError(t, cmd.AddVC(nil, bytes.NewBuffer(req)), expErr)
+		require.EqualError(t, lookupHandler(t, cmd, AddVC)(nil, bytes.NewBuffer(req)), expErr)
 	})
 
 	t.Run("Queue leaf error", func(t *testing.T) {
@@ -1340,10 +1541,13 @@ func TestCmd_AddVC(t *testing.T) {
 		loadContexts(t, db)
 
 		cmd, err := New(&Config{
-			KMS:      km,
-			LogID:    logID,
-			Trillian: client,
-			VDR:      vdr.New(vdr.WithVDR(key.New())),
+			KMS: km,
+			Logs: []Log{{
+				Alias:      alias,
+				Permission: "w",
+				Client:     client,
+			}},
+			VDR: vdr.New(vdr.WithVDR(key.New())),
 			Key: Key{
 				ID:   kid,
 				Type: keyType,
@@ -1353,9 +1557,15 @@ func TestCmd_AddVC(t *testing.T) {
 		require.NoError(t, err)
 		require.NotNil(t, cmd)
 
+		req, err := json.Marshal(AddVCRequest{
+			Alias:   alias,
+			VCEntry: verifiableCredential,
+		})
+		require.NoError(t, err)
+
 		const expErr = "queue leaf: error"
-		require.EqualError(t, cmd.AddVC(nil, bytes.NewBuffer(verifiableCredential)), expErr)
-		require.EqualError(t, lookupHandler(t, cmd, AddVC)(nil, bytes.NewBuffer(verifiableCredential)), expErr)
+		require.EqualError(t, cmd.AddVC(nil, bytes.NewBuffer(req)), expErr)
+		require.EqualError(t, lookupHandler(t, cmd, AddVC)(nil, bytes.NewBuffer(req)), expErr)
 	})
 
 	t.Run("No leaf", func(t *testing.T) {
@@ -1373,10 +1583,13 @@ func TestCmd_AddVC(t *testing.T) {
 		loadContexts(t, db)
 
 		cmd, err := New(&Config{
-			KMS:      km,
-			LogID:    logID,
-			Trillian: client,
-			VDR:      vdr.New(vdr.WithVDR(key.New())),
+			KMS: km,
+			Logs: []Log{{
+				Alias:      alias,
+				Permission: "w",
+				Client:     client,
+			}},
+			VDR: vdr.New(vdr.WithVDR(key.New())),
 			Key: Key{
 				ID:   kid,
 				Type: keyType,
@@ -1386,9 +1599,15 @@ func TestCmd_AddVC(t *testing.T) {
 		require.NoError(t, err)
 		require.NotNil(t, cmd)
 
+		req, err := json.Marshal(AddVCRequest{
+			Alias:   alias,
+			VCEntry: verifiableCredential,
+		})
+		require.NoError(t, err)
+
 		const expErr = "internal error: no leaf"
-		require.EqualError(t, cmd.AddVC(nil, bytes.NewBuffer(verifiableCredential)), expErr)
-		require.EqualError(t, lookupHandler(t, cmd, AddVC)(nil, bytes.NewBuffer(verifiableCredential)), expErr)
+		require.EqualError(t, cmd.AddVC(nil, bytes.NewBuffer(req)), expErr)
+		require.EqualError(t, lookupHandler(t, cmd, AddVC)(nil, bytes.NewBuffer(req)), expErr)
 	})
 
 	t.Run("Corrupted leaf", func(t *testing.T) {
@@ -1412,10 +1631,13 @@ func TestCmd_AddVC(t *testing.T) {
 		loadContexts(t, db)
 
 		cmd, err := New(&Config{
-			KMS:      km,
-			LogID:    logID,
-			Trillian: client,
-			VDR:      vdr.New(vdr.WithVDR(key.New())),
+			KMS: km,
+			Logs: []Log{{
+				Alias:      alias,
+				Permission: "w",
+				Client:     client,
+			}},
+			VDR: vdr.New(vdr.WithVDR(key.New())),
 			Key: Key{
 				ID:   kid,
 				Type: keyType,
@@ -1425,9 +1647,15 @@ func TestCmd_AddVC(t *testing.T) {
 		require.NoError(t, err)
 		require.NotNil(t, cmd)
 
+		req, err := json.Marshal(AddVCRequest{
+			Alias:   alias,
+			VCEntry: verifiableCredential,
+		})
+		require.NoError(t, err)
+
 		const expErr = "failed to reconstruct MerkleTreeLeaf: json: cannot unmarshal array into Go value of type command.MerkleTreeLeaf" // nolint: lll
-		require.EqualError(t, cmd.AddVC(nil, bytes.NewBuffer(verifiableCredential)), expErr)
-		require.EqualError(t, lookupHandler(t, cmd, AddVC)(nil, bytes.NewBuffer(verifiableCredential)), expErr)
+		require.EqualError(t, cmd.AddVC(nil, bytes.NewBuffer(req)), expErr)
+		require.EqualError(t, lookupHandler(t, cmd, AddVC)(nil, bytes.NewBuffer(req)), expErr)
 	})
 
 	t.Run("Sign error", func(t *testing.T) {
@@ -1454,11 +1682,14 @@ func TestCmd_AddVC(t *testing.T) {
 		loadContexts(t, db)
 
 		cmd, err := New(&Config{
-			KMS:      km,
-			LogID:    logID,
-			Trillian: client,
-			Crypto:   cr,
-			VDR:      vdr.New(vdr.WithVDR(key.New())),
+			KMS: km,
+			Logs: []Log{{
+				Alias:      alias,
+				Permission: "w",
+				Client:     client,
+			}},
+			Crypto: cr,
+			VDR:    vdr.New(vdr.WithVDR(key.New())),
 			Key: Key{
 				ID:   kid,
 				Type: keyType,
@@ -1468,9 +1699,54 @@ func TestCmd_AddVC(t *testing.T) {
 		require.NoError(t, err)
 		require.NotNil(t, cmd)
 
+		req, err := json.Marshal(AddVCRequest{
+			Alias:   alias,
+			VCEntry: verifiableCredential,
+		})
+		require.NoError(t, err)
+
 		const expErr = "sign V1 VCTS: sign TreeHeadSignature: error"
-		require.EqualError(t, cmd.AddVC(nil, bytes.NewBuffer(verifiableCredential)), expErr)
-		require.EqualError(t, lookupHandler(t, cmd, AddVC)(nil, bytes.NewBuffer(verifiableCredential)), expErr)
+		require.EqualError(t, cmd.AddVC(nil, bytes.NewBuffer(req)), expErr)
+		require.EqualError(t, lookupHandler(t, cmd, AddVC)(nil, bytes.NewBuffer(req)), expErr)
+	})
+
+	t.Run("Action forbidden", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		defer ctrl.Finish()
+
+		km := NewMockKeyManager(ctrl)
+		km.EXPECT().Get(kid).Return(nil, nil)
+		km.EXPECT().ExportPubKeyBytes(kid).Return([]byte(`public key`), nil)
+
+		db := mem.NewProvider()
+		loadContexts(t, db)
+
+		cmd, err := New(&Config{
+			KMS: km,
+			Logs: []Log{{
+				Alias:      alias,
+				Permission: "r",
+			}},
+			Crypto: NewMockCrypto(ctrl),
+			VDR:    vdr.New(vdr.WithVDR(key.New())),
+			Key: Key{
+				ID:   kid,
+				Type: keyType,
+			},
+			StorageProvider: db,
+		})
+		require.NoError(t, err)
+		require.NotNil(t, cmd)
+
+		req, err := json.Marshal(AddVCRequest{
+			Alias:   alias,
+			VCEntry: verifiableCredential,
+		})
+		require.NoError(t, err)
+
+		const expErr = "has permissions: action forbidden for \"maple2021\""
+		require.EqualError(t, cmd.AddVC(nil, bytes.NewBuffer(req)), expErr)
+		require.EqualError(t, lookupHandler(t, cmd, AddVC)(nil, bytes.NewBuffer(req)), expErr)
 	})
 }
 

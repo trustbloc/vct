@@ -58,41 +58,19 @@ const (
 	agentHostFlagUsage     = "Host Name:Port." +
 		" Alternatively, this can be set with the following environment variable: " + agentHostEnvKey
 
-	logIDFlagName      = "log-id"
-	logIDEnvKey        = envPrefix + "LOG_ID"
-	logIDFlagShorthand = "l"
-	logIDFlagUsage     = "Trillian log id." +
-		" Alternatively, this can be set with the following environment variable: " + logIDEnvKey
-
-	logEndpointFlagName      = "log-endpoint"
-	logEndpointEnvKey        = envPrefix + "LOG_ENDPOINT"
-	logEndpointFlagShorthand = "e"
-	logEndpointFlagUsage     = "Trillian log id." +
-		" Alternatively, this can be set with the following environment variable: " + logEndpointEnvKey
-
-	kmsStoreEndpointFlagName      = "kms-store-endpoint"
-	kmsStoreEndpointEnvKey        = envPrefix + "KMS_STORE_ENDPOINT"
-	kmsStoreEndpointFlagShorthand = "k"
-	kmsStoreEndpointFlagUsage     = "Remote KMS URL." +
-		" Alternatively, this can be set with the following environment variable: " + kmsStoreEndpointEnvKey
+	logsFlagName      = "logs"
+	logsEnvKey        = envPrefix + "LOGS"
+	logsFlagShorthand = "l"
+	logsFlagUsage     = "Trillian logs comma separated. " +
+		" Format must be <alias>:<permission>@<endpoint>." +
+		" Examples: maple2021:rw@server.com,maple2020:r@server.com:9890" +
+		" Alternatively, this can be set with the following environment variable: " + logsEnvKey
 
 	kmsEndpointFlagName      = "kms-endpoint"
 	kmsEndpointEnvKey        = envPrefix + "KMS_ENDPOINT"
 	kmsEndpointFlagShorthand = "s"
 	kmsEndpointFlagUsage     = "Remote KMS URL." +
 		" Alternatively, this can be set with the following environment variable: " + kmsEndpointEnvKey
-
-	keyIDFlagName      = "key-id"
-	keyIDEnvKey        = envPrefix + "KEY_ID"
-	keyIDFlagShorthand = "i"
-	keyIDFlagUsage     = "Key ID." +
-		" Alternatively, this can be set with the following environment variable: " + keyIDEnvKey
-
-	keyTypeFlagName      = "key-type"
-	keyTypeEnvKey        = envPrefix + "KEY_TYPE"
-	keyTypeFlagShorthand = "t"
-	keyTypeFlagUsage     = "Key type." +
-		" Alternatively, this can be set with the following environment variable: " + keyTypeEnvKey
 
 	datasourceNameFlagName      = "dsn"
 	datasourceNameFlagShorthand = "d"
@@ -103,16 +81,10 @@ const (
 		" Alternatively, this can be set with the following environment variable: " + datasourceNameEnvKey
 	datasourceNameEnvKey = envPrefix + "DSN"
 
-	datasourceTimeoutFlagName  = "dsn-timeout"
-	datasourceTimeoutFlagUsage = "Total time in seconds to wait until the datasource is available before giving up." +
-		" Default: 30 seconds." +
-		" Alternatively, this can be set with the following environment variable: " + datasourceTimeoutEnvKey
-	datasourceTimeoutEnvKey = envPrefix + "DSN_TIMEOUT"
-
-	trillianTimeoutFlagName  = "trillian-timeout"
-	trillianTimeoutFlagUsage = "Total time in seconds to wait until the trillian is available before giving up." +
-		" Alternatively, this can be set with the following environment variable: " + trillianTimeoutEnvKey
-	trillianTimeoutEnvKey = envPrefix + "TRILLIAN_TIMEOUT"
+	timeoutFlagName  = "timeout"
+	timeoutFlagUsage = "Total time in seconds to wait until the services are available before giving up." +
+		" Alternatively, this can be set with the following environment variable: " + timeoutEnvKey
+	timeoutEnvKey = envPrefix + "TIMEOUT"
 
 	databasePrefixFlagName  = "database-prefix"
 	databasePrefixFlagUsage = "An optional prefix to be used when creating and retrieving underlying databases. " +
@@ -124,12 +96,6 @@ const (
 		" Possible values [true] [false]. Defaults to false if not set." +
 		" Alternatively, this can be set with the following environment variable: " + tlsSystemCertPoolEnvKey
 	tlsSystemCertPoolEnvKey = envPrefix + "TLS_SYSTEMCERTPOOL"
-
-	autoInitTreeFlagName  = "auto-init-tree"
-	autoInitTreeFlagUsage = "Creates test tree." +
-		" Possible values [true] [false]. Defaults to false if not set." +
-		" Alternatively, this can be set with the following environment variable: " + autoInitTreeEnvKey
-	autoInitTreeEnvKey = envPrefix + "AUTO_INIT_TREE"
 
 	tlsCACertsFlagName  = "tls-cacerts"
 	tlsCACertsFlagUsage = "Comma-Separated list of ca certs path." +
@@ -161,6 +127,13 @@ const (
 	kidKey              = "kid"
 	treeLogKey          = "tree-log"
 	defaultMasterKeyURI = "local-lock://default/master/key/"
+)
+
+type (
+	// TrillianLogServer interface.
+	TrillianLogServer trillian.TrillianLogServer
+	// TrillianAdminServer interface.
+	TrillianAdminServer trillian.TrillianAdminServer
 )
 
 var logger = log.New("vct/startcmd")
@@ -204,21 +177,14 @@ func Cmd(server server) (*cobra.Command, error) {
 }
 
 type agentParameters struct {
-	logID             int64
-	autoInitTree      bool
-	issuers           []string
-	host              string
-	logEndpoint       string
-	keyID             string
-	keyType           kms.KeyType
-	datasourceName    string
-	datasourceTimeout uint64
-	trillianTimeout   uint64
-	databasePrefix    string
-	kmsEndpoint       string
-	kmsStoreEndpoint  string
-	tlsParams         *tlsParameters
-	server            server
+	logs           []command.Log
+	host           string
+	datasourceName string
+	timeout        uint64
+	databasePrefix string
+	kmsEndpoint    string
+	tlsParams      *tlsParameters
+	server         server
 }
 
 type tlsParameters struct {
@@ -228,50 +194,63 @@ type tlsParameters struct {
 	serveKeyPath   string
 }
 
-func createStartCMD(server server) *cobra.Command { // nolint: funlen
+func parseLogs(logsRaw string, issuersRaw []string) []command.Log {
+	logsSet := map[string]command.Log{}
+
+	issuersSet := map[string]map[string]struct{}{}
+
+	for _, issuerRaw := range issuersRaw {
+		parts := strings.Split(issuerRaw, "@")
+
+		alias := strings.TrimSpace(parts[0])
+		issuer := strings.TrimSpace(parts[1])
+
+		if _, ok := issuersSet[alias]; !ok {
+			issuersSet[alias] = map[string]struct{}{}
+		}
+
+		issuersSet[alias][issuer] = struct{}{}
+	}
+
+	for _, rawLog := range strings.Split(logsRaw, ",") {
+		parts := strings.Split(rawLog, "@")
+		apParts := strings.Split(parts[0], ":")
+
+		logEntity := command.Log{
+			Alias:      strings.TrimSpace(apParts[0]),
+			Permission: strings.TrimSpace(apParts[1]),
+			Endpoint:   strings.TrimSpace(parts[1]),
+		}
+
+		var issuers []string
+		for issuer := range issuersSet[logEntity.Alias] {
+			issuers = append(issuers, issuer)
+		}
+
+		logEntity.Issuers = issuers
+
+		logsSet[logEntity.Alias] = logEntity
+	}
+
+	var result []command.Log
+	for _, v := range logsSet {
+		result = append(result, v)
+	}
+
+	return result
+}
+
+func createStartCMD(server server) *cobra.Command {
 	return &cobra.Command{
 		Use:   "start",
 		Short: "Starts vct service",
 		Long:  `Starts verifiable credentials transparency service`,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			host, err := getUserSetVar(cmd, agentHostFlagName, agentHostEnvKey, false)
-			if err != nil {
-				return fmt.Errorf("get variable (%s or %s): %w", agentHostFlagName, agentHostEnvKey, err)
-			}
-
-			autoInitTreeStr := getUserSetVarOptional(cmd, autoInitTreeFlagName, autoInitTreeEnvKey)
-			autoInitTree, err := strconv.ParseBool(autoInitTreeStr)
-			if err != nil {
-				return fmt.Errorf("parse test tree: %w", err)
-			}
-
-			if autoInitTree {
-				logger.Warnf("Log ID will be automatically created and initialized!")
-			}
-
-			logIDVal, err := getUserSetVar(cmd, logIDFlagName, logIDEnvKey, autoInitTree)
-			if err != nil {
-				return fmt.Errorf("get variable (%s or %s): %w", logIDFlagName, logIDEnvKey, err)
-			}
-
-			logID, err := strconv.ParseInt(logIDVal, 10, 64)
-			if !autoInitTree && err != nil {
-				return fmt.Errorf("log ID is not a number: %w", err)
-			}
-
-			logEndpoint, err := getUserSetVar(cmd, logEndpointFlagName, logEndpointEnvKey, false)
-			if err != nil {
-				return fmt.Errorf("get variable (%s or %s): %w", logEndpointFlagName, logEndpointEnvKey, err)
-			}
-
-			keyID := getUserSetVarOptional(cmd, keyIDFlagName, keyIDEnvKey)
-			keyType := getUserSetVarOptional(cmd, keyTypeFlagName, keyTypeEnvKey)
-			kmsStoreEndpoint := getUserSetVarOptional(cmd, kmsStoreEndpointFlagName, kmsStoreEndpointEnvKey)
+			host := getUserSetVarOptional(cmd, agentHostFlagName, agentHostEnvKey)
 			kmsEndpoint := getUserSetVarOptional(cmd, kmsEndpointFlagName, kmsEndpointEnvKey)
 			datasourceName := getUserSetVarOptional(cmd, datasourceNameFlagName, datasourceNameEnvKey)
 			databasePrefix := getUserSetVarOptional(cmd, databasePrefixFlagName, databasePrefixEnvKey)
-			datasourceTimeoutStr := getUserSetVarOptional(cmd, datasourceTimeoutFlagName, datasourceTimeoutEnvKey)
-			trillianTimeoutStr := getUserSetVarOptional(cmd, trillianTimeoutFlagName, trillianTimeoutEnvKey)
+			timeoutStr := getUserSetVarOptional(cmd, timeoutFlagName, timeoutEnvKey)
 			issuersStr := getUserSetVarOptional(cmd, issuersFlagName, issuersEnvKey)
 
 			var issuers []string
@@ -279,37 +258,30 @@ func createStartCMD(server server) *cobra.Command { // nolint: funlen
 				issuers = strings.Split(issuersStr, ",")
 			}
 
-			datasourceTimeout, err := strconv.ParseUint(datasourceTimeoutStr, 10, 64)
+			timeout, err := strconv.ParseUint(timeoutStr, 10, 64)
 			if err != nil {
 				return fmt.Errorf("timeout is not a number(positive): %w", err)
 			}
 
-			trillianTimeout, err := strconv.ParseUint(trillianTimeoutStr, 10, 64)
-			if err != nil {
-				return fmt.Errorf("trillian timeout is not a number(positive): %w", err)
-			}
-
 			tlsParams, err := getTLS(cmd)
 			if err != nil {
-				return fmt.Errorf("get TLS (%s or %s): %w", keyTypeFlagName, keyTypeEnvKey, err)
+				return fmt.Errorf("get TLS: %w", err)
+			}
+
+			logsVal, err := getUserSetVar(cmd, logsFlagName, logsEnvKey, false)
+			if err != nil {
+				return fmt.Errorf("get variable (%s or %s): %w", logsFlagName, logsEnvKey, err)
 			}
 
 			parameters := &agentParameters{
-				server:            server,
-				autoInitTree:      autoInitTree,
-				issuers:           issuers,
-				host:              host,
-				logID:             logID,
-				trillianTimeout:   trillianTimeout,
-				logEndpoint:       logEndpoint,
-				kmsStoreEndpoint:  kmsStoreEndpoint,
-				kmsEndpoint:       kmsEndpoint,
-				keyID:             keyID,
-				keyType:           kms.KeyType(keyType),
-				datasourceName:    datasourceName,
-				databasePrefix:    databasePrefix,
-				tlsParams:         tlsParams,
-				datasourceTimeout: datasourceTimeout,
+				server:         server,
+				host:           host,
+				logs:           parseLogs(logsVal, issuers),
+				timeout:        timeout,
+				kmsEndpoint:    kmsEndpoint,
+				datasourceName: datasourceName,
+				databasePrefix: databasePrefix,
+				tlsParams:      tlsParams,
 			}
 
 			return startAgent(parameters)
@@ -326,11 +298,7 @@ func getUserSetVarOptional(cmd *cobra.Command, flagName, envKey string) string {
 
 func createKMSAndCrypto(parameters *agentParameters, client *http.Client,
 	store storage.Provider, cfg storage.Store) (kms.KeyManager, crypto.Crypto, error) {
-	if parameters.kmsEndpoint != "" || parameters.kmsStoreEndpoint != "" {
-		if parameters.kmsStoreEndpoint != "" {
-			return webkms.New(parameters.kmsStoreEndpoint, client), webcrypto.New(parameters.kmsStoreEndpoint, client), nil
-		}
-
+	if parameters.kmsEndpoint != "" {
 		var keystoreURL string
 
 		err := getOrInit(cfg, webKeyStoreKey, &keystoreURL, func() (interface{}, error) {
@@ -343,7 +311,6 @@ func createKMSAndCrypto(parameters *agentParameters, client *http.Client,
 		}
 
 		keystoreURL = BuildKMSURL(parameters.kmsEndpoint, keystoreURL)
-		parameters.kmsStoreEndpoint = keystoreURL
 
 		return webkms.New(keystoreURL, client), webcrypto.New(keystoreURL, client), nil
 	}
@@ -373,19 +340,26 @@ func BuildKMSURL(base, uri string) string {
 	return uri
 }
 
-func createKID(km kms.KeyManager, parameters *agentParameters, cfg storage.Store) error {
-	return getOrInit(cfg, kidKey, &parameters.keyID, func() (interface{}, error) {
-		keyID, _, err := km.Create(parameters.keyType)
+func createKID(km kms.KeyManager, cfg storage.Store) (string, kms.KeyType, error) {
+	var (
+		keyID   string
+		keyType = kms.ECDSAP256TypeIEEEP1363
+	)
 
-		return keyID, err // nolint: wrapcheck
+	err := getOrInit(cfg, kidKey, &keyID, func() (interface{}, error) {
+		kid, _, err := km.Create(keyType)
+
+		return kid, err // nolint: wrapcheck
 	})
+
+	return keyID, keyType, err
 }
 
 func startAgent(parameters *agentParameters) error { // nolint: funlen
 	store, err := createStoreProvider(
 		parameters.datasourceName,
-		parameters.datasourceTimeout,
 		parameters.databasePrefix,
+		parameters.timeout,
 	)
 	if err != nil {
 		return fmt.Errorf("create store provider: %w", err)
@@ -422,49 +396,54 @@ func startAgent(parameters *agentParameters) error { // nolint: funlen
 		return fmt.Errorf("create kms and crypto: %w", err)
 	}
 
-	if parameters.keyID == "" {
-		if err = createKID(km, parameters, configStore); err != nil {
-			return fmt.Errorf("create kid: %w", err)
-		}
-	}
-
-	conn, err := grpc.Dial(parameters.logEndpoint, grpc.WithInsecure())
+	keyID, keyType, err := createKID(km, configStore)
 	if err != nil {
-		return fmt.Errorf("grpc dial: %w", err)
+		return fmt.Errorf("create kid: %w", err)
 	}
 
-	defer func() {
-		if err = conn.Close(); err != nil {
-			logger.Errorf("connection close: %v", err)
-		}
-	}()
+	conns := map[string]*grpc.ClientConn{}
 
-	if parameters.autoInitTree {
+	for i := range parameters.logs {
 		var tree *trillian.Tree
 
-		tree, err = createTreeAndInit(conn, configStore, parameters.trillianTimeout)
+		conn, ok := conns[parameters.logs[i].Endpoint]
+		if !ok {
+			conn, err = grpc.Dial(parameters.logs[i].Endpoint, grpc.WithInsecure())
+			if err != nil {
+				return fmt.Errorf("grpc dial: %w", err)
+			}
+
+			conns[parameters.logs[i].Endpoint] = conn
+		}
+
+		tree, err = createTreeAndInit(conn, configStore, parameters.logs[i].Alias, parameters.timeout)
 		if err != nil {
 			return fmt.Errorf("create tree: %w", err)
 		}
 
-		parameters.logID = tree.TreeId
+		parameters.logs[i].ID = tree.TreeId
+		parameters.logs[i].Client = trillian.NewTrillianLogClient(conn)
 	}
 
+	defer func() {
+		for _, conn := range conns {
+			conn.Close() // nolint: errcheck,gosec
+		}
+	}()
+
 	cmd, err := command.New(&command.Config{
-		Trillian: trillian.NewTrillianLogClient(conn),
-		KMS:      km,
-		Crypto:   cr,
+		KMS:    km,
+		Crypto: cr,
 		VDR: vdr.New(
 			vdr.WithVDR(vdrkey.New()),
 			vdr.WithVDR(&webVDR{http: httpClient, VDR: vdrweb.New()}),
 		),
-		LogID: parameters.logID,
+		Logs: parameters.logs,
 		Key: command.Key{
-			ID:   parameters.keyID,
-			Type: parameters.keyType,
+			ID:   keyID,
+			Type: keyType,
 		},
 		StorageProvider: store,
-		Issuers:         parameters.issuers,
 	})
 	if err != nil {
 		return fmt.Errorf("create command instance: %w", err)
@@ -477,9 +456,6 @@ func startAgent(parameters *agentParameters) error { // nolint: funlen
 	}
 
 	logger.Infof("Starting vct on host [%s]", parameters.host)
-	logger.Infof("Log ID: [%d]", parameters.logID)
-	logger.Infof("Key ID: [%s]", parameters.keyID)
-	logger.Infof("Store endpoint: [%s]", parameters.kmsStoreEndpoint)
 
 	return parameters.server.ListenAndServe( // nolint: wrapcheck
 		parameters.host,
@@ -498,10 +474,10 @@ func (w *webVDR) Read(didID string, opts ...vdrapi.DIDMethodOption) (*did.DocRes
 	return w.VDR.Read(didID, append(opts, vdrapi.WithOption(vdrweb.HTTPClientOpt, w.http))...) // nolint: wrapcheck
 }
 
-func createTreeAndInit(conn *grpc.ClientConn, cfg storage.Store, timeout uint64) (*trillian.Tree, error) {
+func createTreeAndInit(conn *grpc.ClientConn, cfg storage.Store, alias string, timeout uint64) (*trillian.Tree, error) {
 	var tree *trillian.Tree
 
-	err := getOrInit(cfg, treeLogKey, &tree, func() (interface{}, error) {
+	err := getOrInit(cfg, treeLogKey+"-"+alias, &tree, func() (interface{}, error) {
 		var (
 			createdTree *trillian.Tree
 			err         error
@@ -586,22 +562,16 @@ func getUserSetVar(cmd *cobra.Command, flagName, envKey string, isOptional bool)
 }
 
 func createFlags(startCmd *cobra.Command) {
-	startCmd.Flags().StringP(agentHostFlagName, agentHostFlagShorthand, "", agentHostFlagUsage)
-	startCmd.Flags().StringP(logIDFlagName, logIDFlagShorthand, "", logIDFlagUsage)
-	startCmd.Flags().StringP(logEndpointFlagName, logEndpointFlagShorthand, "", logEndpointFlagUsage)
-	startCmd.Flags().StringP(kmsStoreEndpointFlagName, kmsStoreEndpointFlagShorthand, "", kmsStoreEndpointFlagUsage)
+	startCmd.Flags().StringP(agentHostFlagName, agentHostFlagShorthand, ":5678", agentHostFlagUsage)
+	startCmd.Flags().StringP(logsFlagName, logsFlagShorthand, "", logsFlagUsage)
 	startCmd.Flags().StringP(kmsEndpointFlagName, kmsEndpointFlagShorthand, "", kmsEndpointFlagUsage)
-	startCmd.Flags().StringP(keyIDFlagName, keyIDFlagShorthand, "", keyIDFlagUsage)
-	startCmd.Flags().StringP(keyTypeFlagName, keyTypeFlagShorthand, string(kms.ECDSAP256TypeIEEEP1363), keyTypeFlagUsage)
 	startCmd.Flags().StringP(datasourceNameFlagName, datasourceNameFlagShorthand, "mem://test", datasourceNameFlagUsage)
 	startCmd.Flags().String(databasePrefixFlagName, "", databasePrefixFlagUsage)
-	startCmd.Flags().String(datasourceTimeoutFlagName, "30", datasourceTimeoutFlagUsage)
-	startCmd.Flags().String(trillianTimeoutFlagName, "0", trillianTimeoutFlagUsage)
+	startCmd.Flags().String(timeoutFlagName, "0", timeoutFlagUsage)
 	startCmd.Flags().String(tlsSystemCertPoolFlagName, "false", tlsSystemCertPoolFlagUsage)
 	startCmd.Flags().String(tlsCACertsFlagName, "", tlsCACertsFlagUsage)
 	startCmd.Flags().String(tlsServeCertPathFlagName, "", tlsServeCertPathFlagUsage)
 	startCmd.Flags().String(tlsServeKeyPathFlagName, "", tlsServeKeyPathFlagUsage)
-	startCmd.Flags().String(autoInitTreeFlagName, "false", autoInitTreeFlagUsage)
 	startCmd.Flags().String(issuersFlagName, "", issuersFlagUsage)
 }
 
@@ -629,7 +599,7 @@ func getTLS(cmd *cobra.Command) (*tlsParameters, error) {
 	}, nil
 }
 
-func createStoreProvider(dbURL string, timeout uint64, prefix string) (storage.Provider, error) {
+func createStoreProvider(dbURL, prefix string, timeout uint64) (storage.Provider, error) {
 	driver, dsn, err := getDBParams(dbURL)
 	if err != nil {
 		return nil, err

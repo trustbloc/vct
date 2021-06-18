@@ -65,8 +65,9 @@ const (
 
 // GetEntryAndProofRequest represents the request to get-entry-and-proof.
 type GetEntryAndProofRequest struct {
-	LeafIndex int64 `json:"leaf_index"`
-	TreeSize  int64 `json:"tree_size"`
+	Alias     string `json:"alias"`
+	LeafIndex int64  `json:"leaf_index"`
+	TreeSize  int64  `json:"tree_size"`
 }
 
 // Validate validates data.
@@ -99,6 +100,7 @@ type GetEntryAndProofResponse struct {
 
 // GetProofByHashRequest represents the request to the get-proof-by-hash.
 type GetProofByHashRequest struct {
+	Alias    string `json:"alias"`
 	Hash     string `json:"hash"`
 	TreeSize int64  `json:"tree_size"`
 }
@@ -124,8 +126,9 @@ type GetProofByHashResponse struct {
 
 // GetEntriesRequest represents the request to the get-entries.
 type GetEntriesRequest struct {
-	Start int64 `json:"start"`
-	End   int64 `json:"end"`
+	Alias string `json:"alias"`
+	Start int64  `json:"start"`
+	End   int64  `json:"end"`
 }
 
 // GetEntriesResponse represents the response to the get-entries.
@@ -158,8 +161,9 @@ func (r *GetEntriesRequest) Validate() error {
 
 // GetSTHConsistencyRequest represents the request to the get-sth-consistency.
 type GetSTHConsistencyRequest struct {
-	FirstTreeSize  int64 `json:"first_tree_size"`
-	SecondTreeSize int64 `json:"second_tree_size"`
+	Alias          string `json:"alias"`
+	FirstTreeSize  int64  `json:"first_tree_size"`
+	SecondTreeSize int64  `json:"second_tree_size"`
 }
 
 // Validate validates data.
@@ -251,4 +255,10 @@ type AddVCResponse struct {
 	Timestamp   uint64  `json:"timestamp"`
 	Extensions  string  `json:"extensions"`
 	Signature   []byte  `json:"signature"`
+}
+
+// AddVCRequest represents the request to add-vc.
+type AddVCRequest struct {
+	Alias   string `json:"alias"`
+	VCEntry []byte `json:"vc_entry"`
 }

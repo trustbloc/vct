@@ -4,31 +4,34 @@ Copyright SecureKey Technologies Inc. All Rights Reserved.
 SPDX-License-Identifier: Apache-2.0
 */
 
+// nolint: lll
+//go:generate mockgen -destination gomocks_test.go -self_package mocks -package startcmd_test . TrillianLogServer,TrillianAdminServer
+
 package startcmd_test
 
 import (
+	"net"
 	"net/http"
 	"os"
 	"testing"
 
+	"github.com/golang/mock/gomock"
+	"github.com/google/trillian"
 	"github.com/stretchr/testify/require"
+	"google.golang.org/grpc"
 
 	"github.com/trustbloc/vct/cmd/vct/startcmd"
 )
 
 const (
 	agentHostFlagName         = "api-host"
-	logIDFlagName             = "log-id"
-	logEndpointFlagName       = "log-endpoint"
-	kmsStoreEndpointFlagName  = "kms-store-endpoint"
 	kmsEndpointFlagName       = "kms-endpoint"
-	keyTypeFlagName           = "key-type"
-	tlsSystemCertPoolFlagName = "tls-systemcertpool"
-	datasourceNameFlagName    = "dsn"
-	datasourceTimeoutFlagName = "dsn-timeout"
-	tlsCACertsFlagName        = "tls-cacerts"
-	autoInitTreeFlagName      = "auto-init-tree"
+	logsFlagName              = "logs"
 	issuersFlagName           = "issuers"
+	datasourceNameFlagName    = "dsn"
+	tlsSystemCertPoolFlagName = "tls-systemcertpool"
+	tlsCACertsFlagName        = "tls-cacerts"
+	timeoutFlagName           = "timeout"
 )
 
 type mockServer struct{}
@@ -52,18 +55,40 @@ func TestBuildKMSURL(t *testing.T) {
 }
 
 func TestCmd(t *testing.T) {
-	t.Run("No api-host", func(t *testing.T) {
+	t.Run("Success", func(t *testing.T) {
 		startCmd, err := startcmd.Cmd(&mockServer{})
 		require.NoError(t, err)
 
-		startCmd.SetArgs(nil)
+		lis, err := net.Listen("tcp", "localhost:50051")
+		require.NoError(t, err)
 
-		err = startCmd.Execute()
+		ctrl := gomock.NewController(t)
+		defer ctrl.Finish()
 
-		require.Contains(t, err.Error(), "api-host (command line flag) nor VCT_API_HOST (environment variable) have been set")
+		logServer := NewMockTrillianLogServer(ctrl)
+		logServer.EXPECT().InitLog(gomock.Any(), gomock.Any()).Return(&trillian.InitLogResponse{}, nil)
+
+		adminServer := NewMockTrillianAdminServer(ctrl)
+		adminServer.EXPECT().CreateTree(gomock.Any(), gomock.Any()).Return(&trillian.Tree{}, nil)
+
+		s := grpc.NewServer()
+
+		trillian.RegisterTrillianLogServer(s, logServer)
+		trillian.RegisterTrillianAdminServer(s, adminServer)
+
+		go func() {
+			require.NoError(t, s.Serve(lis))
+		}()
+
+		args := []string{
+			"--" + agentHostFlagName, "",
+			"--" + logsFlagName, "maple2021:rw@localhost:50051",
+		}
+		startCmd.SetArgs(args)
+		require.NoError(t, startCmd.Execute())
 	})
 
-	t.Run("No log-id", func(t *testing.T) {
+	t.Run("No logs", func(t *testing.T) {
 		startCmd, err := startcmd.Cmd(&mockServer{})
 		require.NoError(t, err)
 
@@ -74,23 +99,7 @@ func TestCmd(t *testing.T) {
 
 		err = startCmd.Execute()
 
-		require.Contains(t, err.Error(), "log-id (command line flag) nor VCT_LOG_ID (environment variable) have been set")
-	})
-
-	t.Run("Parse test tree", func(t *testing.T) {
-		startCmd, err := startcmd.Cmd(&mockServer{})
-		require.NoError(t, err)
-
-		args := []string{
-			"--" + agentHostFlagName, "",
-			"--" + autoInitTreeFlagName, "t r u e",
-			"--" + logEndpointFlagName, "https://vct.example.com",
-		}
-		startCmd.SetArgs(args)
-
-		err = startCmd.Execute()
-
-		require.Contains(t, err.Error(), "parse test tree: strconv.ParseBool")
+		require.Contains(t, err.Error(), "nor VCT_LOGS (environment variable) have been set")
 	})
 
 	t.Run("Create tree (unavailable)", func(t *testing.T) {
@@ -99,59 +108,14 @@ func TestCmd(t *testing.T) {
 
 		args := []string{
 			"--" + agentHostFlagName, "",
-			"--" + autoInitTreeFlagName, "true",
-			"--" + logEndpointFlagName, "https://vct.example.com",
+			"--" + issuersFlagName, "maple2021@issuer",
+			"--" + logsFlagName, "maple2021:rw@https://vct.example.com",
 		}
 		startCmd.SetArgs(args)
 
 		err = startCmd.Execute()
 
-		require.Contains(t, err.Error(), "create and init tree: init config value for \"tree-log\"")
-	})
-
-	t.Run("No log-id is not valid", func(t *testing.T) {
-		startCmd, err := startcmd.Cmd(&mockServer{})
-		require.NoError(t, err)
-
-		args := []string{
-			"--" + agentHostFlagName, "",
-			"--" + logIDFlagName, "oops",
-		}
-		startCmd.SetArgs(args)
-
-		err = startCmd.Execute()
-
-		require.Contains(t, err.Error(), "log ID is not a number")
-	})
-
-	t.Run("No log-endpoint", func(t *testing.T) {
-		startCmd, err := startcmd.Cmd(&mockServer{})
-		require.NoError(t, err)
-
-		args := []string{
-			"--" + agentHostFlagName, "",
-			"--" + logIDFlagName, "11111",
-		}
-		startCmd.SetArgs(args)
-
-		err = startCmd.Execute()
-
-		require.Contains(t, err.Error(), "log-endpoint (command line flag) nor VCT_LOG_ENDPOINT (environment variable) have been set") // nolint: lll
-	})
-
-	t.Run("Success", func(t *testing.T) {
-		startCmd, err := startcmd.Cmd(&mockServer{})
-		require.NoError(t, err)
-
-		args := []string{
-			"--" + agentHostFlagName, ":98989",
-			"--" + logIDFlagName, "11111",
-			"--" + issuersFlagName, "issuer",
-			"--" + logEndpointFlagName, "https://vct.example.com",
-		}
-		startCmd.SetArgs(args)
-
-		require.Nil(t, startCmd.Execute())
+		require.Contains(t, err.Error(), "create and init tree: init config value for \"tree-log-maple2021\"")
 	})
 
 	t.Run("KMS fails (web-key-store)", func(t *testing.T) {
@@ -160,8 +124,7 @@ func TestCmd(t *testing.T) {
 
 		args := []string{
 			"--" + agentHostFlagName, ":98989",
-			"--" + logIDFlagName, "11111",
-			"--" + logEndpointFlagName, "https://vct.example.com",
+			"--" + logsFlagName, "11111:rw@https://vct.example.com",
 			"--" + kmsEndpointFlagName, "https://vct.example.com",
 		}
 		startCmd.SetArgs(args)
@@ -171,72 +134,20 @@ func TestCmd(t *testing.T) {
 		require.Contains(t, err.Error(), "get or init: init config value for \"web-key-store\"")
 	})
 
-	t.Run("KMS fails (create kid)", func(t *testing.T) {
-		startCmd, err := startcmd.Cmd(&mockServer{})
-		require.NoError(t, err)
-
-		args := []string{
-			"--" + agentHostFlagName, ":98989",
-			"--" + logIDFlagName, "11111",
-			"--" + logEndpointFlagName, "https://vct.example.com",
-			"--" + kmsStoreEndpointFlagName, "https://vct.example.com",
-		}
-		startCmd.SetArgs(args)
-
-		err = startCmd.Execute()
-
-		require.Contains(t, err.Error(), "create kid: init config value for \"kid\"")
-	})
-
-	t.Run("Create command (supported key)", func(t *testing.T) {
-		startCmd, err := startcmd.Cmd(&mockServer{})
-		require.NoError(t, err)
-
-		args := []string{
-			"--" + agentHostFlagName, ":98989",
-			"--" + logIDFlagName, "11111",
-			"--" + logEndpointFlagName, "https://vct.example.com",
-			"--" + keyTypeFlagName, "BLS12381G2",
-		}
-		startCmd.SetArgs(args)
-
-		err = startCmd.Execute()
-
-		require.Contains(t, err.Error(), "create command instance: key type BLS12381G2 is not supported")
-	})
-
-	t.Run("Key type unrecognized", func(t *testing.T) {
-		startCmd, err := startcmd.Cmd(&mockServer{})
-		require.NoError(t, err)
-
-		args := []string{
-			"--" + agentHostFlagName, ":98989",
-			"--" + logIDFlagName, "11111",
-			"--" + logEndpointFlagName, "https://vct.example.com",
-			"--" + keyTypeFlagName, "unknown",
-		}
-		startCmd.SetArgs(args)
-
-		err = startCmd.Execute()
-
-		require.Contains(t, err.Error(), "key type 'unknown' unrecognized")
-	})
-
 	t.Run("Wrong cert pool flag (TLS)", func(t *testing.T) {
 		startCmd, err := startcmd.Cmd(&mockServer{})
 		require.NoError(t, err)
 
 		args := []string{
 			"--" + agentHostFlagName, ":98989",
-			"--" + logIDFlagName, "11111",
-			"--" + logEndpointFlagName, "https://vct.example.com",
+			"--" + logsFlagName, "11111:rw@https://vct.example.com",
 			"--" + tlsSystemCertPoolFlagName, "invalid",
 		}
 		startCmd.SetArgs(args)
 
 		err = startCmd.Execute()
 
-		require.Contains(t, err.Error(), "get TLS (key-type or VCT_KEY_TYPE): parse cert pool")
+		require.Contains(t, err.Error(), "get TLS: parse cert pool")
 	})
 
 	t.Run("Unsupported driver (DSN)", func(t *testing.T) {
@@ -245,8 +156,7 @@ func TestCmd(t *testing.T) {
 
 		args := []string{
 			"--" + agentHostFlagName, ":98989",
-			"--" + logIDFlagName, "11111",
-			"--" + logEndpointFlagName, "https://vct.example.com",
+			"--" + logsFlagName, "11111:rw@https://vct.example.com",
 			"--" + datasourceNameFlagName, "mem1://test",
 		}
 		startCmd.SetArgs(args)
@@ -262,8 +172,7 @@ func TestCmd(t *testing.T) {
 
 		args := []string{
 			"--" + agentHostFlagName, ":98989",
-			"--" + logIDFlagName, "11111",
-			"--" + logEndpointFlagName, "https://vct.example.com",
+			"--" + logsFlagName, "11111:rw@https://vct.example.com",
 			"--" + datasourceNameFlagName, "mem",
 		}
 		startCmd.SetArgs(args)
@@ -273,16 +182,15 @@ func TestCmd(t *testing.T) {
 		require.Contains(t, err.Error(), "invalid dbURL mem")
 	})
 
-	t.Run("Bad timeout (DSN)", func(t *testing.T) {
+	t.Run("Bad timeout", func(t *testing.T) {
 		startCmd, err := startcmd.Cmd(&mockServer{})
 		require.NoError(t, err)
 
 		args := []string{
 			"--" + agentHostFlagName, ":98989",
-			"--" + logIDFlagName, "11111",
-			"--" + logEndpointFlagName, "https://vct.example.com",
+			"--" + logsFlagName, "11111:rw@https://vct.example.com",
 			"--" + datasourceNameFlagName, "mem://test",
-			"--" + datasourceTimeoutFlagName, "w1",
+			"--" + timeoutFlagName, "w1",
 		}
 		startCmd.SetArgs(args)
 
@@ -291,16 +199,15 @@ func TestCmd(t *testing.T) {
 		require.Contains(t, err.Error(), "timeout is not a number")
 	})
 
-	t.Run("Bad timeout (DSN ENV)", func(t *testing.T) {
+	t.Run("Bad timeout (ENV)", func(t *testing.T) {
 		startCmd, err := startcmd.Cmd(&mockServer{})
 		require.NoError(t, err)
-		require.NoError(t, os.Setenv("VCT_DSN_TIMEOUT", "w1"))
-		defer func() { require.NoError(t, os.Unsetenv("VCT_DSN_TIMEOUT")) }()
+		require.NoError(t, os.Setenv("VCT_TIMEOUT", "w1"))
+		defer func() { require.NoError(t, os.Unsetenv("VCT_TIMEOUT")) }()
 
 		args := []string{
 			"--" + agentHostFlagName, ":98989",
-			"--" + logIDFlagName, "11111",
-			"--" + logEndpointFlagName, "https://vct.example.com",
+			"--" + logsFlagName, "11111:rw@https://vct.example.com",
 			"--" + datasourceNameFlagName, "mem://test",
 		}
 		startCmd.SetArgs(args)
@@ -316,8 +223,7 @@ func TestCmd(t *testing.T) {
 
 		args := []string{
 			"--" + agentHostFlagName, ":98989",
-			"--" + logIDFlagName, "11111",
-			"--" + logEndpointFlagName, "https://vct.example.com",
+			"--" + logsFlagName, "11111:rw@https://vct.example.com",
 			"--" + datasourceNameFlagName, "mem://test",
 			"--" + tlsCACertsFlagName, "invalid",
 		}
