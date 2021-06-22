@@ -17,6 +17,7 @@ import (
 
 	"github.com/gorilla/mux"
 	"github.com/hyperledger/aries-framework-go/pkg/common/log"
+	ldctxrest "github.com/hyperledger/aries-framework-go/pkg/controller/rest/jsonld/context"
 
 	"github.com/trustbloc/vct/pkg/controller/command"
 	"github.com/trustbloc/vct/pkg/controller/errors"
@@ -37,7 +38,7 @@ const (
 	GetIssuersPath        = basePath + "/get-issuers"
 	GetEntryAndProofPath  = basePath + "/get-entry-and-proof"
 	GetPublicKeyPath      = basePath + "/get-public-key"
-	AddContextPath        = basePath + "/context/add"
+	AddContextPath        = ldctxrest.AddContextPath
 	HealthCheckPath       = "/healthcheck"
 )
 

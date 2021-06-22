@@ -107,7 +107,7 @@ func TestClient_AddJSONLDContexts(t *testing.T) {
 			StatusCode: http.StatusOK,
 		}, nil)
 
-		client := vct.New(endpoint, vct.WithHTTPClient(httpClient))
+		client := vct.New(endpoint+"/maple2020", vct.WithHTTPClient(httpClient))
 		require.NoError(t, client.AddJSONLDContexts(context.Background(), jsonld.ContextDocument{}))
 	})
 
