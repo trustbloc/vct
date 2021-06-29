@@ -36,7 +36,7 @@ const (
 	GetEntriesPath        = basePath + "/get-entries"
 	GetIssuersPath        = basePath + "/get-issuers"
 	GetEntryAndProofPath  = basePath + "/get-entry-and-proof"
-	GetPublicKeyPath      = basePath + "/get-public-key"
+	WebfingerPath         = AliasPath + "/.well-known/webfinger"
 	AddContextPath        = basePath + "/context/add"
 	HealthCheckPath       = "/healthcheck"
 )
@@ -55,7 +55,7 @@ type Cmd interface {
 	GetProofByHash(io.Writer, io.Reader) error
 	GetEntries(io.Writer, io.Reader) error
 	GetEntryAndProof(io.Writer, io.Reader) error
-	GetPublicKey(io.Writer, io.Reader) error
+	Webfinger(io.Writer, io.Reader) error
 	AddLdContext(io.Writer, io.Reader) error
 }
 
@@ -78,7 +78,7 @@ func (c *Operation) GetRESTHandlers() []Handler {
 		NewHTTPHandler(GetProofByHashPath, http.MethodGet, c.GetProofByHash),
 		NewHTTPHandler(GetEntriesPath, http.MethodGet, c.GetEntries),
 		NewHTTPHandler(GetIssuersPath, http.MethodGet, c.GetIssuers),
-		NewHTTPHandler(GetPublicKeyPath, http.MethodGet, c.GetPublicKey),
+		NewHTTPHandler(WebfingerPath, http.MethodGet, c.Webfinger),
 		NewHTTPHandler(GetEntryAndProofPath, http.MethodGet, c.GetEntryAndProof),
 		NewHTTPHandler(HealthCheckPath, http.MethodGet, c.HealthCheck),
 		// JSON-LD contexts API
@@ -154,9 +154,9 @@ func (c *Operation) HealthCheck(w http.ResponseWriter, _ *http.Request) {
 	}, w, nil)
 }
 
-// GetPublicKey returns public key.
-func (c *Operation) GetPublicKey(w http.ResponseWriter, _ *http.Request) {
-	execute(c.cmd.GetPublicKey, w, nil)
+// Webfinger returns discovery info.
+func (c *Operation) Webfinger(w http.ResponseWriter, r *http.Request) {
+	execute(c.cmd.Webfinger, w, bytes.NewBufferString(fmt.Sprintf("%q", mux.Vars(r)[aliasVarName])))
 }
 
 // GetSTHConsistency retrieves merkle consistency proofs between signed tree heads.

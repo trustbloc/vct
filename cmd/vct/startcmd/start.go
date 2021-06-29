@@ -91,6 +91,11 @@ const (
 		" Alternatively, this can be set with the following environment variable: " + databasePrefixEnvKey
 	databasePrefixEnvKey = envPrefix + "DATABASE_PREFIX"
 
+	baseURLFlagName  = "base-url"
+	baseURLFlagUsage = "Base URL. e.g (https://vct.com)" +
+		" Alternatively, this can be set with the following environment variable: " + baseURLEnvKey
+	baseURLEnvKey = envPrefix + "BASE_URL"
+
 	tlsSystemCertPoolFlagName  = "tls-systemcertpool"
 	tlsSystemCertPoolFlagUsage = "Use system certificate pool." +
 		" Possible values [true] [false]. Defaults to false if not set." +
@@ -179,6 +184,7 @@ func Cmd(server server) (*cobra.Command, error) {
 type agentParameters struct {
 	logs           []command.Log
 	host           string
+	baseURL        string
 	datasourceName string
 	timeout        uint64
 	databasePrefix string
@@ -250,6 +256,7 @@ func createStartCMD(server server) *cobra.Command {
 			kmsEndpoint := getUserSetVarOptional(cmd, kmsEndpointFlagName, kmsEndpointEnvKey)
 			datasourceName := getUserSetVarOptional(cmd, datasourceNameFlagName, datasourceNameEnvKey)
 			databasePrefix := getUserSetVarOptional(cmd, databasePrefixFlagName, databasePrefixEnvKey)
+			baseURL := getUserSetVarOptional(cmd, baseURLFlagName, baseURLEnvKey)
 			timeoutStr := getUserSetVarOptional(cmd, timeoutFlagName, timeoutEnvKey)
 			issuersStr := getUserSetVarOptional(cmd, issuersFlagName, issuersEnvKey)
 
@@ -282,6 +289,7 @@ func createStartCMD(server server) *cobra.Command {
 				datasourceName: datasourceName,
 				databasePrefix: databasePrefix,
 				tlsParams:      tlsParams,
+				baseURL:        baseURL,
 			}
 
 			return startAgent(parameters)
@@ -444,6 +452,7 @@ func startAgent(parameters *agentParameters) error { // nolint: funlen
 			Type: keyType,
 		},
 		StorageProvider: store,
+		BaseURL:         parameters.baseURL,
 	})
 	if err != nil {
 		return fmt.Errorf("create command instance: %w", err)
@@ -567,6 +576,7 @@ func createFlags(startCmd *cobra.Command) {
 	startCmd.Flags().StringP(kmsEndpointFlagName, kmsEndpointFlagShorthand, "", kmsEndpointFlagUsage)
 	startCmd.Flags().StringP(datasourceNameFlagName, datasourceNameFlagShorthand, "mem://test", datasourceNameFlagUsage)
 	startCmd.Flags().String(databasePrefixFlagName, "", databasePrefixFlagUsage)
+	startCmd.Flags().String(baseURLFlagName, "", baseURLFlagUsage)
 	startCmd.Flags().String(timeoutFlagName, "0", timeoutFlagUsage)
 	startCmd.Flags().String(tlsSystemCertPoolFlagName, "false", tlsSystemCertPoolFlagUsage)
 	startCmd.Flags().String(tlsCACertsFlagName, "", tlsCACertsFlagUsage)

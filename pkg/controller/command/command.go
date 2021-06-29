@@ -38,9 +38,12 @@ const (
 	GetProofByHash    = "getProofByHash"
 	GetEntryAndProof  = "getEntryAndProof"
 	GetIssuers        = "getIssuers"
-	GetPublicKey      = "getPublicKey"
+	Webfinger         = "webfinger"
 	AddVC             = "addVC"
 	AddLdContext      = "addLdContext"
+
+	PublicKeyType = "https://trustbloc.dev/ns/public-key"
+	LedgerType    = "https://trustbloc.dev/ns/ledger-type"
 )
 
 // StorageProvider represents a storage provider.
@@ -63,6 +66,7 @@ type Key struct {
 
 // Cmd is a controller for commands.
 type Cmd struct {
+	baseURL         string
 	logs            map[string]Log
 	VCLogID         [32]byte
 	kh              interface{}
@@ -102,6 +106,7 @@ type Config struct {
 	VDR             vdr.Registry
 	Logs            []Log
 	Key             Key
+	BaseURL         string
 }
 
 type storageProviderFn func() storage.Provider
@@ -142,6 +147,7 @@ func New(cfg *Config) (*Cmd, error) {
 		kh:              kh,
 		crypto:          cfg.Crypto,
 		alg:             alg,
+		baseURL:         cfg.BaseURL,
 	}, nil
 }
 
@@ -163,7 +169,7 @@ func (c *Cmd) GetHandlers() []Handler {
 		NewCmdHandler(GetProofByHash, c.GetProofByHash),
 		NewCmdHandler(GetEntryAndProof, c.GetEntryAndProof),
 		NewCmdHandler(GetIssuers, c.GetIssuers),
-		NewCmdHandler(GetPublicKey, c.GetPublicKey),
+		NewCmdHandler(Webfinger, c.Webfinger),
 		NewCmdHandler(AddVC, c.AddVC),
 		NewCmdHandler(AddLdContext, c.AddLdContext),
 	}
@@ -244,9 +250,26 @@ func (c *Cmd) GetIssuers(w io.Writer, r io.Reader) error {
 	return json.NewEncoder(w).Encode(c.logs[alias].Issuers) // nolint: wrapcheck
 }
 
-// GetPublicKey returns public key.
-func (c *Cmd) GetPublicKey(w io.Writer, _ io.Reader) error {
-	return json.NewEncoder(w).Encode(c.PubKey) // nolint: wrapcheck
+// Webfinger returns discovery info.
+func (c *Cmd) Webfinger(w io.Writer, r io.Reader) error {
+	var alias string
+
+	if err := json.NewDecoder(r).Decode(&alias); err != nil {
+		return fmt.Errorf("%w: decode alias failed", errors.ErrInternal)
+	}
+
+	sub := c.baseURL + "/" + alias
+	// TODO: add alternate links
+	return json.NewEncoder(w).Encode(&WebFingerResponse{
+		Subject: sub,
+		Properties: map[string]interface{}{
+			PublicKeyType: c.PubKey,
+			LedgerType:    "vct-v1",
+		},
+		Links: []WebFingerLink{
+			{Rel: "self", Href: sub},
+		},
+	}) // nolint: wrapcheck
 }
 
 // CreateLeaf creates MerkleTreeLeaf.

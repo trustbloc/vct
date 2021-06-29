@@ -97,11 +97,11 @@ func (c *Client) AddJSONLDContexts(ctx context.Context, docs ...jsonld.ContextDo
 	return nil
 }
 
-// GetPublicKey returns public key.
-func (c *Client) GetPublicKey(ctx context.Context) ([]byte, error) {
-	var result []byte
-	if err := c.do(ctx, rest.GetPublicKeyPath, &result); err != nil {
-		return nil, fmt.Errorf("get public key: %w", err)
+// Webfinger returns discovery info.
+func (c *Client) Webfinger(ctx context.Context) (*command.WebFingerResponse, error) {
+	var result *command.WebFingerResponse
+	if err := c.do(ctx, rest.WebfingerPath, &result); err != nil {
+		return nil, fmt.Errorf("webfinger: %w", err)
 	}
 
 	return result, nil
