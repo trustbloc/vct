@@ -95,20 +95,30 @@ func TestOperation_AddLdContext(t *testing.T) {
 
 		cmd := NewMockCmd(ctrl)
 		cmd.EXPECT().AddLdContext(gomock.Any(), gomock.Any()).Do(func(_ io.Writer, r io.Reader) {
-			payload, err := io.ReadAll(r)
-			require.NoError(t, err)
-
-			require.Equal(t, dummyPayload, string(payload))
+			var req *command.AddLdContextRequest
+			require.NoError(t, json.NewDecoder(r).Decode(&req))
+			require.Equal(t, alias, req.Alias)
 		}).Return(nil)
 
 		operation := New(cmd)
 
 		_, code := sendRequestToHandler(t,
 			handlerLookup(t, operation, AddContextPath),
-			bytes.NewBufferString(dummyPayload), AddContextPath,
+			bytes.NewBufferString(dummyPayload), strings.Replace(AddContextPath, "{alias}", alias, 1),
 		)
 
 		require.Equal(t, http.StatusOK, code)
+	})
+
+	t.Run("Bad request", func(t *testing.T) {
+		operation := New(nil)
+
+		_, code := sendRequestToHandler(t,
+			handlerLookup(t, operation, AddContextPath),
+			&readerMock{errors.New("EOF")}, AddContextPath,
+		)
+
+		require.Equal(t, http.StatusInternalServerError, code)
 	})
 }
 

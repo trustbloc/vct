@@ -54,7 +54,9 @@ func New() *Steps {
 // RegisterSteps registers the BDD steps on the suite.
 func (s *Steps) RegisterSteps(suite *godog.Suite) {
 	suite.Step(`VCT agent is running on "([^"]*)"$`, s.setVCTClient)
+	suite.Step(`VCT agent is running on "([^"]*)" without contexts$`, s.setVCTClientNoContexts)
 	suite.Step(`Add verifiable credential "([^"]*)" to Log$`, s.addVC)
+	suite.Step(`Add verifiable credential "([^"]*)" to Log is not a valid JSON-LD context$`, s.addVCBadContext)
 	suite.Step(`No permissions to write$`, s.noWritePerm)
 	suite.Step(`No permissions to read$`, s.noReadPerm)
 	suite.Step(`Retrieve latest signed tree head and check that tree_size is "([^"]*)"$`, s.getSTH)
@@ -108,6 +110,22 @@ func (s *Steps) issuerIsNotSupported(issuer string) error {
 	}, backoff.WithMaxRetries(backoff.NewConstantBackOff(time.Second), 15))
 }
 
+func (s *Steps) setVCTClientNoContexts(endpoint string) error {
+	s.vct = vct.New(endpoint, vct.WithHTTPClient(s.client))
+
+	return backoff.Retry(func() error { // nolint: wrapcheck
+		resp, err := s.vct.GetSTH(context.Background())
+		// ignores the error if it is a permission issue
+		if err != nil && !strings.Contains(err.Error(), "action forbidden for") {
+			return err
+		}
+
+		s.state.GetSTHResponse = resp
+
+		return nil
+	}, backoff.WithMaxRetries(backoff.NewConstantBackOff(time.Second), 220))
+}
+
 func (s *Steps) setVCTClient(endpoint string) error {
 	s.vct = vct.New(endpoint, vct.WithHTTPClient(s.client))
 
@@ -120,7 +138,12 @@ func (s *Steps) setVCTClient(endpoint string) error {
 
 		s.state.GetSTHResponse = resp
 
-		return s.vct.AddJSONLDContexts(context.Background(), ldcontext.MustGetAll()...) // nolint: wrapcheck
+		err = s.vct.AddJSONLDContexts(context.Background(), ldcontext.MustGetAll()...)
+		if err != nil && !strings.Contains(err.Error(), "action forbidden for") {
+			return err
+		}
+
+		return nil
 	}, backoff.WithMaxRetries(backoff.NewConstantBackOff(time.Second), 220))
 }
 
@@ -228,6 +251,24 @@ func (s *Steps) addVC(file string) error {
 	s.state.AddedCredentials[file] = resp
 
 	return nil
+}
+
+func (s *Steps) addVCBadContext(file string) error {
+	src, err := readFile(file)
+	if err != nil {
+		return fmt.Errorf("read file: %w", err)
+	}
+
+	_, err = s.vct.AddVC(context.Background(), src)
+	if err == nil {
+		return fmt.Errorf("vc was added successfully")
+	}
+
+	if strings.Contains(err.Error(), "URL did not result in a valid JSON-LD context") {
+		return nil
+	}
+
+	return err
 }
 
 func (s *Steps) setTimestamp(from, to string) error {

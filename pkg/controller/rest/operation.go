@@ -17,7 +17,6 @@ import (
 
 	"github.com/gorilla/mux"
 	"github.com/hyperledger/aries-framework-go/pkg/common/log"
-	ldctxrest "github.com/hyperledger/aries-framework-go/pkg/controller/rest/jsonld/context"
 
 	"github.com/trustbloc/vct/pkg/controller/command"
 	"github.com/trustbloc/vct/pkg/controller/errors"
@@ -38,7 +37,7 @@ const (
 	GetIssuersPath        = basePath + "/get-issuers"
 	GetEntryAndProofPath  = basePath + "/get-entry-and-proof"
 	GetPublicKeyPath      = basePath + "/get-public-key"
-	AddContextPath        = ldctxrest.AddContextPath
+	AddContextPath        = basePath + "/context/add"
 	HealthCheckPath       = "/healthcheck"
 )
 
@@ -89,7 +88,26 @@ func (c *Operation) GetRESTHandlers() []Handler {
 
 // AddLdContext adds jsonld context.
 func (c *Operation) AddLdContext(w http.ResponseWriter, r *http.Request) {
-	execute(c.cmd.AddLdContext, w, r.Body)
+	var context bytes.Buffer
+
+	_, err := io.Copy(&context, r.Body)
+	if err != nil {
+		sendError(w, fmt.Errorf("%w: copy context", errors.ErrInternal))
+
+		return
+	}
+
+	req, err := json.Marshal(command.AddLdContextRequest{
+		Alias:   mux.Vars(r)[aliasVarName],
+		Context: context.Bytes(),
+	})
+	if err != nil {
+		sendError(w, fmt.Errorf("%w: marshal AddLdContextRequest", errors.ErrInternal))
+
+		return
+	}
+
+	execute(c.cmd.AddLdContext, w, bytes.NewBuffer(req))
 }
 
 // AddVC adds verifiable credential to log.

@@ -7,12 +7,14 @@ SPDX-License-Identifier: Apache-2.0
 package command
 
 import (
+	"bytes"
 	"context"
 	"crypto/sha256"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"io"
+	"sync"
 	"time"
 
 	"github.com/google/trillian"
@@ -61,16 +63,17 @@ type Key struct {
 
 // Cmd is a controller for commands.
 type Cmd struct {
-	logs           map[string]Log
-	VCLogID        [32]byte
-	kh             interface{}
-	vdr            vdr.Registry
-	kms            KeyManager
-	crypto         crypto.Crypto
-	PubKey         []byte
-	documentLoader *jsonld.DocumentLoader
-	alg            *SignatureAndHashAlgorithm
-	ctxCmd         *cmdcontext.Command
+	logs            map[string]Log
+	VCLogID         [32]byte
+	kh              interface{}
+	vdr             vdr.Registry
+	kms             KeyManager
+	crypto          crypto.Crypto
+	PubKey          []byte
+	storageProvider StorageProvider
+	alg             *SignatureAndHashAlgorithm
+	loaders         sync.Map
+	ctxCommands     sync.Map
 }
 
 type permission int32
@@ -124,33 +127,31 @@ func New(cfg *Config) (*Cmd, error) {
 		return nil, fmt.Errorf("export pub key bytes: %w", err)
 	}
 
-	ctxCmd, err := cmdcontext.New(storageProviderFn(func() storage.Provider { return cfg.StorageProvider }))
-	if err != nil {
-		return nil, fmt.Errorf("new cmd context: %w", err)
-	}
-
-	documentLoader, err := jsonld.NewDocumentLoader(cfg.StorageProvider)
-	if err != nil {
-		return nil, fmt.Errorf("new document loader: %w", err)
-	}
-
 	logs := make(map[string]Log)
 	for _, log := range cfg.Logs {
 		logs[log.Alias] = log
 	}
 
 	return &Cmd{
-		documentLoader: documentLoader,
-		vdr:            cfg.VDR,
-		PubKey:         pubBytes,
-		VCLogID:        sha256.Sum256(pubBytes),
-		logs:           logs,
-		kms:            cfg.KMS,
-		kh:             kh,
-		crypto:         cfg.Crypto,
-		alg:            alg,
-		ctxCmd:         ctxCmd,
+		storageProvider: cfg.StorageProvider,
+		vdr:             cfg.VDR,
+		PubKey:          pubBytes,
+		VCLogID:         sha256.Sum256(pubBytes),
+		logs:            logs,
+		kms:             cfg.KMS,
+		kh:              kh,
+		crypto:          cfg.Crypto,
+		alg:             alg,
 	}, nil
+}
+
+type customizedStorageProvider struct {
+	alias string
+	StorageProvider
+}
+
+func (s *customizedStorageProvider) OpenStore(name string) (storage.Store, error) {
+	return s.StorageProvider.OpenStore(s.alias + name)
 }
 
 // GetHandlers returns list of all commands supported by this controller.
@@ -170,7 +171,62 @@ func (c *Cmd) GetHandlers() []Handler {
 
 // AddLdContext adds jsonld context.
 func (c *Cmd) AddLdContext(w io.Writer, r io.Reader) error {
-	return c.ctxCmd.Add(w, r) // nolint: wrapcheck
+	var req AddLdContextRequest
+
+	if err := json.NewDecoder(r).Decode(&req); err != nil {
+		return fmt.Errorf("decode AddLdContext request: %w", err)
+	}
+
+	if err := c.hasPermissions(req.Alias, write); err != nil {
+		return fmt.Errorf("has permissions: %w", err)
+	}
+
+	ctxCmd, err := c.getCtxCmd(req.Alias)
+	if err != nil {
+		return fmt.Errorf("%w: get ctx cmd", errors.ErrInternal)
+	}
+
+	return ctxCmd.Add(w, bytes.NewBuffer(req.Context)) // nolint: wrapcheck
+}
+
+func (c *Cmd) getCtxCmd(alias string) (*cmdcontext.Command, error) {
+	val, ok := c.ctxCommands.Load(alias)
+	if ok {
+		return val.(*cmdcontext.Command), nil
+	}
+
+	ctxCmd, err := cmdcontext.New(storageProviderFn(func() storage.Provider {
+		return &customizedStorageProvider{
+			alias:           alias,
+			StorageProvider: c.storageProvider,
+		}
+	}))
+	if err != nil {
+		return nil, fmt.Errorf("%w: new cmd context", errors.ErrInternal)
+	}
+
+	c.ctxCommands.Store(alias, ctxCmd)
+
+	return c.getCtxCmd(alias)
+}
+
+func (c *Cmd) documentLoader(alias string) (*jsonld.DocumentLoader, error) {
+	val, ok := c.loaders.Load(alias)
+	if ok {
+		return val.(*jsonld.DocumentLoader), nil
+	}
+
+	loader, err := jsonld.NewDocumentLoader(&customizedStorageProvider{
+		alias:           alias,
+		StorageProvider: c.storageProvider,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("new document loader: %w", err)
+	}
+
+	c.loaders.Store(alias, loader)
+
+	return c.documentLoader(alias)
 }
 
 // GetIssuers returns issuers.
@@ -242,9 +298,14 @@ func (c *Cmd) AddVC(w io.Writer, r io.Reader) error { // nolint: funlen
 		return fmt.Errorf("has permissions: %w", err)
 	}
 
+	loader, err := c.documentLoader(req.Alias)
+	if err != nil {
+		return fmt.Errorf("document loader: %w", err)
+	}
+
 	vc, err := verifiable.ParseCredential(req.VCEntry, verifiable.WithPublicKeyFetcher(
 		verifiable.NewVDRKeyResolver(c.vdr).PublicKeyFetcher(),
-	), verifiable.WithJSONLDDocumentLoader(c.documentLoader))
+	), verifiable.WithJSONLDDocumentLoader(loader))
 	if err != nil {
 		return errors.NewBadRequestError(fmt.Errorf("parse credential: %w", err))
 	}

@@ -89,8 +89,7 @@ func (c *Client) AddJSONLDContexts(ctx context.Context, docs ...jsonld.ContextDo
 		return fmt.Errorf("marshal AddRequest for JSONLDContexts: %w", err)
 	}
 
-	err = c.do(ctx, rest.AddContextPath, nil, withMethod(http.MethodPost),
-		withEndpoint(baseURL(c.endpoint)), withBody(body))
+	err = c.do(ctx, rest.AddContextPath, nil, withMethod(http.MethodPost), withBody(body))
 	if err != nil {
 		return fmt.Errorf("add JSON ld contexts: %w", err)
 	}
@@ -250,10 +249,9 @@ func VerifyVCTimestampSignature(signature, pubKey []byte, timestamp uint64, vc *
 }
 
 type options struct {
-	method   string
-	endpoint string
-	body     io.Reader
-	values   url.Values
+	method string
+	body   io.Reader
+	values url.Values
 }
 
 type opt func(*options)
@@ -276,21 +274,15 @@ func withMethod(val string) opt {
 	}
 }
 
-func withEndpoint(val string) opt {
-	return func(o *options) {
-		o.endpoint = val
-	}
-}
-
 func (c *Client) do(ctx context.Context, path string, v interface{}, opts ...opt) error {
-	op := &options{method: http.MethodGet, values: url.Values{}, endpoint: c.endpoint}
+	op := &options{method: http.MethodGet, values: url.Values{}}
 	for _, fn := range opts {
 		fn(op)
 	}
 
 	path = strings.Replace(path, rest.AliasPath, "", 1)
 
-	req, err := http.NewRequestWithContext(ctx, op.method, op.endpoint+path+"?"+op.values.Encode(), op.body)
+	req, err := http.NewRequestWithContext(ctx, op.method, c.endpoint+path+"?"+op.values.Encode(), op.body)
 	if err != nil {
 		return fmt.Errorf("new request with context: %w", err)
 	}
@@ -317,15 +309,4 @@ func getError(reader io.Reader) error {
 	}
 
 	return errors.New(errMsg.Message)
-}
-
-func baseURL(u string) string {
-	const max = 3
-
-	parts := strings.Split(u, "/")
-	if len(parts) > max {
-		parts = parts[:max]
-	}
-
-	return strings.Join(parts, "/")
 }
