@@ -262,3 +262,9 @@ type AddVCRequest struct {
 	Alias   string `json:"alias"`
 	VCEntry []byte `json:"vc_entry"`
 }
+
+// AddLdContextRequest represents the request to add ld context.
+type AddLdContextRequest struct {
+	Alias   string `json:"alias"`
+	Context []byte `json:"context"`
+}

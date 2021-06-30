@@ -78,51 +78,6 @@ func TestNew(t *testing.T) {
 		require.NotNil(t, cmd)
 	})
 
-	t.Run("Document loader error", func(t *testing.T) {
-		ctrl := gomock.NewController(t)
-		defer ctrl.Finish()
-
-		km := NewMockKeyManager(ctrl)
-		km.EXPECT().Get(kid).Return(nil, nil)
-		km.EXPECT().ExportPubKeyBytes(kid).Return(nil, nil)
-
-		db := NewMockStorageProvider(ctrl)
-		db.EXPECT().OpenStore(gomock.Any()).Return(nil, nil)
-		db.EXPECT().OpenStore(gomock.Any()).Return(nil, errors.New("error"))
-
-		cmd, err := New(&Config{
-			KMS: km, Key: Key{
-				ID:   kid,
-				Type: kms.ECDSAP256TypeDER,
-			},
-			StorageProvider: db,
-		})
-		require.EqualError(t, err, "new document loader: new document loader: error")
-		require.Nil(t, cmd)
-	})
-
-	t.Run("Create cmd error", func(t *testing.T) {
-		ctrl := gomock.NewController(t)
-		defer ctrl.Finish()
-
-		km := NewMockKeyManager(ctrl)
-		km.EXPECT().Get(kid).Return(nil, nil)
-		km.EXPECT().ExportPubKeyBytes(kid).Return(nil, nil)
-
-		db := NewMockStorageProvider(ctrl)
-		db.EXPECT().OpenStore(gomock.Any()).Return(nil, errors.New("error"))
-
-		cmd, err := New(&Config{
-			KMS: km, Key: Key{
-				ID:   kid,
-				Type: kms.ECDSAP256TypeDER,
-			},
-			StorageProvider: db,
-		})
-		require.EqualError(t, err, "new cmd context: open store: error")
-		require.Nil(t, cmd)
-	})
-
 	t.Run("Key is not supported", func(t *testing.T) {
 		cmd, err := New(&Config{Key: Key{Type: "test"}})
 		require.EqualError(t, err, "key type test is not supported")
@@ -164,30 +119,130 @@ func TestNew(t *testing.T) {
 func TestCmd_AddLdContext(t *testing.T) {
 	const kid = "kid"
 
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
+	t.Run("Context URL is mandatory", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		defer ctrl.Finish()
 
-	km := NewMockKeyManager(ctrl)
-	km.EXPECT().Get(kid).Return(nil, nil)
-	km.EXPECT().ExportPubKeyBytes(kid).Return([]byte(`public key`), nil)
+		km := NewMockKeyManager(ctrl)
+		km.EXPECT().Get(kid).Return(nil, nil)
+		km.EXPECT().ExportPubKeyBytes(kid).Return([]byte(`public key`), nil)
 
-	cmd, err := New(&Config{
-		KMS: km, Key: Key{
-			ID:   kid,
-			Type: kms.ECDSAP256TypeIEEEP1363,
-		},
-		StorageProvider: mem.NewProvider(),
+		cmd, err := New(&Config{
+			KMS: km, Key: Key{
+				ID:   kid,
+				Type: kms.ECDSAP256TypeIEEEP1363,
+			},
+			Logs: []Log{{
+				Alias:      alias,
+				Permission: "rw",
+			}},
+			StorageProvider: mem.NewProvider(),
+		})
+		require.NoError(t, err)
+		require.NotNil(t, cmd)
+
+		const (
+			errorMsg = "context URL is mandatory"
+			payload  = `{"alias":"maple2021","context":"eyJkb2N1bWVudHMiOlt7fV19"}`
+		)
+
+		require.EqualError(t, cmd.AddLdContext(nil, bytes.NewBufferString(payload)), errorMsg)
+		require.EqualError(t, lookupHandler(t, cmd, AddLdContext)(nil, bytes.NewBufferString(payload)), errorMsg)
 	})
-	require.NoError(t, err)
-	require.NotNil(t, cmd)
 
-	const (
-		errorMsg = "context URL is mandatory"
-		payload  = `{"documents":[{}]}`
-	)
+	t.Run("Create cmd failed", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		defer ctrl.Finish()
 
-	require.EqualError(t, cmd.AddLdContext(nil, bytes.NewBufferString(payload)), errorMsg)
-	require.EqualError(t, lookupHandler(t, cmd, AddLdContext)(nil, bytes.NewBufferString(payload)), errorMsg)
+		km := NewMockKeyManager(ctrl)
+		km.EXPECT().Get(kid).Return(nil, nil)
+		km.EXPECT().ExportPubKeyBytes(kid).Return([]byte(`public key`), nil)
+
+		sp := NewMockStorageProvider(ctrl)
+		sp.EXPECT().OpenStore(gomock.Any()).Return(nil, errors.New("error")).Times(2)
+
+		cmd, err := New(&Config{
+			KMS: km, Key: Key{
+				ID:   kid,
+				Type: kms.ECDSAP256TypeIEEEP1363,
+			},
+			Logs: []Log{{
+				Alias:      alias,
+				Permission: "rw",
+			}},
+			StorageProvider: sp,
+		})
+		require.NoError(t, err)
+		require.NotNil(t, cmd)
+
+		const (
+			errorMsg = "internal error: get ctx cmd"
+			payload  = `{"alias":"maple2021","context":"eyJkb2N1bWVudHMiOlt7fV19"}`
+		)
+
+		require.EqualError(t, cmd.AddLdContext(nil, bytes.NewBufferString(payload)), errorMsg)
+		require.EqualError(t, lookupHandler(t, cmd, AddLdContext)(nil, bytes.NewBufferString(payload)), errorMsg)
+	})
+
+	t.Run("No permissions", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		defer ctrl.Finish()
+
+		km := NewMockKeyManager(ctrl)
+		km.EXPECT().Get(kid).Return(nil, nil)
+		km.EXPECT().ExportPubKeyBytes(kid).Return([]byte(`public key`), nil)
+
+		cmd, err := New(&Config{
+			KMS: km, Key: Key{
+				ID:   kid,
+				Type: kms.ECDSAP256TypeIEEEP1363,
+			},
+			Logs: []Log{{
+				Alias:      alias,
+				Permission: "r",
+			}},
+			StorageProvider: mem.NewProvider(),
+		})
+		require.NoError(t, err)
+		require.NotNil(t, cmd)
+
+		const (
+			errorMsg = "has permissions: action forbidden for \"maple2021\""
+			payload  = `{"alias":"maple2021","context":"eyJkb2N1bWVudHMiOlt7fV19"}`
+		)
+
+		require.EqualError(t, cmd.AddLdContext(nil, bytes.NewBufferString(payload)), errorMsg)
+		require.EqualError(t, lookupHandler(t, cmd, AddLdContext)(nil, bytes.NewBufferString(payload)), errorMsg)
+	})
+
+	t.Run("Decode failed", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		defer ctrl.Finish()
+
+		km := NewMockKeyManager(ctrl)
+		km.EXPECT().Get(kid).Return(nil, nil)
+		km.EXPECT().ExportPubKeyBytes(kid).Return([]byte(`public key`), nil)
+
+		cmd, err := New(&Config{
+			KMS: km, Key: Key{
+				ID:   kid,
+				Type: kms.ECDSAP256TypeIEEEP1363,
+			},
+			StorageProvider: mem.NewProvider(),
+		})
+		require.NoError(t, err)
+		require.NotNil(t, cmd)
+
+		const errMsg = "decode AddLdContext request: json: cannot unmarshal array into Go" +
+			" value of type command.AddLdContextRequest"
+
+		require.EqualError(t, cmd.AddLdContext(nil,
+			bytes.NewBufferString("[]")), errMsg,
+		)
+		require.EqualError(t, lookupHandler(t, cmd, AddLdContext)(nil,
+			bytes.NewBufferString("[]")), errMsg,
+		)
+	})
 }
 
 func TestCmd_GetIssuers(t *testing.T) {
@@ -1382,7 +1437,7 @@ func TestCmd_AddVC(t *testing.T) {
 		).Times(2)
 
 		db := mem.NewProvider()
-		loadContexts(t, db)
+		loadContexts(t, db, alias)
 
 		cmd, err := New(&Config{
 			KMS:    km,
@@ -1433,6 +1488,46 @@ func TestCmd_AddVC(t *testing.T) {
 		require.NotEmpty(t, sig.Algorithm.Hash)
 		require.NotEmpty(t, sig.Algorithm.Type)
 		require.NotEmpty(t, sig.Algorithm.Signature)
+	})
+
+	t.Run("Document loader error", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		defer ctrl.Finish()
+
+		km, cr := createKMSAndCrypto(t)
+		newKID, _, err := km.Create(keyType)
+		require.NoError(t, err)
+
+		db := NewMockStorageProvider(ctrl)
+		db.EXPECT().OpenStore(gomock.Any()).Return(nil, errors.New("error")).Times(2)
+
+		cmd, err := New(&Config{
+			KMS:    km,
+			Crypto: cr,
+			Logs: []Log{{
+				Alias:      alias,
+				Permission: "w",
+				Client:     NewMockTrillianLogClient(ctrl),
+			}},
+			VDR: vdr.New(vdr.WithVDR(key.New())),
+			Key: Key{
+				ID:   newKID,
+				Type: keyType,
+			},
+			StorageProvider: db,
+		})
+		require.NoError(t, err)
+		require.NotNil(t, cmd)
+
+		req, err := json.Marshal(AddVCRequest{
+			Alias:   alias,
+			VCEntry: verifiableCredential,
+		})
+		require.NoError(t, err)
+
+		const expErr = "document loader: new document loader: new document loader: error"
+		require.EqualError(t, cmd.AddVC(nil, bytes.NewBuffer(req)), expErr)
+		require.EqualError(t, lookupHandler(t, cmd, AddVC)(nil, bytes.NewBuffer(req)), expErr)
 	})
 
 	t.Run("Copy vc failed", func(t *testing.T) {
@@ -1496,7 +1591,7 @@ func TestCmd_AddVC(t *testing.T) {
 		km.EXPECT().ExportPubKeyBytes(kid).Return([]byte(`public key`), nil)
 
 		db := mem.NewProvider()
-		loadContexts(t, db)
+		loadContexts(t, db, alias)
 
 		cmd, err := New(&Config{
 			KMS: km,
@@ -1538,7 +1633,7 @@ func TestCmd_AddVC(t *testing.T) {
 		client.EXPECT().QueueLeaf(gomock.Any(), gomock.Any()).Return(nil, errors.New("error")).Times(2)
 
 		db := mem.NewProvider()
-		loadContexts(t, db)
+		loadContexts(t, db, alias)
 
 		cmd, err := New(&Config{
 			KMS: km,
@@ -1580,7 +1675,7 @@ func TestCmd_AddVC(t *testing.T) {
 		client.EXPECT().QueueLeaf(gomock.Any(), gomock.Any()).Return(&trillian.QueueLeafResponse{}, nil).Times(2)
 
 		db := mem.NewProvider()
-		loadContexts(t, db)
+		loadContexts(t, db, alias)
 
 		cmd, err := New(&Config{
 			KMS: km,
@@ -1628,7 +1723,7 @@ func TestCmd_AddVC(t *testing.T) {
 		}, nil).Times(2)
 
 		db := mem.NewProvider()
-		loadContexts(t, db)
+		loadContexts(t, db, alias)
 
 		cmd, err := New(&Config{
 			KMS: km,
@@ -1679,7 +1774,7 @@ func TestCmd_AddVC(t *testing.T) {
 		}, nil).Times(2)
 
 		db := mem.NewProvider()
-		loadContexts(t, db)
+		loadContexts(t, db, alias)
 
 		cmd, err := New(&Config{
 			KMS: km,
@@ -1719,7 +1814,7 @@ func TestCmd_AddVC(t *testing.T) {
 		km.EXPECT().ExportPubKeyBytes(kid).Return([]byte(`public key`), nil)
 
 		db := mem.NewProvider()
-		loadContexts(t, db)
+		loadContexts(t, db, alias)
 
 		cmd, err := New(&Config{
 			KMS: km,
@@ -1766,10 +1861,10 @@ func lookupHandler(t *testing.T, cmd *Cmd, name string) Exec {
 	}
 }
 
-func loadContexts(t *testing.T, p storage.Provider) {
+func loadContexts(t *testing.T, p storage.Provider, prefix string) { // nolint: unparam
 	t.Helper()
 
-	store, err := p.OpenStore(jsonld.ContextsDBName)
+	store, err := p.OpenStore(prefix + jsonld.ContextsDBName)
 	require.NoError(t, err)
 
 	var ops []storage.Operation
