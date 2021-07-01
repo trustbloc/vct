@@ -352,7 +352,7 @@ func TestCmd_GetIssuers(t *testing.T) {
 	})
 }
 
-func TestCmd_GetPublicKey(t *testing.T) {
+func TestCmd_Webfinger(t *testing.T) {
 	const kid = "kid"
 
 	ctrl := gomock.NewController(t)
@@ -367,6 +367,7 @@ func TestCmd_GetPublicKey(t *testing.T) {
 			ID:   kid,
 			Type: kms.ECDSAP256TypeIEEEP1363,
 		},
+		BaseURL:         "https://vct.com",
 		StorageProvider: mem.NewProvider(),
 	})
 	require.NoError(t, err)
@@ -374,14 +375,20 @@ func TestCmd_GetPublicKey(t *testing.T) {
 
 	var fr bytes.Buffer
 
-	require.NoError(t, cmd.GetPublicKey(&fr, nil))
+	require.NoError(t, cmd.Webfinger(&fr, bytes.NewBufferString(`"maple2021"`)))
 
 	var hr bytes.Buffer
 
-	require.NoError(t, lookupHandler(t, cmd, GetPublicKey)(&hr, nil))
+	require.NoError(t, lookupHandler(t, cmd, Webfinger)(&hr, bytes.NewBufferString(`"maple2021"`)))
 
 	require.Equal(t, fr.String(), hr.String())
-	require.Equal(t, "\"cHVibGljIGtleQ==\"\n", fr.String())
+
+	exp := `{"subject":"https://vct.com/maple2021",` +
+		`"properties":{"https://trustbloc.dev/ns/ledger-type":"vct-v1",` +
+		`"https://trustbloc.dev/ns/public-key":"cHVibGljIGtleQ=="},` +
+		`"links":[{"rel":"self","href":"https://vct.com/maple2021"}]}` + "\n"
+
+	require.Equal(t, exp, fr.String())
 }
 
 func TestCmd_GetEntries(t *testing.T) {

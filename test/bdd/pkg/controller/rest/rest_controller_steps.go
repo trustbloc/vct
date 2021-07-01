@@ -9,6 +9,7 @@ package rest
 import (
 	"context"
 	"embed"
+	"encoding/base64"
 	"fmt"
 	"net/http"
 	"path/filepath"
@@ -229,9 +230,14 @@ func (s *Steps) addVC(file string) error {
 		return fmt.Errorf("add vc: %w", err)
 	}
 
-	pubKey, err := s.vct.GetPublicKey(context.Background())
+	webResp, err := s.vct.Webfinger(context.Background())
 	if err != nil {
 		return fmt.Errorf("get public key: %w", err)
+	}
+
+	pubKey, err := base64.StdEncoding.DecodeString(webResp.Properties[command.PublicKeyType].(string))
+	if err != nil {
+		return fmt.Errorf("decode public key: %w", err)
 	}
 
 	vc, err := verifiable.ParseCredential(src,

@@ -12,6 +12,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -132,7 +133,7 @@ func TestOperation_GetSTH(t *testing.T) {
 			payload, err := io.ReadAll(r)
 			require.NoError(t, err)
 
-			require.Equal(t, `"maple2021"`, string(payload))
+			require.Equal(t, fmt.Sprintf("%q", alias), string(payload))
 		}).Return(nil)
 
 		operation := New(cmd)
@@ -155,7 +156,7 @@ func TestOperation_GetIssuers(t *testing.T) {
 			payload, err := io.ReadAll(r)
 			require.NoError(t, err)
 
-			require.Equal(t, `"maple2021"`, string(payload))
+			require.Equal(t, fmt.Sprintf("%q", alias), string(payload))
 		}).Return(nil)
 
 		operation := New(cmd)
@@ -178,19 +179,25 @@ func TestOperation_HealthCheck(t *testing.T) {
 	})
 }
 
-func TestOperation_GetPublicKey(t *testing.T) {
+func TestOperation_Webfinger(t *testing.T) {
 	t.Run("Success", func(t *testing.T) {
 		ctrl := gomock.NewController(t)
 		defer ctrl.Finish()
 
 		cmd := NewMockCmd(ctrl)
-		cmd.EXPECT().GetPublicKey(gomock.Any(), gomock.Any()).Do(func(_ io.Writer, r io.Reader) {
-			require.Nil(t, r)
+		cmd.EXPECT().Webfinger(gomock.Any(), gomock.Any()).Do(func(_ io.Writer, r io.Reader) {
+			payload, err := io.ReadAll(r)
+			require.NoError(t, err)
+
+			require.Equal(t, fmt.Sprintf("%q", alias), string(payload))
 		}).Return(nil)
 
 		operation := New(cmd)
 
-		_, code := sendRequestToHandler(t, handlerLookup(t, operation, GetPublicKeyPath), nil, GetPublicKeyPath)
+		_, code := sendRequestToHandler(t,
+			handlerLookup(t, operation, WebfingerPath), nil,
+			strings.Replace(WebfingerPath, "{alias}", alias, 1),
+		)
 
 		require.Equal(t, http.StatusOK, code)
 	})

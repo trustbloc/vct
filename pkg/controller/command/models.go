@@ -268,3 +268,17 @@ type AddLdContextRequest struct {
 	Alias   string `json:"alias"`
 	Context []byte `json:"context"`
 }
+
+// WebFingerResponse web finger response.
+type WebFingerResponse struct {
+	Subject    string                 `json:"subject,omitempty"`
+	Properties map[string]interface{} `json:"properties,omitempty"`
+	Links      []WebFingerLink        `json:"links,omitempty"`
+}
+
+// WebFingerLink web finger link.
+type WebFingerLink struct {
+	Rel  string `json:"rel,omitempty"`
+	Type string `json:"type,omitempty"`
+	Href string `json:"href,omitempty"`
+}

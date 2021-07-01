@@ -121,6 +121,7 @@ services:
     image: ghcr.io/trustbloc/vct:latest
     restart: always
     environment:
+      - VCT_BASE_URL=http://vct:56565
       - VCT_API_HOST=0.0.0.0:56565
       - VCT_LOGS=maple2020:rw@vct.trillian.log.server:8090,maple2021:rw@vct.trillian.log.server:8090,maple2022:r@vct.trillian.log.server:8090,maple2023:w@vct.trillian.log.server:8090,maple2024:rw@vct.trillian.log.server:8090
       - VCT_KMS_ENDPOINT=http://vct.kms:7878

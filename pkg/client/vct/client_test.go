@@ -179,12 +179,21 @@ func TestClient_GetIssuers(t *testing.T) {
 	})
 }
 
-func TestClient_GetPublicKey(t *testing.T) {
+func TestClient_Webfinger(t *testing.T) {
 	t.Run("Success", func(t *testing.T) {
 		ctrl := gomock.NewController(t)
 		defer ctrl.Finish()
 
-		expected := []byte("public key")
+		expected := command.WebFingerResponse{
+			Subject: "https://vct.com/maple2021",
+			Properties: map[string]interface{}{
+				"https://trustbloc.dev/ns/public-key": "cHVibGljIGtleQ==",
+			},
+			Links: []command.WebFingerLink{{
+				Rel:  "self",
+				Href: "https://vct.com/maple2021",
+			}},
+		}
 
 		fakeResp, err := json.Marshal(expected)
 		require.NoError(t, err)
@@ -196,7 +205,7 @@ func TestClient_GetPublicKey(t *testing.T) {
 		}, nil)
 
 		client := vct.New(endpoint, vct.WithHTTPClient(httpClient))
-		resp, err := client.GetPublicKey(context.Background())
+		resp, err := client.Webfinger(context.Background())
 		require.NoError(t, err)
 
 		bytesResp, err := json.Marshal(resp)
@@ -221,8 +230,8 @@ func TestClient_GetPublicKey(t *testing.T) {
 		}, nil)
 
 		client := vct.New(endpoint, vct.WithHTTPClient(httpClient))
-		_, err = client.GetPublicKey(context.Background())
-		require.EqualError(t, err, "get public key: error")
+		_, err = client.Webfinger(context.Background())
+		require.EqualError(t, err, "webfinger: error")
 	})
 }
 
