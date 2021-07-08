@@ -32,6 +32,7 @@ const (
 	tlsSystemCertPoolFlagName = "tls-systemcertpool"
 	tlsCACertsFlagName        = "tls-cacerts"
 	timeoutFlagName           = "timeout"
+	syncTimeoutFlagName       = "sync-timeout"
 )
 
 type mockServer struct{}
@@ -199,11 +200,46 @@ func TestCmd(t *testing.T) {
 		require.Contains(t, err.Error(), "timeout is not a number")
 	})
 
+	t.Run("Bad sync-timeout", func(t *testing.T) {
+		startCmd, err := startcmd.Cmd(&mockServer{})
+		require.NoError(t, err)
+
+		args := []string{
+			"--" + agentHostFlagName, ":98989",
+			"--" + logsFlagName, "11111:rw@https://vct.example.com",
+			"--" + datasourceNameFlagName, "mem://test",
+			"--" + syncTimeoutFlagName, "w1",
+		}
+		startCmd.SetArgs(args)
+
+		err = startCmd.Execute()
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "timeout is not a number")
+	})
+
 	t.Run("Bad timeout (ENV)", func(t *testing.T) {
 		startCmd, err := startcmd.Cmd(&mockServer{})
 		require.NoError(t, err)
 		require.NoError(t, os.Setenv("VCT_TIMEOUT", "w1"))
 		defer func() { require.NoError(t, os.Unsetenv("VCT_TIMEOUT")) }()
+
+		args := []string{
+			"--" + agentHostFlagName, ":98989",
+			"--" + logsFlagName, "11111:rw@https://vct.example.com",
+			"--" + datasourceNameFlagName, "mem://test",
+		}
+		startCmd.SetArgs(args)
+
+		err = startCmd.Execute()
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "timeout is not a number")
+	})
+
+	t.Run("Bad sync timeout (ENV)", func(t *testing.T) {
+		startCmd, err := startcmd.Cmd(&mockServer{})
+		require.NoError(t, err)
+		require.NoError(t, os.Setenv("VCT_SYNC_TIMEOUT", "w1"))
+		defer func() { require.NoError(t, os.Unsetenv("VCT_SYNC_TIMEOUT")) }()
 
 		args := []string{
 			"--" + agentHostFlagName, ":98989",
