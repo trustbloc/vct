@@ -127,6 +127,11 @@ const (
 	tlsServeKeyPathFlagUsage = "Path to the private key to use when serving HTTPS." +
 		" Alternatively, this can be set with the following environment variable: " + tlsServeKeyPathFlagEnvKey
 	tlsServeKeyPathFlagEnvKey = envPrefix + "TLS_SERVE_KEY"
+
+	devModeFlagName  = "dev-mode"
+	devModeFlagUsage = "Enable dev mode." +
+		" Alternatively, this can be set with the following environment variable: " + devModeFlagEnvKey
+	devModeFlagEnvKey = envPrefix + "DEV_MODE"
 )
 
 const (
@@ -198,6 +203,7 @@ type agentParameters struct {
 	kmsEndpoint    string
 	tlsParams      *tlsParameters
 	server         server
+	devMode        bool
 }
 
 type tlsParameters struct {
@@ -253,7 +259,7 @@ func parseLogs(logsRaw string, issuersRaw []string) []command.Log {
 	return result
 }
 
-func createStartCMD(server server) *cobra.Command {
+func createStartCMD(server server) *cobra.Command { //nolint: funlen
 	return &cobra.Command{
 		Use:   "start",
 		Short: "Starts vct service",
@@ -267,6 +273,7 @@ func createStartCMD(server server) *cobra.Command {
 			timeoutStr := getUserSetVarOptional(cmd, timeoutFlagName, timeoutEnvKey)
 			syncTimeoutStr := getUserSetVarOptional(cmd, syncTimeoutFlagName, syncTimeoutEnvKey)
 			issuersStr := getUserSetVarOptional(cmd, issuersFlagName, issuersEnvKey)
+			devModeStr := getUserSetVarOptional(cmd, devModeFlagName, devModeFlagEnvKey)
 
 			var issuers []string
 			if issuersStr != "" {
@@ -293,6 +300,15 @@ func createStartCMD(server server) *cobra.Command {
 				return fmt.Errorf("get variable (%s or %s): %w", logsFlagName, logsEnvKey, err)
 			}
 
+			devMode := false
+
+			if devModeStr != "" {
+				devMode, err = strconv.ParseBool(devModeStr)
+				if err != nil {
+					return fmt.Errorf("dev mode is not a bool: %w", err)
+				}
+			}
+
 			parameters := &agentParameters{
 				server:         server,
 				host:           host,
@@ -304,6 +320,7 @@ func createStartCMD(server server) *cobra.Command {
 				databasePrefix: databasePrefix,
 				tlsParams:      tlsParams,
 				baseURL:        baseURL,
+				devMode:        devMode,
 			}
 
 			return startAgent(parameters)
@@ -459,7 +476,7 @@ func startAgent(parameters *agentParameters) error { // nolint: funlen
 		Crypto: cr,
 		VDR: vdr.New(
 			vdr.WithVDR(vdrkey.New()),
-			vdr.WithVDR(&webVDR{http: httpClient, VDR: vdrweb.New()}),
+			vdr.WithVDR(&webVDR{http: httpClient, VDR: vdrweb.New(), useHTTPOpt: parameters.devMode}),
 		),
 		Logs: parameters.logs,
 		Key: command.Key{
@@ -492,9 +509,14 @@ func startAgent(parameters *agentParameters) error { // nolint: funlen
 type webVDR struct {
 	http *http.Client
 	*vdrweb.VDR
+	useHTTPOpt bool
 }
 
 func (w *webVDR) Read(didID string, opts ...vdrapi.DIDMethodOption) (*did.DocResolution, error) {
+	if w.useHTTPOpt {
+		opts = append(opts, vdrapi.WithOption(vdrweb.UseHTTPOpt, true))
+	}
+
 	return w.VDR.Read(didID, append(opts, vdrapi.WithOption(vdrweb.HTTPClientOpt, w.http))...) // nolint: wrapcheck
 }
 
@@ -613,6 +635,7 @@ func createFlags(startCmd *cobra.Command) {
 	startCmd.Flags().String(tlsServeCertPathFlagName, "", tlsServeCertPathFlagUsage)
 	startCmd.Flags().String(tlsServeKeyPathFlagName, "", tlsServeKeyPathFlagUsage)
 	startCmd.Flags().String(issuersFlagName, "", issuersFlagUsage)
+	startCmd.Flags().String(devModeFlagName, "", devModeFlagUsage)
 }
 
 func getTLS(cmd *cobra.Command) (*tlsParameters, error) {

@@ -27,6 +27,7 @@ const (
 	agentHostFlagName         = "api-host"
 	kmsEndpointFlagName       = "kms-endpoint"
 	logsFlagName              = "logs"
+	devModeFlagName           = "dev-mode"
 	issuersFlagName           = "issuers"
 	datasourceNameFlagName    = "dsn"
 	tlsSystemCertPoolFlagName = "tls-systemcertpool"
@@ -87,6 +88,21 @@ func TestCmd(t *testing.T) {
 		}
 		startCmd.SetArgs(args)
 		require.NoError(t, startCmd.Execute())
+	})
+
+	t.Run("wrong dev mode flag", func(t *testing.T) {
+		startCmd, err := startcmd.Cmd(&mockServer{})
+		require.NoError(t, err)
+
+		args := []string{
+			"--" + agentHostFlagName, "",
+			"--" + logsFlagName, "maple2021:rw@localhost:50051",
+			"--" + devModeFlagName, "wrong",
+		}
+		startCmd.SetArgs(args)
+		err = startCmd.Execute()
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "dev mode is not a bool")
 	})
 
 	t.Run("No logs", func(t *testing.T) {

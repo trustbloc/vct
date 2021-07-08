@@ -16,14 +16,14 @@ require (
 	github.com/google/uuid v1.2.0
 	github.com/gorilla/mux v1.8.0
 	github.com/grpc-ecosystem/go-grpc-middleware v1.3.0
-	github.com/hyperledger/aries-framework-go v0.1.7-0.20210603061245-f77269180c6f
+	github.com/hyperledger/aries-framework-go v0.1.7-0.20210708130136-17663938344d
 	github.com/hyperledger/aries-framework-go-ext/component/storage/couchdb v0.0.0-20210326155331-14f4ca7d75cb
 	github.com/hyperledger/aries-framework-go-ext/component/storage/mysql v0.0.0-20210527163239-7c95eede0f1c
 	github.com/hyperledger/aries-framework-go/component/storageutil v0.0.0-20210520055214-ae429bb89bf7
 	github.com/hyperledger/aries-framework-go/spi v0.0.0-20210520055214-ae429bb89bf7
 	github.com/lib/pq v1.10.0
 	github.com/ory/dockertest/v3 v3.6.3
-	github.com/piprate/json-gold v0.4.0 // indirect
+	github.com/piprate/json-gold v0.4.0
 	github.com/prometheus/client_golang v1.10.0
 	github.com/spf13/cobra v1.1.3
 	github.com/stretchr/testify v1.7.0
