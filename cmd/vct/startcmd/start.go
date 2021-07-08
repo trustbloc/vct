@@ -14,6 +14,7 @@ import (
 	"fmt"
 	"net/http"
 	"os"
+	"reflect"
 	"strconv"
 	"strings"
 	"time"
@@ -85,6 +86,11 @@ const (
 	timeoutFlagUsage = "Total time in seconds to wait until the services are available before giving up." +
 		" Alternatively, this can be set with the following environment variable: " + timeoutEnvKey
 	timeoutEnvKey = envPrefix + "TIMEOUT"
+
+	syncTimeoutFlagName  = "sync-timeout"
+	syncTimeoutFlagUsage = "Total time in seconds to resolve config values." +
+		" Alternatively, this can be set with the following environment variable: " + syncTimeoutEnvKey
+	syncTimeoutEnvKey = envPrefix + "SYNC_TIMEOUT"
 
 	databasePrefixFlagName  = "database-prefix"
 	databasePrefixFlagUsage = "An optional prefix to be used when creating and retrieving underlying databases. " +
@@ -187,6 +193,7 @@ type agentParameters struct {
 	baseURL        string
 	datasourceName string
 	timeout        uint64
+	syncTimeout    uint64
 	databasePrefix string
 	kmsEndpoint    string
 	tlsParams      *tlsParameters
@@ -258,6 +265,7 @@ func createStartCMD(server server) *cobra.Command {
 			databasePrefix := getUserSetVarOptional(cmd, databasePrefixFlagName, databasePrefixEnvKey)
 			baseURL := getUserSetVarOptional(cmd, baseURLFlagName, baseURLEnvKey)
 			timeoutStr := getUserSetVarOptional(cmd, timeoutFlagName, timeoutEnvKey)
+			syncTimeoutStr := getUserSetVarOptional(cmd, syncTimeoutFlagName, syncTimeoutEnvKey)
 			issuersStr := getUserSetVarOptional(cmd, issuersFlagName, issuersEnvKey)
 
 			var issuers []string
@@ -268,6 +276,11 @@ func createStartCMD(server server) *cobra.Command {
 			timeout, err := strconv.ParseUint(timeoutStr, 10, 64)
 			if err != nil {
 				return fmt.Errorf("timeout is not a number(positive): %w", err)
+			}
+
+			syncTimeout, err := strconv.ParseUint(syncTimeoutStr, 10, 64)
+			if err != nil {
+				return fmt.Errorf("sync timeout is not a number(positive): %w", err)
 			}
 
 			tlsParams, err := getTLS(cmd)
@@ -285,6 +298,7 @@ func createStartCMD(server server) *cobra.Command {
 				host:           host,
 				logs:           parseLogs(logsVal, issuers),
 				timeout:        timeout,
+				syncTimeout:    syncTimeout,
 				kmsEndpoint:    kmsEndpoint,
 				datasourceName: datasourceName,
 				databasePrefix: databasePrefix,
@@ -305,7 +319,7 @@ func getUserSetVarOptional(cmd *cobra.Command, flagName, envKey string) string {
 }
 
 func createKMSAndCrypto(parameters *agentParameters, client *http.Client,
-	store storage.Provider, cfg storage.Store) (kms.KeyManager, crypto.Crypto, error) {
+	store storage.Provider, cfg storage.Store, syncTimeout uint64) (kms.KeyManager, crypto.Crypto, error) {
 	if parameters.kmsEndpoint != "" {
 		var keystoreURL string
 
@@ -313,7 +327,7 @@ func createKMSAndCrypto(parameters *agentParameters, client *http.Client,
 			location, _, err := webkms.CreateKeyStore(client, parameters.kmsEndpoint, uuid.New().String(), "")
 
 			return location, err // nolint: wrapcheck
-		})
+		}, syncTimeout)
 		if err != nil {
 			return nil, nil, fmt.Errorf("get or init: %w", err)
 		}
@@ -348,7 +362,7 @@ func BuildKMSURL(base, uri string) string {
 	return uri
 }
 
-func createKID(km kms.KeyManager, cfg storage.Store) (string, kms.KeyType, error) {
+func createKID(km kms.KeyManager, cfg storage.Store, syncTimeout uint64) (string, kms.KeyType, error) {
 	var (
 		keyID   string
 		keyType = kms.ECDSAP256TypeIEEEP1363
@@ -358,7 +372,7 @@ func createKID(km kms.KeyManager, cfg storage.Store) (string, kms.KeyType, error
 		kid, _, err := km.Create(keyType)
 
 		return kid, err // nolint: wrapcheck
-	})
+	}, syncTimeout)
 
 	return keyID, keyType, err
 }
@@ -399,12 +413,12 @@ func startAgent(parameters *agentParameters) error { // nolint: funlen
 		},
 	}
 
-	km, cr, err := createKMSAndCrypto(parameters, httpClient, store, configStore)
+	km, cr, err := createKMSAndCrypto(parameters, httpClient, store, configStore, parameters.syncTimeout)
 	if err != nil {
 		return fmt.Errorf("create kms and crypto: %w", err)
 	}
 
-	keyID, keyType, err := createKID(km, configStore)
+	keyID, keyType, err := createKID(km, configStore, parameters.syncTimeout)
 	if err != nil {
 		return fmt.Errorf("create kid: %w", err)
 	}
@@ -424,7 +438,8 @@ func startAgent(parameters *agentParameters) error { // nolint: funlen
 			conns[parameters.logs[i].Endpoint] = conn
 		}
 
-		tree, err = createTreeAndInit(conn, configStore, parameters.logs[i].Alias, parameters.timeout)
+		tree, err = createTreeAndInit(conn, configStore, parameters.logs[i].Alias,
+			parameters.timeout, parameters.syncTimeout)
 		if err != nil {
 			return fmt.Errorf("create tree: %w", err)
 		}
@@ -483,7 +498,8 @@ func (w *webVDR) Read(didID string, opts ...vdrapi.DIDMethodOption) (*did.DocRes
 	return w.VDR.Read(didID, append(opts, vdrapi.WithOption(vdrweb.HTTPClientOpt, w.http))...) // nolint: wrapcheck
 }
 
-func createTreeAndInit(conn *grpc.ClientConn, cfg storage.Store, alias string, timeout uint64) (*trillian.Tree, error) {
+func createTreeAndInit(conn *grpc.ClientConn, cfg storage.Store, alias string, timeout,
+	syncTimeout uint64) (*trillian.Tree, error) {
 	var tree *trillian.Tree
 
 	err := getOrInit(cfg, treeLogKey+"-"+alias, &tree, func() (interface{}, error) {
@@ -516,7 +532,7 @@ func createTreeAndInit(conn *grpc.ClientConn, cfg storage.Store, alias string, t
 		)
 
 		return createdTree, err // nolint: wrapcheck
-	})
+	}, syncTimeout)
 	if err != nil {
 		return nil, fmt.Errorf("create and init tree: %w", err)
 	}
@@ -524,14 +540,27 @@ func createTreeAndInit(conn *grpc.ClientConn, cfg storage.Store, alias string, t
 	return tree, nil
 }
 
-func getOrInit(cfg storage.Store, key string, v interface{}, initFn func() (interface{}, error)) error {
+func getOrInit(cfg storage.Store, key string, v interface{}, initFn func() (interface{}, error), timeout uint64) error {
 	src, err := cfg.Get(key)
 	if err != nil && !errors.Is(err, storage.ErrDataNotFound) {
 		return fmt.Errorf("get config value for %q: %w", key, err)
 	}
 
 	if err == nil {
-		return json.Unmarshal(src, v) // nolint: wrapcheck
+		time.Sleep(time.Second * time.Duration(timeout))
+
+		var src2 []byte
+
+		src2, err = cfg.Get(key)
+		if err != nil && !errors.Is(err, storage.ErrDataNotFound) {
+			return fmt.Errorf("get config value for %q: %w", key, err)
+		}
+
+		if reflect.DeepEqual(src, src2) {
+			return json.Unmarshal(src, v) // nolint: wrapcheck
+		}
+
+		return getOrInit(cfg, key, v, initFn, timeout)
 	}
 
 	val, err := initFn()
@@ -548,7 +577,7 @@ func getOrInit(cfg storage.Store, key string, v interface{}, initFn func() (inte
 		return fmt.Errorf("marshal config value for %q: %w", key, err)
 	}
 
-	return getOrInit(cfg, key, v, initFn)
+	return getOrInit(cfg, key, v, initFn, timeout)
 }
 
 func getUserSetVar(cmd *cobra.Command, flagName, envKey string, isOptional bool) (string, error) {
@@ -578,6 +607,7 @@ func createFlags(startCmd *cobra.Command) {
 	startCmd.Flags().String(databasePrefixFlagName, "", databasePrefixFlagUsage)
 	startCmd.Flags().String(baseURLFlagName, "", baseURLFlagUsage)
 	startCmd.Flags().String(timeoutFlagName, "0", timeoutFlagUsage)
+	startCmd.Flags().String(syncTimeoutFlagName, "3", syncTimeoutFlagUsage)
 	startCmd.Flags().String(tlsSystemCertPoolFlagName, "false", tlsSystemCertPoolFlagUsage)
 	startCmd.Flags().String(tlsCACertsFlagName, "", tlsCACertsFlagUsage)
 	startCmd.Flags().String(tlsServeCertPathFlagName, "", tlsServeCertPathFlagUsage)

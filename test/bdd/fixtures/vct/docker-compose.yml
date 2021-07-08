@@ -87,9 +87,23 @@ services:
     networks:
       - witness_ledger_net
 
+  vct:
+    container_name: vct
+    image: nginx:latest
+    restart: always
+    ports:
+      - 56565:56565
+    volumes:
+      - ./nginx-config/nginx.conf:/etc/nginx/nginx.conf
+    depends_on:
+      - vct-1.backend
+      - vct-2.backend
+    networks:
+      - witness_ledger_net
+
   vct.kms:
     container_name: vct.kms
-    image: ghcr.io/trustbloc-cicd/kms:0.1.7-snapshot-913aeec
+    image: ghcr.io/trustbloc-cicd/kms:0.1.7-snapshot-bff24d1
     restart: always
     environment:
       - KMS_BASE_URL=http://vct.kms:7878
@@ -116,13 +130,13 @@ services:
     networks:
       - witness_ledger_net
 
-  vct:
-    container_name: vct
+  vct-1.backend:
+    container_name: vct-1.backend
     image: ghcr.io/trustbloc/vct:latest
     restart: always
     environment:
       - VCT_BASE_URL=http://vct:56565
-      - VCT_API_HOST=0.0.0.0:56565
+      - VCT_API_HOST=0.0.0.0:56561
       - VCT_LOGS=maple2020:rw@vct.trillian.log.server:8090,maple2021:rw@vct.trillian.log.server:8090,maple2022:r@vct.trillian.log.server:8090,maple2023:w@vct.trillian.log.server:8090,maple2024:rw@vct.trillian.log.server:8090
       - VCT_KMS_ENDPOINT=http://vct.kms:7878
       - VCT_TIMEOUT=60
@@ -132,7 +146,31 @@ services:
     volumes:
       - ./keys/tls:/etc/tls
     ports:
-      - 56565:56565
+      - 56561:56561
+    command: start
+    depends_on:
+      - vct.mysql
+      - vct.kms
+    networks:
+      - witness_ledger_net
+
+  vct-2.backend:
+    container_name: vct-2.backend
+    image: ghcr.io/trustbloc/vct:latest
+    restart: always
+    environment:
+      - VCT_BASE_URL=http://vct:56565
+      - VCT_API_HOST=0.0.0.0:56562
+      - VCT_LOGS=maple2020:rw@vct.trillian.log.server:8090,maple2021:rw@vct.trillian.log.server:8090,maple2022:r@vct.trillian.log.server:8090,maple2023:w@vct.trillian.log.server:8090,maple2024:rw@vct.trillian.log.server:8090
+      - VCT_KMS_ENDPOINT=http://vct.kms:7878
+      - VCT_TIMEOUT=60
+      - VCT_DSN=mysql://root@tcp(vct.mysql:3306)/test?interpolateParams=true&multiStatements=true
+      - VCT_ISSUERS=maple2021@did:key:zUC724vuGvHpnCGFG1qqpXb81SiBLu3KLSqVzenwEZNPoY35i2Bscb8DLaVwHvRFs6F2NkNNXRcPWvqnPDUd9ukdjLkjZd3u9zzL4wDZDUpkPAatLDGLEYVo8kkAzuAKJQMr7N2,maple2020@did:key:zUC724vuGvHpnCGFG1qqpXb81SiBLu3KLSqVzenwEZNPoY35i2Bscb8DLaVwHvRFs6F2NkNNXRcPWvqnPDUd9ukdjLkjZd3u9zzL4wDZDUpkPAatLDGLEYVo8kkAzuAKJQMr7N7
+      - VCT_TLS_CACERTS=/etc/tls/vct.local.crt
+    volumes:
+      - ./keys/tls:/etc/tls
+    ports:
+      - 56562:56562
     command: start
     depends_on:
       - vct.mysql
