@@ -25,6 +25,7 @@ require (
 	github.com/ory/dockertest/v3 v3.6.3
 	github.com/piprate/json-gold v0.4.0
 	github.com/prometheus/client_golang v1.10.0
+	github.com/rs/cors v1.7.0
 	github.com/spf13/cobra v1.1.3
 	github.com/stretchr/testify v1.7.0
 	github.com/trustbloc/edge-core v0.1.7-0.20210310142750-7eb11997c4a9

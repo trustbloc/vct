@@ -9,3 +9,4 @@ build/
 gomocks_test.go
 coverage.out
 test/bdd/fixtures/vct/keys
+openAPI.yml

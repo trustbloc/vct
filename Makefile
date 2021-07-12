@@ -5,6 +5,9 @@
 GOBIN_PATH 		=$(abspath .)/build/bin
 LINT_VERSION 	?=v1.39.0
 MOCK_VERSION 	?=v1.5.0
+SWAGGER_VERSION ?=v0.27.0
+SWAGGER_DIR		="./test/bdd/fixtures/vct/specs"
+SWAGGER_OUTPUT	=$(SWAGGER_DIR)"/openAPI.yml"
 PROJECT_ROOT 	=github.com/trustbloc/vct
 
 DOCKER_OUTPUT_NS 	?=ghcr.io
@@ -26,7 +29,7 @@ endif
 all: clean checks unit-test bdd-test
 
 .PHONY: checks
-checks: license lint
+checks: clean license lint open-api-spec
 
 .PHONY: license
 license:
@@ -49,6 +52,16 @@ bdd-test: generate-test-keys build-vct-docker build-log-server-docker build-log-
 build-vct:
 	@echo "Building verifiable credentials transparency (vct)"
 	@go build -o build/bin/vct cmd/vct/main.go
+
+.PHONY: build-log-server
+build-log-server:
+	@echo "Building log server (log-server)"
+	@go build -o build/bin/log-server cmd/log_server/main.go
+
+.PHONY: build-log-signer
+build-log-signer:
+	@echo "Building log signer (log-signer)"
+	@go build -o build/bin/log-signer cmd/log_signer/main.go
 
 .PHONY: build-vct-dist
 build-vct-dist:
@@ -115,7 +128,7 @@ build-log-signer-docker:
 
 .PHONY: generate-test-keys
 generate-test-keys:
-	@mkdir -p test/bdd/fixtures/vct/keys/tls
+	@mkdir -p ./test/bdd/fixtures/vct/keys/tls
 	@docker run -i --rm \
 		-v $(abspath .):/opt/workspace/vct \
 		--entrypoint "/opt/workspace/vct/scripts/generate_test_keys.sh" \
@@ -124,12 +137,27 @@ generate-test-keys:
 .PHONY: clean
 clean:
 	@rm -rf ./build
-	@rm -rf test/bdd/fixtures/vct/keys
+	@rm -rf ./test/bdd/fixtures/vct/keys/tls
 	@rm -rf ./test/bdd/build
 	@rm -rf coverage.out
+	@rm -rf $(SWAGGER_DIR)
 	@find . -name "gomocks_test.go" -delete
 
 .PHONY: mocks
 mocks:
 	@GOBIN=$(GOBIN_PATH) go install github.com/golang/mock/mockgen@$(MOCK_VERSION)
 	@go generate ./...
+
+.PHONY: open-api-spec
+open-api-spec:
+	@GOBIN=$(GOBIN_PATH) go install github.com/go-swagger/go-swagger/cmd/swagger@$(SWAGGER_VERSION)
+	@echo "Generating Open API spec"
+	@mkdir $(SWAGGER_DIR)
+	@$(GOBIN_PATH)/swagger generate spec -w ./cmd/vct -o $(SWAGGER_OUTPUT)
+	@echo "Validating generated spec"
+	@$(GOBIN_PATH)/swagger validate $(SWAGGER_OUTPUT)
+
+.PHONY: run-open-api-demo
+run-open-api-demo: clean build-vct-docker build-log-server-docker build-log-signer-docker generate-test-keys open-api-spec
+	@echo "Running Open API demo on http://localhost:8089/openapi"
+	@docker-compose -f test/bdd/fixtures/vct/docker-compose.yml up --force-recreate -d vct.openapi.com
