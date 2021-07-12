@@ -41,6 +41,7 @@ import (
 	vdrkey "github.com/hyperledger/aries-framework-go/pkg/vdr/key"
 	vdrweb "github.com/hyperledger/aries-framework-go/pkg/vdr/web"
 	"github.com/hyperledger/aries-framework-go/spi/storage"
+	"github.com/rs/cors"
 	"github.com/spf13/cobra"
 	tlsutils "github.com/trustbloc/edge-core/pkg/utils/tls"
 	"google.golang.org/grpc"
@@ -500,7 +501,7 @@ func startAgent(parameters *agentParameters) error { // nolint: funlen
 
 	return parameters.server.ListenAndServe( // nolint: wrapcheck
 		parameters.host,
-		router,
+		cors.New(cors.Options{AllowedMethods: []string{http.MethodGet, http.MethodPost}}).Handler(router),
 		parameters.tlsParams.serveCertPath,
 		parameters.tlsParams.serveKeyPath,
 	)

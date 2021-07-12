@@ -86,7 +86,13 @@ func (c *Operation) GetRESTHandlers() []Handler {
 	}
 }
 
-// AddLdContext adds jsonld context.
+// AddLdContext swagger:route POST /{alias}/v1/context/add vct addLdContextRequest
+//
+// Adds jsonld context.
+//
+// Responses:
+//    default: genericError
+//        200: addLdContextResponse
 func (c *Operation) AddLdContext(w http.ResponseWriter, r *http.Request) {
 	var context bytes.Buffer
 
@@ -110,7 +116,13 @@ func (c *Operation) AddLdContext(w http.ResponseWriter, r *http.Request) {
 	execute(c.cmd.AddLdContext, w, bytes.NewBuffer(req))
 }
 
-// AddVC adds verifiable credential to log.
+// AddVC swagger:route POST /{alias}/v1/add-vc vct addVCRequest
+//
+// Adds verifiable credential to log.
+//
+// Responses:
+//    default: genericError
+//        200: addVCResponse
 func (c *Operation) AddVC(w http.ResponseWriter, r *http.Request) {
 	var vcEntry bytes.Buffer
 
@@ -134,17 +146,35 @@ func (c *Operation) AddVC(w http.ResponseWriter, r *http.Request) {
 	execute(c.cmd.AddVC, w, bytes.NewBuffer(req))
 }
 
-// GetSTH retrieves latest signed tree head.
+// GetSTH swagger:route GET /{alias}/v1/get-sth vct getSTHRequest
+//
+// Retrieves the latest signed tree head.
+//
+// Responses:
+//    default: genericError
+//        200: getSTHResponse
 func (c *Operation) GetSTH(w http.ResponseWriter, r *http.Request) {
 	execute(c.cmd.GetSTH, w, bytes.NewBufferString(fmt.Sprintf("%q", mux.Vars(r)[aliasVarName])))
 }
 
-// GetIssuers returns issuers.
+// GetIssuers swagger:route GET /{alias}/v1/get-issuers vct getIssuersRequest
+//
+// Returns issuers.
+//
+// Responses:
+//    default: genericError
+//        200: getIssuersResponse
 func (c *Operation) GetIssuers(w http.ResponseWriter, r *http.Request) {
 	execute(c.cmd.GetIssuers, w, bytes.NewBufferString(fmt.Sprintf("%q", mux.Vars(r)[aliasVarName])))
 }
 
-// HealthCheck returns status.
+// HealthCheck swagger:route GET /healthcheck vct healthCheckRequest
+//
+// Returns health check status.
+//
+// Responses:
+//    default: genericError
+//        200: healthCheckResponse
 func (c *Operation) HealthCheck(w http.ResponseWriter, _ *http.Request) {
 	execute(func(rw io.Writer, req io.Reader) error {
 		return json.NewEncoder(rw).Encode(map[string]interface{}{ // nolint: wrapcheck
@@ -154,12 +184,24 @@ func (c *Operation) HealthCheck(w http.ResponseWriter, _ *http.Request) {
 	}, w, nil)
 }
 
-// Webfinger returns discovery info.
+// Webfinger swagger:route GET /{alias}/.well-known/webfinger vct webfingerRequest
+//
+// Returns discovery info.
+//
+// Responses:
+//    default: genericError
+//        200: webfingerResponse
 func (c *Operation) Webfinger(w http.ResponseWriter, r *http.Request) {
 	execute(c.cmd.Webfinger, w, bytes.NewBufferString(fmt.Sprintf("%q", mux.Vars(r)[aliasVarName])))
 }
 
-// GetSTHConsistency retrieves merkle consistency proofs between signed tree heads.
+// GetSTHConsistency swagger:route GET /{alias}/v1/get-sth-consistency vct getSTHConsistencyRequest
+//
+// Retrieves merkle consistency proofs between signed tree heads.
+//
+// Responses:
+//    default: genericError
+//        200: getSTHConsistencyResponse
 func (c *Operation) GetSTHConsistency(w http.ResponseWriter, r *http.Request) {
 	const (
 		firstParamName  = "first"
@@ -194,7 +236,13 @@ func (c *Operation) GetSTHConsistency(w http.ResponseWriter, r *http.Request) {
 	execute(c.cmd.GetSTHConsistency, w, bytes.NewBuffer(req))
 }
 
-// GetProofByHash retrieves Merkle Audit proof from Log by leaf hash.
+// GetProofByHash swagger:route GET /{alias}/v1/get-proof-by-hash vct getProofByHashRequest
+//
+// Retrieves Merkle Audit proof from Log by leaf hash.
+//
+// Responses:
+//    default: genericError
+//        200: getProofByHashResponse
 func (c *Operation) GetProofByHash(w http.ResponseWriter, r *http.Request) {
 	const (
 		hashParamName     = "hash"
@@ -222,7 +270,13 @@ func (c *Operation) GetProofByHash(w http.ResponseWriter, r *http.Request) {
 	execute(c.cmd.GetProofByHash, w, bytes.NewBuffer(req))
 }
 
-// GetEntries retrieves entries from log.
+// GetEntries swagger:route GET /{alias}/v1/get-entries vct getEntriesRequest
+//
+// Retrieves entries from log.
+//
+// Responses:
+//    default: genericError
+//        200: getEntriesResponse
 func (c *Operation) GetEntries(w http.ResponseWriter, r *http.Request) {
 	const (
 		startParamName = "start"
@@ -257,7 +311,13 @@ func (c *Operation) GetEntries(w http.ResponseWriter, r *http.Request) {
 	execute(c.cmd.GetEntries, w, bytes.NewBuffer(req))
 }
 
-// GetEntryAndProof retrieves entry and merkle audit proof from log.
+// GetEntryAndProof swagger:route GET /{alias}/v1/get-entry-and-proof vct getEntryAndProofRequest
+//
+// Retrieves entry and merkle audit proof from log.
+//
+// Responses:
+//    default: genericError
+//        200: getEntryAndProofResponse
 func (c *Operation) GetEntryAndProof(w http.ResponseWriter, r *http.Request) {
 	const (
 		leafIndexParamName = "leaf_index"

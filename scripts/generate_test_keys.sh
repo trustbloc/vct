@@ -11,9 +11,7 @@ echo "Generating test certs ..."
 
 cd /opt/workspace/vct
 
-CERTS_OUTPUT_DIR=test/bdd/fixtures/vct/keys/tls
-
-mkdir -p ${CERTS_OUTPUT_DIR}
+CERTS_OUTPUT_DIR=${CERTS_OUTPUT_DIR:-test/bdd/fixtures/vct/keys/tls}
 
 trustblocSSLConf=$(mktemp)
 echo "subjectKeyIdentifier=hash

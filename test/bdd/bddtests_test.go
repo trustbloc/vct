@@ -55,10 +55,12 @@ func getCmdArg(argName string) string {
 	return ""
 }
 
+const composeFile = "./fixtures/vct/docker-compose.yml"
+
 // nolint: gochecknoglobals
 var (
-	dockerComposeUp   = []string{"docker-compose", "-f", "./fixtures/vct/docker-compose.yml", "up", "-d"}
-	dockerComposeDown = []string{"docker-compose", "-f", "./fixtures/vct/docker-compose.yml", "down"}
+	dockerComposeUp   = []string{"docker-compose", "-f", composeFile, "up", "--force-recreate", "-d"}
+	dockerComposeDown = []string{"docker-compose", "-f", composeFile, "down"}
 )
 
 func runBddTests(tags, format string) int {
