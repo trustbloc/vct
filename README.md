@@ -40,11 +40,16 @@ To deploy the service you would need to build them first.
 
 1. Run the log-server.
 
-Log server depends on the database. To run DB you can simply use `docker-compose` for that.
+Log server depends on the database.
+First, you need to build a database docker image. Use the following command to to that:
+
+`make build-mysql-docker`
+
+To run DB you can simply use `docker-compose` for that.
 
 NOTE: We support MySQL and Postgres. If you run your own DB service, do not forget to import schema.
-See [MySQL schema](https://github.com/trustbloc/vct/blob/main/test/bdd/fixtures/vct/mysql-config/mysql_config.sql)
-and [Postgres schema](https://github.com/trustbloc/vct/blob/main/test/bdd/fixtures/vct/postgres-config/postgres_config.sql).
+See [MySQL schema](https://github.com/trustbloc/vct/blob/main/images/db/mysql/storage.sql)
+and [Postgres schema](https://github.com/trustbloc/vct/blob/main/images/db/postgres/storage.sql).
 
 Run MySQL by using `docker-compose`:
 

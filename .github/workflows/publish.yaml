@@ -30,6 +30,8 @@ jobs:
           echo "IMAGE_PREFIX_VCT"=ghcr.io/trustbloc/vct >> $GITHUB_ENV
           echo "IMAGE_PREFIX_LOG_SERVER"=ghcr.io/trustbloc/vct-log-server >> $GITHUB_ENV
           echo "IMAGE_PREFIX_LOG_SIGNER"=ghcr.io/trustbloc/vct-log-signer >> $GITHUB_ENV
+          echo "IMAGE_PREFIX_MYSQL"=ghcr.io/trustbloc/vct-mysql >> $GITHUB_ENV
+          echo "IMAGE_PREFIX_POSTGRES"=ghcr.io/trustbloc/vct-postgres >> $GITHUB_ENV
 
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v1
@@ -88,6 +90,26 @@ jobs:
           tags: |
             ${{ env.IMAGE_PREFIX_LOG_SIGNER }}:${{ env.IMAGE_TAG }}
             ${{ env.IMAGE_PREFIX_LOG_SIGNER }}:latest
+
+      - name: Build and Push container images (mysql)
+        uses: docker/build-push-action@v2
+        with:
+          context: .
+          file: ./images/db/mysql/Dockerfile
+          push: true
+          tags: |
+            ${{ env.IMAGE_PREFIX_MYSQL }}:${{ env.IMAGE_TAG }}
+            ${{ env.IMAGE_PREFIX_MYSQL }}:latest
+
+      - name: Build and Push container images (postgres)
+        uses: docker/build-push-action@v2
+        with:
+          context: .
+          file: ./images/db/postgres/Dockerfile
+          push: true
+          tags: |
+            ${{ env.IMAGE_PREFIX_POSTGRES }}:${{ env.IMAGE_TAG }}
+            ${{ env.IMAGE_PREFIX_POSTGRES }}:latest
 
       - name: Build binaries (vct)
         run: make build-vct-dist build-log-server-dist build-log-signer-dist

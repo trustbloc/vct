@@ -12,6 +12,8 @@ PROJECT_ROOT 	=github.com/trustbloc/vct
 
 DOCKER_OUTPUT_NS 	?=ghcr.io
 VCT_IMAGE_NAME 		?=trustbloc/vct
+MYSQL_IMAGE_NAME 	?=trustbloc/vct-mysql
+POSTGRES_IMAGE_NAME ?=trustbloc/vct-postgres
 LOG_SERVER_IMAGE_NAME ?=trustbloc/vct-log-server
 LOG_SIGNER_IMAGE_NAME ?=trustbloc/vct-log-signer
 
@@ -45,7 +47,7 @@ unit-test: mocks
 	@go test $(shell go list ./... | grep -v /test/bdd) -count=1 -race -coverprofile=coverage.out -covermode=atomic -timeout=10m
 
 .PHONY: bdd-test
-bdd-test: generate-test-keys build-vct-docker build-log-server-docker build-log-signer-docker
+bdd-test: generate-test-keys build-mysql-docker build-postgres-docker build-vct-docker build-log-server-docker build-log-signer-docker
 	@go test github.com/trustbloc/vct/test/bdd -count=1 -v -cover . -p 1 -timeout=20m -race
 
 .PHONY: build-vct
@@ -110,6 +112,17 @@ build-vct-docker:
 	--build-arg APP_FOLDER=vct \
 	--build-arg ALPINE_VER=$(ALPINE_VER)  .
 
+.PHONY: build-mysql-docker
+build-mysql-docker:
+	@echo "Building mysql docker image"
+	@docker build -f ./images/db/mysql/Dockerfile --no-cache -t $(DOCKER_OUTPUT_NS)/$(MYSQL_IMAGE_NAME):latest .
+
+
+.PHONY: build-postgres-docker
+build-postgres-docker:
+	@echo "Building postgres docker image"
+	@docker build -f ./images/db/postgres/Dockerfile --no-cache -t $(DOCKER_OUTPUT_NS)/$(POSTGRES_IMAGE_NAME):latest .
+
 .PHONY: build-log-server-docker
 build-log-server-docker:
 	@echo "Building log server docker image"
@@ -158,6 +171,6 @@ open-api-spec:
 	@$(GOBIN_PATH)/swagger validate $(SWAGGER_OUTPUT)
 
 .PHONY: run-open-api-demo
-run-open-api-demo: clean build-vct-docker build-log-server-docker build-log-signer-docker generate-test-keys open-api-spec
+run-open-api-demo: clean build-mysql-docker build-postgres-docker build-vct-docker build-log-server-docker build-log-signer-docker generate-test-keys open-api-spec
 	@echo "Running Open API demo on http://localhost:8089/openapi"
 	@docker-compose -f test/bdd/fixtures/vct/docker-compose.yml up --force-recreate -d vct.openapi.com
