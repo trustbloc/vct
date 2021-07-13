@@ -17,8 +17,6 @@ services:
     environment:
       - MYSQL_ALLOW_EMPTY_PASSWORD=true
       - MYSQL_DATABASE=test
-    volumes:
-      - ./mysql-config:/docker-entrypoint-initdb.d
     networks:
       - witness_ledger_net
     ports:
@@ -28,8 +26,6 @@ services:
     container_name: vct.postgres
     image: postgres:13
     restart: always
-    volumes:
-      - ./postgres-config/postgres_config.sql:/docker-entrypoint-initdb.d/postgres_config.sql
     environment:
       - POSTGRES_PASSWORD=password
       - POSTGRES_DB=test
@@ -118,7 +114,7 @@ services:
 
   vct.kms:
     container_name: vct.kms
-    image: ghcr.io/trustbloc-cicd/kms:0.1.7-snapshot-bff24d1
+    image: ghcr.io/trustbloc-cicd/kms:0.1.7-snapshot-cb16814
     restart: always
     environment:
       - KMS_BASE_URL=http://vct.kms:7878
