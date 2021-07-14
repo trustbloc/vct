@@ -43,7 +43,9 @@ import (
 	"google.golang.org/grpc"
 
 	"github.com/trustbloc/vct/cmd/internal/serverutil"
+	mysqlschema "github.com/trustbloc/vct/pkg/storage/mysql/schema"
 	_ "github.com/trustbloc/vct/pkg/storage/postgres"
+	postgresschema "github.com/trustbloc/vct/pkg/storage/postgres/schema"
 )
 
 var logger = log.New("log-server")
@@ -74,9 +76,11 @@ var (
 	tracingPercent   = flag.Int("tracing_percent", 0, "Percent of requests to be traced. Zero is a special case to use the DefaultSampler")
 
 	configFile = flag.String("config", "", "Config file containing flags, file contents can be overridden by command line flags")
+
+	_ = flag.String("import_conn_str", "", "Connection string for Postgres or MySQL database")
 )
 
-func main() { // nolint: funlen
+func main() { // nolint: funlen,gocyclo,cyclop
 	flag.Parse()
 
 	if *configFile != "" {
@@ -100,6 +104,18 @@ func main() { // nolint: funlen
 		}
 		// Enable the server request counter tracing etc.
 		options = append(options, opts...)
+	}
+
+	if *storageSystem == "postgres" {
+		if err := serverutil.ImportPostgres(string(postgresschema.SQL)); err != nil {
+			logger.Fatalf("Failed to load %s schema: %v", *storageSystem, err)
+		}
+	}
+
+	if *storageSystem == "mysql" {
+		if err := serverutil.ImportMySQL(strings.Split(string(mysqlschema.SQL), ";")...); err != nil {
+			logger.Fatalf("Failed to load %s schema: %v", *storageSystem, err)
+		}
 	}
 
 	sp, err := storage.NewProvider(*storageSystem, mf)

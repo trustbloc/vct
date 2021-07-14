@@ -44,7 +44,9 @@ import (
 	"google.golang.org/grpc"
 
 	"github.com/trustbloc/vct/cmd/internal/serverutil"
+	mysqlschema "github.com/trustbloc/vct/pkg/storage/mysql/schema"
 	_ "github.com/trustbloc/vct/pkg/storage/postgres"
+	postgresschema "github.com/trustbloc/vct/pkg/storage/postgres/schema"
 )
 
 var logger = arieslog.New("log-signer")
@@ -84,9 +86,11 @@ var (
 	masterHoldJitter   = flag.Duration("master_hold_jitter", defaultMasterHoldJitter, "Maximal random addition to --master_hold_interval")
 
 	configFile = flag.String("config", "", "Config file containing flags, file contents can be overridden by command line flags")
+
+	_ = flag.String("import_conn_str", "", "Connection string for Postgres or MySQL database")
 )
 
-func main() { // nolint: funlen
+func main() { // nolint: funlen,cyclop
 	flag.Parse()
 
 	if *configFile != "" {
@@ -100,6 +104,18 @@ func main() { // nolint: funlen
 	mf := prometheus.MetricFactory{}
 
 	monitoring.SetStartSpan(opencensus.StartSpan)
+
+	if *storageSystem == "postgres" {
+		if err := serverutil.ImportPostgres(string(postgresschema.SQL)); err != nil {
+			logger.Fatalf("Failed to load %s schema: %v", *storageSystem, err)
+		}
+	}
+
+	if *storageSystem == "mysql" {
+		if err := serverutil.ImportMySQL(strings.Split(string(mysqlschema.SQL), ";")...); err != nil {
+			logger.Fatalf("Failed to load %s schema: %v", *storageSystem, err)
+		}
+	}
 
 	sp, err := storage.NewProvider(*storageSystem, mf)
 	if err != nil {
