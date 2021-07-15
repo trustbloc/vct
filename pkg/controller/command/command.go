@@ -132,6 +132,10 @@ func New(cfg *Config) (*Cmd, error) {
 		return nil, fmt.Errorf("export pub key bytes: %w", err)
 	}
 
+	if len(pubBytes) == 0 {
+		return nil, fmt.Errorf("public key is empty")
+	}
+
 	logs := make(map[string]Log)
 	for _, log := range cfg.Logs {
 		logs[log.Alias] = log

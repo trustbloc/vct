@@ -575,7 +575,11 @@ func getOrInit(cfg storage.Store, key string, v interface{}, initFn func() (inte
 		var src2 []byte
 
 		src2, err = cfg.Get(key)
-		if err != nil && !errors.Is(err, storage.ErrDataNotFound) {
+		if err != nil && errors.Is(err, storage.ErrDataNotFound) {
+			return getOrInit(cfg, key, v, initFn, timeout)
+		}
+
+		if err != nil {
 			return fmt.Errorf("get config value for %q: %w", key, err)
 		}
 
