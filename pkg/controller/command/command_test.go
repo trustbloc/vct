@@ -78,6 +78,25 @@ func TestNew(t *testing.T) {
 		require.NotNil(t, cmd)
 	})
 
+	t.Run("Empty key", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		defer ctrl.Finish()
+
+		km := NewMockKeyManager(ctrl)
+		km.EXPECT().Get(kid).Return(nil, nil)
+		km.EXPECT().ExportPubKeyBytes(kid).Return(nil, nil)
+
+		cmd, err := New(&Config{
+			KMS: km, Key: Key{
+				ID:   kid,
+				Type: kms.ECDSAP256TypeDER,
+			},
+			StorageProvider: mem.NewProvider(),
+		})
+		require.EqualError(t, err, "public key is empty")
+		require.Nil(t, cmd)
+	})
+
 	t.Run("Key is not supported", func(t *testing.T) {
 		cmd, err := New(&Config{Key: Key{Type: "test"}})
 		require.EqualError(t, err, "key type test is not supported")
