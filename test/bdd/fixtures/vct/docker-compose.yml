@@ -7,21 +7,6 @@
 version: '2'
 
 services:
-
-  vct.mysql:
-    container_name: vct.mysql
-    image: mysql:8.0.25
-    restart: always
-    cap_add:
-      - SYS_NICE
-    environment:
-      - MYSQL_ALLOW_EMPTY_PASSWORD=true
-      - MYSQL_DATABASE=test
-    networks:
-      - witness_ledger_net
-    ports:
-      - 3306:3306
-
   vct.postgres:
     container_name: vct.postgres
     image: postgres:13
@@ -151,7 +136,7 @@ services:
       - VCT_LOGS=maple2020:rw@vct.trillian.log.server:8090,maple2021:rw@vct.trillian.log.server:8090,maple2022:r@vct.trillian.log.server:8090,maple2023:w@vct.trillian.log.server:8090,maple2024:rw@vct.trillian.log.server:8090
       - VCT_KMS_ENDPOINT=http://vct.kms:7878
       - VCT_TIMEOUT=60
-      - VCT_DSN=mysql://root@tcp(vct.mysql:3306)/test?interpolateParams=true&multiStatements=true
+      - VCT_DSN=couchdb://admin:password@vct.couchdb:5984
       - VCT_ISSUERS=maple2021@did:key:zUC724vuGvHpnCGFG1qqpXb81SiBLu3KLSqVzenwEZNPoY35i2Bscb8DLaVwHvRFs6F2NkNNXRcPWvqnPDUd9ukdjLkjZd3u9zzL4wDZDUpkPAatLDGLEYVo8kkAzuAKJQMr7N2,maple2020@did:key:zUC724vuGvHpnCGFG1qqpXb81SiBLu3KLSqVzenwEZNPoY35i2Bscb8DLaVwHvRFs6F2NkNNXRcPWvqnPDUd9ukdjLkjZd3u9zzL4wDZDUpkPAatLDGLEYVo8kkAzuAKJQMr7N7
       - VCT_TLS_CACERTS=/etc/tls/vct.local.crt
     volumes:
@@ -160,7 +145,7 @@ services:
       - 56561:56561
     command: start
     depends_on:
-      - vct.mysql
+      - vct.couchdb
       - vct.kms
       - vct.trillian.log.server
     networks:
@@ -176,7 +161,7 @@ services:
       - VCT_LOGS=maple2020:rw@vct.trillian.log.server:8090,maple2021:rw@vct.trillian.log.server:8090,maple2022:r@vct.trillian.log.server:8090,maple2023:w@vct.trillian.log.server:8090,maple2024:rw@vct.trillian.log.server:8090
       - VCT_KMS_ENDPOINT=http://vct.kms:7878
       - VCT_TIMEOUT=60
-      - VCT_DSN=mysql://root@tcp(vct.mysql:3306)/test?interpolateParams=true&multiStatements=true
+      - VCT_DSN=couchdb://admin:password@vct.couchdb:5984
       - VCT_ISSUERS=maple2021@did:key:zUC724vuGvHpnCGFG1qqpXb81SiBLu3KLSqVzenwEZNPoY35i2Bscb8DLaVwHvRFs6F2NkNNXRcPWvqnPDUd9ukdjLkjZd3u9zzL4wDZDUpkPAatLDGLEYVo8kkAzuAKJQMr7N2,maple2020@did:key:zUC724vuGvHpnCGFG1qqpXb81SiBLu3KLSqVzenwEZNPoY35i2Bscb8DLaVwHvRFs6F2NkNNXRcPWvqnPDUd9ukdjLkjZd3u9zzL4wDZDUpkPAatLDGLEYVo8kkAzuAKJQMr7N7
       - VCT_TLS_CACERTS=/etc/tls/vct.local.crt
     volumes:
@@ -185,7 +170,7 @@ services:
       - 56562:56562
     command: start
     depends_on:
-      - vct.mysql
+      - vct.couchdb
       - vct.kms
       - vct.trillian.log.server
     networks:
