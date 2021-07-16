@@ -141,8 +141,6 @@ services:
       - VCT_TLS_CACERTS=/etc/tls/vct.local.crt
     volumes:
       - ./keys/tls:/etc/tls
-    ports:
-      - 56561:56561
     command: start
     depends_on:
       - vct.couchdb
@@ -166,8 +164,6 @@ services:
       - VCT_TLS_CACERTS=/etc/tls/vct.local.crt
     volumes:
       - ./keys/tls:/etc/tls
-    ports:
-      - 56562:56562
     command: start
     depends_on:
       - vct.couchdb
