@@ -99,7 +99,7 @@ services:
 
   vct.kms:
     container_name: vct.kms
-    image: ghcr.io/trustbloc-cicd/kms:0.1.7-snapshot-cb16814
+    image: ghcr.io/trustbloc-cicd/kms:0.1.7-snapshot-03d0af8
     restart: always
     environment:
       - KMS_BASE_URL=http://vct.kms:7878
@@ -137,6 +137,7 @@ services:
       - VCT_KMS_ENDPOINT=http://vct.kms:7878
       - VCT_TIMEOUT=60
       - VCT_DSN=couchdb://admin:password@vct.couchdb:5984
+      - VCT_DATABASE_PREFIX=vctdb
       - VCT_ISSUERS=maple2021@did:key:zUC724vuGvHpnCGFG1qqpXb81SiBLu3KLSqVzenwEZNPoY35i2Bscb8DLaVwHvRFs6F2NkNNXRcPWvqnPDUd9ukdjLkjZd3u9zzL4wDZDUpkPAatLDGLEYVo8kkAzuAKJQMr7N2,maple2020@did:key:zUC724vuGvHpnCGFG1qqpXb81SiBLu3KLSqVzenwEZNPoY35i2Bscb8DLaVwHvRFs6F2NkNNXRcPWvqnPDUd9ukdjLkjZd3u9zzL4wDZDUpkPAatLDGLEYVo8kkAzuAKJQMr7N7
       - VCT_TLS_CACERTS=/etc/tls/vct.local.crt
     volumes:
@@ -160,6 +161,7 @@ services:
       - VCT_KMS_ENDPOINT=http://vct.kms:7878
       - VCT_TIMEOUT=60
       - VCT_DSN=couchdb://admin:password@vct.couchdb:5984
+      - VCT_DATABASE_PREFIX=vctdb
       - VCT_ISSUERS=maple2021@did:key:zUC724vuGvHpnCGFG1qqpXb81SiBLu3KLSqVzenwEZNPoY35i2Bscb8DLaVwHvRFs6F2NkNNXRcPWvqnPDUd9ukdjLkjZd3u9zzL4wDZDUpkPAatLDGLEYVo8kkAzuAKJQMr7N2,maple2020@did:key:zUC724vuGvHpnCGFG1qqpXb81SiBLu3KLSqVzenwEZNPoY35i2Bscb8DLaVwHvRFs6F2NkNNXRcPWvqnPDUd9ukdjLkjZd3u9zzL4wDZDUpkPAatLDGLEYVo8kkAzuAKJQMr7N7
       - VCT_TLS_CACERTS=/etc/tls/vct.local.crt
     volumes:

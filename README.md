@@ -85,6 +85,46 @@ The vct server by default will be run on `localhost:5678`.
 
 Use help flag to find out all available flags `./build/bin/vct -h`.
 
+## Databases
+
+### VCT Storage
+
+VCT uses Aries generic storage interface for storing data.
+Backup should be done similarly to other trustbloc projects.
+In VCT we support the following databases:
+* CouchDB
+* MySQL
+* Memory (backup is not supported)
+
+Use the database-specific command to get all databases and filter them by `VCT_DATABASE_PREFIX` env.
+
+For instance, to get all databases for CouchDB use the following command:
+```
+curl -X GET http://admin:password@127.0.0.1:5984/_all_dbs
+```
+Output:
+```
+["_replicator","_users","kmspkprimarykey","vctdbmaple2021jsonldcontexts","vctdbconfig"]
+```
+
+Then, filter databases from the output above by `VCT_DATABASE_PREFIX=vctdb` env.
+Databases we need to backup are `vctdbmaple2021jsonldcontexts` and `vctdbconfig`
+Make a backup according to CouchDB documentation.
+
+### Trillian Storage
+
+For Trillian we support the following databases:
+* Postgres
+* MySQL
+
+Backup should be done according to the official documentation (Postgres or MySQL).
+
+See schemas for better understanding:
+* [MySQL schema](https://github.com/trustbloc/vct/blob/main/test/bdd/fixtures/vct/mysql-config/mysql_config.sql)
+* [Postgres schema](https://github.com/trustbloc/vct/blob/main/test/bdd/fixtures/vct/postgres-config/postgres_config.sql).
+
+Note: If you want to restore a backup from the ground up make sure that schema was imported first.
+
 ## Contributing
 
 Thank you for your interest in contributing. Please see our [community contribution guidelines](https://github.com/trustbloc/community/blob/master/CONTRIBUTING.md) for more information.
