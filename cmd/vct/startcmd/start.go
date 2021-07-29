@@ -411,7 +411,7 @@ func startAgent(parameters *agentParameters) error { // nolint: funlen
 		}
 	}()
 
-	configStore, err := store.OpenStore("vct-config")
+	configStore, err := store.OpenStore("config")
 	if err != nil {
 		return fmt.Errorf("open store: %w", err)
 	}
