@@ -85,6 +85,56 @@ The vct server by default will be run on `localhost:5678`.
 
 Use help flag to find out all available flags `./build/bin/vct -h`.
 
+## Configuration
+
+To get help about startup options use the following command:
+
+```$ ./build/bin/vct start -h```
+The output should be similar to this:
+
+```
+Starts verifiable credentials transparency service
+
+Usage:
+  vct start [flags]
+
+Flags:
+  -a, --api-host string             Host Name:Port. Alternatively, this can be set with the following environment variable: VCT_API_HOST (default ":5678")
+      --base-url string             Base URL. e.g (https://vct.com) Alternatively, this can be set with the following environment variable: VCT_BASE_URL
+      --database-prefix string      An optional prefix to be used when creating and retrieving underlying databases.  Alternatively, this can be set with the following environment variable: VCT_DATABASE_PREFIX
+      --dev-mode string             Enable dev mode. Alternatively, this can be set with the following environment variable: VCT_DEV_MODE
+  -d, --dsn string                  Datasource Name with credentials if required. Format must be <driver>:[//]<driver-specific-dsn>. Examples: 'mysql://root:secret@tcp(localhost:3306)/adapter', 'mem://test'. Supported drivers are [mem, couchdb, mysql]. Alternatively, this can be set with the following environment variable: VCT_DSN (default "mem://test")
+  -h, --help                        help for start
+      --issuers string              Comma-Separated list of supported issuers. Alternatively, this can be set with the following environment variable: VCT_ISSUERS
+  -s, --kms-endpoint string         Remote KMS URL. Alternatively, this can be set with the following environment variable: VCT_KMS_ENDPOINT
+  -l, --logs string                 Trillian logs comma separated.  Format must be <alias>:<permission>@<endpoint>. Examples: maple2021:rw@server.com,maple2020:r@server.com:9890 Alternatively, this can be set with the following environment variable: VCT_LOGS
+      --sync-timeout string         Total time in seconds to resolve config values. Alternatively, this can be set with the following environment variable: VCT_SYNC_TIMEOUT (default "3")
+      --timeout string              Total time in seconds to wait until the services are available before giving up. Alternatively, this can be set with the following environment variable: VCT_TIMEOUT (default "0")
+      --tls-cacerts string          Comma-Separated list of ca certs path. Alternatively, this can be set with the following environment variable: VCT_TLS_CACERTS
+      --tls-serve-cert string       Path to the server certificate to use when serving HTTPS. Alternatively, this can be set with the following environment variable: VCT_TLS_SERVE_CERT
+      --tls-serve-key string        Path to the private key to use when serving HTTPS. Alternatively, this can be set with the following environment variable: VCT_TLS_SERVE_KEY
+      --tls-systemcertpool string   Use system certificate pool. Possible values [true] [false]. Defaults to false if not set. Alternatively, this can be set with the following environment variable: VCT_TLS_SYSTEMCERTPOOL (default "false")
+```
+
+Each parameter has a description. It should not be hard to start a service.
+Only one parameter is required to launch a service and requires extra explanation.
+This is `--logs` flag. It describes the ledger per tenant.
+
+For example, let's take a look at the following configuration:
+
+e.g  `--logs=maple2020:rw@127.0.0.1:8090,maple2021:rw@127.0.0.1:8090`
+
+It means that we have two tenants (maple2020 and maple2021).
+Both of them have read/write permissions(rw) and they are using the same Trillian log server (127.0.0.1:8090).
+You can set permissions to `r,w` or `rw`. e.g `maple2020:r@127.0.0.1:8090` (only read).
+Under the hood, the service will create a new log id per tenant and map it to its alias.
+e.g `maple2020` might be mapped to `11715276152711`.
+Where `11715276152711` is created by Trillian.
+That correlation will be stored in the DB. So, next time when vct service will be up and running we will not create a new log id.
+
+VCT depends on [Trillian log server/signer](https://github.com/google/trillian).
+Deployment should be done similar to [trillian deployments](https://github.com/google/trillian/tree/master/deployment#trillian-supported-deployments).
+
 ## Databases
 
 ### VCT Storage
