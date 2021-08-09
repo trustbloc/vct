@@ -61,6 +61,12 @@ const (
 	agentHostFlagUsage     = "Host Name:Port." +
 		" Alternatively, this can be set with the following environment variable: " + agentHostEnvKey
 
+	agentMetricsHostFlagName      = "metrics-host"
+	agentMetricsHostEnvKey        = envPrefix + "METRICS_HOST"
+	agentMetricsHostFlagShorthand = "m"
+	agentMetricsHostFlagUsage     = "Metrics host Name:Port." +
+		" Alternatively, this can be set with the following environment variable: " + agentMetricsHostEnvKey
+
 	logsFlagName      = "logs"
 	logsEnvKey        = envPrefix + "LOGS"
 	logsFlagShorthand = "l"
@@ -197,6 +203,7 @@ func Cmd(server server) (*cobra.Command, error) {
 type agentParameters struct {
 	logs           []command.Log
 	host           string
+	metricsHost    string
 	baseURL        string
 	datasourceName string
 	timeout        uint64
@@ -268,6 +275,7 @@ func createStartCMD(server server) *cobra.Command { //nolint: funlen
 		Long:  `Starts verifiable credentials transparency service`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			host := getUserSetVarOptional(cmd, agentHostFlagName, agentHostEnvKey)
+			metricsHost := getUserSetVarOptional(cmd, agentMetricsHostFlagName, agentMetricsHostEnvKey)
 			kmsEndpoint := getUserSetVarOptional(cmd, kmsEndpointFlagName, kmsEndpointEnvKey)
 			datasourceName := getUserSetVarOptional(cmd, datasourceNameFlagName, datasourceNameEnvKey)
 			databasePrefix := getUserSetVarOptional(cmd, databasePrefixFlagName, databasePrefixEnvKey)
@@ -314,6 +322,7 @@ func createStartCMD(server server) *cobra.Command { //nolint: funlen
 			parameters := &agentParameters{
 				server:         server,
 				host:           host,
+				metricsHost:    metricsHost,
 				logs:           parseLogs(logsVal, issuers),
 				timeout:        timeout,
 				syncTimeout:    syncTimeout,
@@ -492,13 +501,22 @@ func startAgent(parameters *agentParameters) error { // nolint: funlen
 		return fmt.Errorf("create command instance: %w", err)
 	}
 
-	router := mux.NewRouter()
+	var (
+		router        = mux.NewRouter()
+		metricsRouter = mux.NewRouter()
+	)
 
 	mf := prometheus.MetricFactory{}
 
 	for _, handler := range rest.New(cmd, mf).GetRESTHandlers() {
-		router.HandleFunc(handler.Path(), handler.Handle()).Methods(handler.Method())
+		if handler.Path() == rest.MetricsPath {
+			metricsRouter.HandleFunc(handler.Path(), handler.Handle()).Methods(handler.Method())
+		} else {
+			router.HandleFunc(handler.Path(), handler.Handle()).Methods(handler.Method())
+		}
 	}
+
+	go startMetrics(parameters, metricsRouter)
 
 	logger.Infof("Starting vct on host [%s]", parameters.host)
 
@@ -508,6 +526,13 @@ func startAgent(parameters *agentParameters) error { // nolint: funlen
 		parameters.tlsParams.serveCertPath,
 		parameters.tlsParams.serveKeyPath,
 	)
+}
+
+func startMetrics(parameters *agentParameters, route *mux.Router) {
+	err := parameters.server.ListenAndServe(parameters.metricsHost, route, "", "")
+	if err != nil {
+		logger.Fatalf("%v", err)
+	}
 }
 
 type webVDR struct {
@@ -631,6 +656,7 @@ func getUserSetVar(cmd *cobra.Command, flagName, envKey string, isOptional bool)
 
 func createFlags(startCmd *cobra.Command) {
 	startCmd.Flags().StringP(agentHostFlagName, agentHostFlagShorthand, ":5678", agentHostFlagUsage)
+	startCmd.Flags().StringP(agentMetricsHostFlagName, agentMetricsHostFlagShorthand, ":9099", agentMetricsHostFlagUsage)
 	startCmd.Flags().StringP(logsFlagName, logsFlagShorthand, "", logsFlagUsage)
 	startCmd.Flags().StringP(kmsEndpointFlagName, kmsEndpointFlagShorthand, "", kmsEndpointFlagUsage)
 	startCmd.Flags().StringP(datasourceNameFlagName, datasourceNameFlagShorthand, "mem://test", datasourceNameFlagUsage)
