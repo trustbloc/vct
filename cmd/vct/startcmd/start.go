@@ -21,6 +21,7 @@ import (
 
 	"github.com/cenkalti/backoff/v4"
 	"github.com/google/trillian"
+	"github.com/google/trillian/monitoring/prometheus"
 	"github.com/google/uuid"
 	"github.com/gorilla/mux"
 	"github.com/hyperledger/aries-framework-go-ext/component/storage/couchdb"
@@ -493,7 +494,9 @@ func startAgent(parameters *agentParameters) error { // nolint: funlen
 
 	router := mux.NewRouter()
 
-	for _, handler := range rest.New(cmd).GetRESTHandlers() {
+	mf := prometheus.MetricFactory{}
+
+	for _, handler := range rest.New(cmd, mf).GetRESTHandlers() {
 		router.HandleFunc(handler.Path(), handler.Handle()).Methods(handler.Method())
 	}
 
