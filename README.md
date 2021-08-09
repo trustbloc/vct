@@ -64,8 +64,7 @@ Log signer must be run with the same DB configuration as a `log-server`.
 Log signer will start the RPC server on `localhost:8090` and  HTTP server on `localhost:8091`.
 Since those ports are already occupied by the `log-server`, let's change them.
 
-`./build/bin/log-signer --pg_conn_str="user=postgres host=localhost password=password dbname=test port=5432 sslmode=disable" --storage_system=postgres --force_master=true --h
-ttp_endpoint=0.0.0.0:8099 --rpc_endpoint=0.0.0.0:8098 --quota_system=noop`
+`./build/bin/log-signer --pg_conn_str="user=postgres host=localhost password=password dbname=test port=5432 sslmode=disable" --storage_system=postgres --force_master=true --http_endpoint=0.0.0.0:8099 --rpc_endpoint=0.0.0.0:8098 --quota_system=noop`
 
 Use help flag to find out all available flags `./build/bin/log-signer -h`.
 
