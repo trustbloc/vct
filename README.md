@@ -46,13 +46,13 @@ NOTE: We support MySQL and Postgres. If you run your own DB service, do not forg
 See [MySQL schema](https://github.com/trustbloc/vct/blob/main/test/bdd/fixtures/vct/mysql-config/mysql_config.sql)
 and [Postgres schema](https://github.com/trustbloc/vct/blob/main/test/bdd/fixtures/vct/postgres-config/postgres_config.sql).
 
-Run MySQL by using `docker-compose`:
+Run `Postgres` by using `docker-compose`:
 
-`cd ./test/bdd/fixtures/vct && docker-compose up vct.mysql`
+`cd ./test/bdd/fixtures/vct && docker-compose up vct.postgres`
 
 Then run the log-server.
 
-`./build/bin/log-server --mysql_uri="root@tcp(localhost:3306)/test"`
+`./build/bin/log-server --pg_conn_str="user=postgres host=localhost password=password dbname=test port=5432 sslmode=disable" --storage_system=postgres -quota_system=noop`
 
 Log server will start the RPC server on `localhost:8090` and  HTTP server on `localhost:8091`.
 
@@ -64,7 +64,8 @@ Log signer must be run with the same DB configuration as a `log-server`.
 Log signer will start the RPC server on `localhost:8090` and  HTTP server on `localhost:8091`.
 Since those ports are already occupied by the `log-server`, let's change them.
 
-` ./build/bin/log-signer --mysql_uri="root@tcp(localhost:3306)/test" --force_master=true --http_endpoint=0.0.0.0:8099 --rpc_endpoint=0.0.0.0:8098   `
+`./build/bin/log-signer --pg_conn_str="user=postgres host=localhost password=password dbname=test port=5432 sslmode=disable" --storage_system=postgres --force_master=true --h
+ttp_endpoint=0.0.0.0:8099 --rpc_endpoint=0.0.0.0:8098 --quota_system=noop`
 
 Use help flag to find out all available flags `./build/bin/log-signer -h`.
 
