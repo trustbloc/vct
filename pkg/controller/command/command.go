@@ -18,6 +18,7 @@ import (
 	"time"
 
 	"github.com/google/trillian"
+	"github.com/google/trillian/monitoring"
 	"github.com/google/trillian/types"
 	ldcmd "github.com/hyperledger/aries-framework-go/pkg/controller/command/ld"
 	"github.com/hyperledger/aries-framework-go/pkg/crypto"
@@ -117,8 +118,25 @@ func (spf storageProviderFn) StorageProvider() storage.Provider {
 	return spf()
 }
 
+// nolint: gochecknoglobals
+var (
+	once                        sync.Once
+	addVCParseCredentialLatency monitoring.Histogram
+)
+
+// nolint: lll
+func createMetrics(mf monitoring.MetricFactory) {
+	addVCParseCredentialLatency = mf.NewHistogram("add_vc_parse_credential_latency", "Latency of parse credential (add-vc operation)", "alias")
+}
+
 // New returns commands controller.
-func New(cfg *Config) (*Cmd, error) {
+func New(cfg *Config, mf monitoring.MetricFactory) (*Cmd, error) {
+	if mf == nil {
+		mf = monitoring.InertMetricFactory{}
+	}
+
+	once.Do(func() { createMetrics(mf) })
+
 	alg, err := signatureAndHashAlgorithmByKeyType(cfg.Key.Type)
 	if err != nil {
 		return nil, fmt.Errorf("key type %v is not supported", cfg.Key.Type)
@@ -329,12 +347,16 @@ func (c *Cmd) AddVC(w io.Writer, r io.Reader) error { // nolint: funlen
 		return fmt.Errorf("document loader: %w", err)
 	}
 
+	parseCredentialTime := time.Now()
+
 	vc, err := verifiable.ParseCredential(req.VCEntry, verifiable.WithPublicKeyFetcher(
 		verifiable.NewVDRKeyResolver(c.vdr).PublicKeyFetcher(),
 	), verifiable.WithJSONLDDocumentLoader(loader))
 	if err != nil {
 		return errors.NewBadRequestError(fmt.Errorf("parse credential: %w", err))
 	}
+
+	addVCParseCredentialLatency.Observe(time.Since(parseCredentialTime).Seconds(), req.Alias)
 
 	if len(c.logs[req.Alias].Issuers) > 0 && !contains(c.logs[req.Alias].Issuers, vc.Issuer.ID) {
 		return fmt.Errorf("%w: issuer %s is not in a list", errors.ErrBadRequest, vc.Issuer.ID)
