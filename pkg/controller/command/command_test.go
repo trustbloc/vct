@@ -22,17 +22,17 @@ import (
 	"github.com/hyperledger/aries-framework-go/component/storageutil/mem"
 	"github.com/hyperledger/aries-framework-go/pkg/crypto"
 	"github.com/hyperledger/aries-framework-go/pkg/crypto/tinkcrypto"
-	"github.com/hyperledger/aries-framework-go/pkg/doc/jsonld"
 	"github.com/hyperledger/aries-framework-go/pkg/doc/util"
 	"github.com/hyperledger/aries-framework-go/pkg/doc/verifiable"
 	"github.com/hyperledger/aries-framework-go/pkg/kms"
 	"github.com/hyperledger/aries-framework-go/pkg/kms/localkms"
 	"github.com/hyperledger/aries-framework-go/pkg/secretlock"
 	"github.com/hyperledger/aries-framework-go/pkg/secretlock/noop"
+	ldstore "github.com/hyperledger/aries-framework-go/pkg/store/ld"
 	"github.com/hyperledger/aries-framework-go/pkg/vdr"
 	"github.com/hyperledger/aries-framework-go/pkg/vdr/key"
 	"github.com/hyperledger/aries-framework-go/spi/storage"
-	"github.com/piprate/json-gold/ld"
+	jsonld "github.com/piprate/json-gold/ld"
 	"github.com/stretchr/testify/require"
 
 	"github.com/trustbloc/vct/internal/pkg/ldcontext"
@@ -160,13 +160,10 @@ func TestCmd_AddLdContext(t *testing.T) {
 		require.NoError(t, err)
 		require.NotNil(t, cmd)
 
-		const (
-			errorMsg = "context URL is mandatory"
-			payload  = `{"alias":"maple2021","context":"eyJkb2N1bWVudHMiOlt7fV19"}`
-		)
+		const payload = `{"alias":"maple2021","context":"eyJkb2N1bWVudHMiOlt7fV19"}`
 
-		require.EqualError(t, cmd.AddLdContext(nil, bytes.NewBufferString(payload)), errorMsg)
-		require.EqualError(t, lookupHandler(t, cmd, AddLdContext)(nil, bytes.NewBufferString(payload)), errorMsg)
+		require.Error(t, cmd.AddLdContext(nil, bytes.NewBufferString(payload)))
+		require.Error(t, lookupHandler(t, cmd, AddLdContext)(nil, bytes.NewBufferString(payload)))
 	})
 
 	t.Run("Create cmd failed", func(t *testing.T) {
@@ -1551,9 +1548,9 @@ func TestCmd_AddVC(t *testing.T) {
 		})
 		require.NoError(t, err)
 
-		const expErr = "document loader: new document loader: new document loader: error"
-		require.EqualError(t, cmd.AddVC(nil, bytes.NewBuffer(req)), expErr)
-		require.EqualError(t, lookupHandler(t, cmd, AddVC)(nil, bytes.NewBuffer(req)), expErr)
+		const expErr = "document loader"
+		require.Contains(t, cmd.AddVC(nil, bytes.NewBuffer(req)).Error(), expErr)
+		require.Contains(t, lookupHandler(t, cmd, AddVC)(nil, bytes.NewBuffer(req)).Error(), expErr)
 	})
 
 	t.Run("Copy vc failed", func(t *testing.T) {
@@ -1890,18 +1887,18 @@ func lookupHandler(t *testing.T, cmd *Cmd, name string) Exec {
 func loadContexts(t *testing.T, p storage.Provider, prefix string) { // nolint: unparam
 	t.Helper()
 
-	store, err := p.OpenStore(prefix + jsonld.ContextsDBName)
+	store, err := p.OpenStore(prefix + ldstore.ContextStoreName)
 	require.NoError(t, err)
 
 	var ops []storage.Operation
 
 	for _, doc := range ldcontext.MustGetAll() {
 		var content interface{}
-		content, err = ld.DocumentFromReader(bytes.NewReader(doc.Content))
+		content, err = jsonld.DocumentFromReader(bytes.NewReader(doc.Content))
 		require.NoError(t, err)
 
 		var b []byte
-		b, err = json.Marshal(ld.RemoteDocument{
+		b, err = json.Marshal(jsonld.RemoteDocument{
 			DocumentURL: doc.URL,
 			Document:    content,
 		})

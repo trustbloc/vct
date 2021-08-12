@@ -9,7 +9,7 @@ package rest
 import (
 	"time"
 
-	cmdcontext "github.com/hyperledger/aries-framework-go/pkg/controller/command/jsonld/context"
+	ldcmd "github.com/hyperledger/aries-framework-go/pkg/controller/command/ld"
 
 	"github.com/trustbloc/vct/pkg/controller/command"
 )
@@ -33,7 +33,7 @@ type addLdContextRequest struct { // nolint: unused,deadcode
 	Alias string `json:"alias"`
 
 	// in: body
-	Body cmdcontext.AddRequest
+	Body ldcmd.AddContextsRequest
 }
 
 // Response message

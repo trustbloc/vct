@@ -18,13 +18,15 @@ import (
 	"testing"
 
 	"github.com/golang/mock/gomock"
-	"github.com/hyperledger/aries-framework-go/component/storageutil/mem"
-	"github.com/hyperledger/aries-framework-go/pkg/doc/jsonld"
+	"github.com/hyperledger/aries-framework-go/pkg/doc/ld"
+	"github.com/hyperledger/aries-framework-go/pkg/doc/ldcontext"
 	"github.com/hyperledger/aries-framework-go/pkg/doc/util"
 	"github.com/hyperledger/aries-framework-go/pkg/doc/verifiable"
+	mockldstore "github.com/hyperledger/aries-framework-go/pkg/mock/ld"
+	ldstore "github.com/hyperledger/aries-framework-go/pkg/store/ld"
 	"github.com/stretchr/testify/require"
 
-	"github.com/trustbloc/vct/internal/pkg/ldcontext"
+	vctldcontext "github.com/trustbloc/vct/internal/pkg/ldcontext"
 	"github.com/trustbloc/vct/pkg/client/vct"
 	"github.com/trustbloc/vct/pkg/controller/command"
 	"github.com/trustbloc/vct/pkg/controller/rest"
@@ -108,7 +110,7 @@ func TestClient_AddJSONLDContexts(t *testing.T) {
 		}, nil)
 
 		client := vct.New(endpoint+"/maple2020", vct.WithHTTPClient(httpClient))
-		require.NoError(t, client.AddJSONLDContexts(context.Background(), jsonld.ContextDocument{}))
+		require.NoError(t, client.AddJSONLDContexts(context.Background(), ldcontext.Document{}))
 	})
 
 	t.Run("Error", func(t *testing.T) {
@@ -127,7 +129,7 @@ func TestClient_AddJSONLDContexts(t *testing.T) {
 		}, nil)
 
 		client := vct.New(endpoint, vct.WithHTTPClient(httpClient))
-		err = client.AddJSONLDContexts(context.Background(), jsonld.ContextDocument{})
+		err = client.AddJSONLDContexts(context.Background(), ldcontext.Document{})
 		require.EqualError(t, err, "add JSON ld contexts: error")
 	})
 }
@@ -577,12 +579,28 @@ func TestVerifyVCTimestampSignature(t *testing.T) {
 	})
 }
 
-func getLoader(t *testing.T) *jsonld.DocumentLoader {
+type mockProvider struct {
+	ContextStore        ldstore.ContextStore
+	RemoteProviderStore ldstore.RemoteProviderStore
+}
+
+func (m *mockProvider) JSONLDContextStore() ldstore.ContextStore {
+	return m.ContextStore
+}
+
+func (m *mockProvider) JSONLDRemoteProviderStore() ldstore.RemoteProviderStore {
+	return m.RemoteProviderStore
+}
+
+func getLoader(t *testing.T) *ld.DocumentLoader {
 	t.Helper()
 
-	documentLoader, err := jsonld.NewDocumentLoader(mem.NewProvider(),
-		jsonld.WithExtraContexts(ldcontext.MustGetAll()...),
-	)
+	p := &mockProvider{
+		ContextStore:        mockldstore.NewMockContextStore(),
+		RemoteProviderStore: mockldstore.NewMockRemoteProviderStore(),
+	}
+
+	documentLoader, err := ld.NewDocumentLoader(p, ld.WithExtraContexts(vctldcontext.MustGetAll()...))
 	require.NoError(t, err)
 
 	return documentLoader
