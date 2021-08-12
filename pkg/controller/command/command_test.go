@@ -73,7 +73,7 @@ func TestNew(t *testing.T) {
 				Type: kms.ECDSAP256TypeDER,
 			},
 			StorageProvider: mem.NewProvider(),
-		})
+		}, nil)
 		require.NoError(t, err)
 		require.NotNil(t, cmd)
 	})
@@ -92,13 +92,13 @@ func TestNew(t *testing.T) {
 				Type: kms.ECDSAP256TypeDER,
 			},
 			StorageProvider: mem.NewProvider(),
-		})
+		}, nil)
 		require.EqualError(t, err, "public key is empty")
 		require.Nil(t, cmd)
 	})
 
 	t.Run("Key is not supported", func(t *testing.T) {
-		cmd, err := New(&Config{Key: Key{Type: "test"}})
+		cmd, err := New(&Config{Key: Key{Type: "test"}}, nil)
 		require.EqualError(t, err, "key type test is not supported")
 		require.Nil(t, cmd)
 	})
@@ -113,7 +113,7 @@ func TestNew(t *testing.T) {
 		cmd, err := New(&Config{KMS: km, Key: Key{
 			ID:   kid,
 			Type: kms.ECDSAP256TypeDER,
-		}})
+		}}, nil)
 		require.EqualError(t, err, "kms get kh: no key")
 		require.Nil(t, cmd)
 	})
@@ -129,7 +129,7 @@ func TestNew(t *testing.T) {
 		cmd, err := New(&Config{KMS: km, Key: Key{
 			ID:   kid,
 			Type: kms.ECDSAP256TypeDER,
-		}})
+		}}, nil)
 		require.EqualError(t, err, "export pub key bytes: internal error")
 		require.Nil(t, cmd)
 	})
@@ -156,7 +156,7 @@ func TestCmd_AddLdContext(t *testing.T) {
 				Permission: "rw",
 			}},
 			StorageProvider: mem.NewProvider(),
-		})
+		}, nil)
 		require.NoError(t, err)
 		require.NotNil(t, cmd)
 
@@ -187,7 +187,7 @@ func TestCmd_AddLdContext(t *testing.T) {
 				Permission: "rw",
 			}},
 			StorageProvider: sp,
-		})
+		}, nil)
 		require.NoError(t, err)
 		require.NotNil(t, cmd)
 
@@ -218,7 +218,7 @@ func TestCmd_AddLdContext(t *testing.T) {
 				Permission: "r",
 			}},
 			StorageProvider: mem.NewProvider(),
-		})
+		}, nil)
 		require.NoError(t, err)
 		require.NotNil(t, cmd)
 
@@ -245,7 +245,7 @@ func TestCmd_AddLdContext(t *testing.T) {
 				Type: kms.ECDSAP256TypeIEEEP1363,
 			},
 			StorageProvider: mem.NewProvider(),
-		})
+		}, nil)
 		require.NoError(t, err)
 		require.NotNil(t, cmd)
 
@@ -283,7 +283,7 @@ func TestCmd_GetIssuers(t *testing.T) {
 				Issuers:    []string{"issuer_a", "issuer_b"},
 			}},
 			StorageProvider: mem.NewProvider(),
-		})
+		}, nil)
 		require.NoError(t, err)
 		require.NotNil(t, cmd)
 
@@ -320,7 +320,7 @@ func TestCmd_GetIssuers(t *testing.T) {
 				Issuers:    []string{"issuer_a", "issuer_b"},
 			}},
 			StorageProvider: mem.NewProvider(),
-		})
+		}, nil)
 		require.NoError(t, err)
 		require.NotNil(t, cmd)
 
@@ -353,7 +353,7 @@ func TestCmd_GetIssuers(t *testing.T) {
 				Issuers:    []string{"issuer_a", "issuer_b"},
 			}},
 			StorageProvider: mem.NewProvider(),
-		})
+		}, nil)
 		require.NoError(t, err)
 		require.NotNil(t, cmd)
 
@@ -385,7 +385,7 @@ func TestCmd_Webfinger(t *testing.T) {
 		},
 		BaseURL:         "https://vct.com",
 		StorageProvider: mem.NewProvider(),
-	})
+	}, nil)
 	require.NoError(t, err)
 	require.NotNil(t, cmd)
 
@@ -441,7 +441,7 @@ func TestCmd_GetEntries(t *testing.T) {
 				Client:     client,
 			}},
 			StorageProvider: mem.NewProvider(),
-		})
+		}, nil)
 		require.NoError(t, err)
 		require.NotNil(t, cmd)
 
@@ -475,7 +475,7 @@ func TestCmd_GetEntries(t *testing.T) {
 				Type: keyType,
 			},
 			StorageProvider: mem.NewProvider(),
-		})
+		}, nil)
 		require.NoError(t, err)
 		require.NotNil(t, cmd)
 
@@ -500,7 +500,7 @@ func TestCmd_GetEntries(t *testing.T) {
 				Type: keyType,
 			},
 			StorageProvider: mem.NewProvider(),
-		})
+		}, nil)
 		require.NoError(t, err)
 		require.NotNil(t, cmd)
 
@@ -537,7 +537,7 @@ func TestCmd_GetEntries(t *testing.T) {
 				Client:     client,
 			}},
 			StorageProvider: mem.NewProvider(),
-		})
+		}, nil)
 		require.NoError(t, err)
 		require.NotNil(t, cmd)
 
@@ -574,7 +574,7 @@ func TestCmd_GetEntries(t *testing.T) {
 				Type: keyType,
 			},
 			StorageProvider: mem.NewProvider(),
-		})
+		}, nil)
 		require.NoError(t, err)
 		require.NotNil(t, cmd)
 
@@ -613,7 +613,7 @@ func TestCmd_GetEntries(t *testing.T) {
 				Type: keyType,
 			},
 			StorageProvider: mem.NewProvider(),
-		})
+		}, nil)
 		require.NoError(t, err)
 		require.NotNil(t, cmd)
 
@@ -655,7 +655,7 @@ func TestCmd_GetEntries(t *testing.T) {
 				Type: keyType,
 			},
 			StorageProvider: mem.NewProvider(),
-		})
+		}, nil)
 		require.NoError(t, err)
 		require.NotNil(t, cmd)
 
@@ -683,7 +683,7 @@ func TestCmd_GetEntries(t *testing.T) {
 				Type: keyType,
 			},
 			StorageProvider: mem.NewProvider(),
-		})
+		}, nil)
 		require.NoError(t, err)
 		require.NotNil(t, cmd)
 
@@ -728,7 +728,7 @@ func TestCmd_GetProofByHash(t *testing.T) {
 				Type: keyType,
 			},
 			StorageProvider: mem.NewProvider(),
-		})
+		}, nil)
 		require.NoError(t, err)
 		require.NotNil(t, cmd)
 
@@ -765,7 +765,7 @@ func TestCmd_GetProofByHash(t *testing.T) {
 				Type: keyType,
 			},
 			StorageProvider: mem.NewProvider(),
-		})
+		}, nil)
 		require.NoError(t, err)
 		require.NotNil(t, cmd)
 
@@ -790,7 +790,7 @@ func TestCmd_GetProofByHash(t *testing.T) {
 				Type: keyType,
 			},
 			StorageProvider: mem.NewProvider(),
-		})
+		}, nil)
 		require.NoError(t, err)
 		require.NotNil(t, cmd)
 
@@ -832,7 +832,7 @@ func TestCmd_GetProofByHash(t *testing.T) {
 				Type: keyType,
 			},
 			StorageProvider: mem.NewProvider(),
-		})
+		}, nil)
 		require.NoError(t, err)
 		require.NotNil(t, cmd)
 
@@ -881,7 +881,7 @@ func TestCmd_GetSTHConsistency(t *testing.T) {
 				Type: keyType,
 			},
 			StorageProvider: mem.NewProvider(),
-		})
+		}, nil)
 		require.NoError(t, err)
 		require.NotNil(t, cmd)
 
@@ -922,7 +922,7 @@ func TestCmd_GetSTHConsistency(t *testing.T) {
 				Permission: "r",
 			}},
 			StorageProvider: mem.NewProvider(),
-		})
+		}, nil)
 		require.NoError(t, err)
 		require.NotNil(t, cmd)
 
@@ -959,7 +959,7 @@ func TestCmd_GetSTHConsistency(t *testing.T) {
 				Type: keyType,
 			},
 			StorageProvider: mem.NewProvider(),
-		})
+		}, nil)
 		require.NoError(t, err)
 		require.NotNil(t, cmd)
 
@@ -984,7 +984,7 @@ func TestCmd_GetSTHConsistency(t *testing.T) {
 				Type: keyType,
 			},
 			StorageProvider: mem.NewProvider(),
-		})
+		}, nil)
 		require.NoError(t, err)
 		require.NotNil(t, cmd)
 
@@ -1026,7 +1026,7 @@ func TestCmd_GetSTHConsistency(t *testing.T) {
 				Type: keyType,
 			},
 			StorageProvider: mem.NewProvider(),
-		})
+		}, nil)
 		require.NoError(t, err)
 		require.NotNil(t, cmd)
 
@@ -1055,7 +1055,7 @@ func TestCmd_GetSTHConsistency(t *testing.T) {
 				Type: keyType,
 			},
 			StorageProvider: mem.NewProvider(),
-		})
+		}, nil)
 		require.NoError(t, err)
 		require.NotNil(t, cmd)
 
@@ -1105,7 +1105,7 @@ func TestCmd_GetSTH(t *testing.T) {
 				Type: keyType,
 			},
 			StorageProvider: mem.NewProvider(),
-		})
+		}, nil)
 		require.NoError(t, err)
 		require.NotNil(t, cmd)
 
@@ -1152,7 +1152,7 @@ func TestCmd_GetSTH(t *testing.T) {
 				Type: keyType,
 			},
 			StorageProvider: mem.NewProvider(),
-		})
+		}, nil)
 		require.NoError(t, err)
 		require.NotNil(t, cmd)
 
@@ -1186,7 +1186,7 @@ func TestCmd_GetSTH(t *testing.T) {
 				Type: keyType,
 			},
 			StorageProvider: mem.NewProvider(),
-		})
+		}, nil)
 		require.NoError(t, err)
 		require.NotNil(t, cmd)
 
@@ -1222,7 +1222,7 @@ func TestCmd_GetSTH(t *testing.T) {
 				Type: keyType,
 			},
 			StorageProvider: mem.NewProvider(),
-		})
+		}, nil)
 		require.NoError(t, err)
 		require.NotNil(t, cmd)
 
@@ -1262,7 +1262,7 @@ func TestCmd_GetSTH(t *testing.T) {
 				Type: keyType,
 			},
 			StorageProvider: mem.NewProvider(),
-		})
+		}, nil)
 		require.NoError(t, err)
 		require.NotNil(t, cmd)
 
@@ -1310,7 +1310,7 @@ func TestCmd_GetEntryAndProof(t *testing.T) {
 				Type: keyType,
 			},
 			StorageProvider: mem.NewProvider(),
-		})
+		}, nil)
 		require.NoError(t, err)
 		require.NotNil(t, cmd)
 
@@ -1363,7 +1363,7 @@ func TestCmd_GetEntryAndProof(t *testing.T) {
 				Type: keyType,
 			},
 			StorageProvider: mem.NewProvider(),
-		})
+		}, nil)
 		require.NoError(t, err)
 		require.NotNil(t, cmd)
 
@@ -1405,7 +1405,7 @@ func TestCmd_GetEntryAndProof(t *testing.T) {
 				Type: keyType,
 			},
 			StorageProvider: mem.NewProvider(),
-		})
+		}, nil)
 		require.NoError(t, err)
 		require.NotNil(t, cmd)
 
@@ -1476,7 +1476,7 @@ func TestCmd_AddVC(t *testing.T) {
 				Type: keyType,
 			},
 			StorageProvider: db,
-		})
+		}, nil)
 		require.NoError(t, err)
 		require.NotNil(t, cmd)
 
@@ -1538,7 +1538,7 @@ func TestCmd_AddVC(t *testing.T) {
 				Type: keyType,
 			},
 			StorageProvider: db,
-		})
+		}, nil)
 		require.NoError(t, err)
 		require.NotNil(t, cmd)
 
@@ -1568,7 +1568,7 @@ func TestCmd_AddVC(t *testing.T) {
 				Type: keyType,
 			},
 			StorageProvider: mem.NewProvider(),
-		})
+		}, nil)
 		require.NoError(t, err)
 		require.NotNil(t, cmd)
 
@@ -1596,7 +1596,7 @@ func TestCmd_AddVC(t *testing.T) {
 				Permission: "w",
 			}},
 			StorageProvider: mem.NewProvider(),
-		})
+		}, nil)
 		require.NoError(t, err)
 		require.NotNil(t, cmd)
 
@@ -1629,7 +1629,7 @@ func TestCmd_AddVC(t *testing.T) {
 				Type: keyType,
 			},
 			StorageProvider: db,
-		})
+		}, nil)
 		require.NoError(t, err)
 		require.NotNil(t, cmd)
 
@@ -1671,7 +1671,7 @@ func TestCmd_AddVC(t *testing.T) {
 				Type: keyType,
 			},
 			StorageProvider: db,
-		})
+		}, nil)
 		require.NoError(t, err)
 		require.NotNil(t, cmd)
 
@@ -1713,7 +1713,7 @@ func TestCmd_AddVC(t *testing.T) {
 				Type: keyType,
 			},
 			StorageProvider: db,
-		})
+		}, nil)
 		require.NoError(t, err)
 		require.NotNil(t, cmd)
 
@@ -1761,7 +1761,7 @@ func TestCmd_AddVC(t *testing.T) {
 				Type: keyType,
 			},
 			StorageProvider: db,
-		})
+		}, nil)
 		require.NoError(t, err)
 		require.NotNil(t, cmd)
 
@@ -1813,7 +1813,7 @@ func TestCmd_AddVC(t *testing.T) {
 				Type: keyType,
 			},
 			StorageProvider: db,
-		})
+		}, nil)
 		require.NoError(t, err)
 		require.NotNil(t, cmd)
 
@@ -1852,7 +1852,7 @@ func TestCmd_AddVC(t *testing.T) {
 				Type: keyType,
 			},
 			StorageProvider: db,
-		})
+		}, nil)
 		require.NoError(t, err)
 		require.NotNil(t, cmd)
 

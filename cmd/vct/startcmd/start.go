@@ -482,6 +482,8 @@ func startAgent(parameters *agentParameters) error { // nolint: funlen
 		}
 	}()
 
+	mf := prometheus.MetricFactory{}
+
 	cmd, err := command.New(&command.Config{
 		KMS:    km,
 		Crypto: cr,
@@ -496,7 +498,7 @@ func startAgent(parameters *agentParameters) error { // nolint: funlen
 		},
 		StorageProvider: store,
 		BaseURL:         parameters.baseURL,
-	})
+	}, mf)
 	if err != nil {
 		return fmt.Errorf("create command instance: %w", err)
 	}
@@ -505,8 +507,6 @@ func startAgent(parameters *agentParameters) error { // nolint: funlen
 		router        = mux.NewRouter()
 		metricsRouter = mux.NewRouter()
 	)
-
-	mf := prometheus.MetricFactory{}
 
 	for _, handler := range rest.New(cmd, mf).GetRESTHandlers() {
 		if handler.Path() == rest.MetricsPath {
