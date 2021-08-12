@@ -20,8 +20,9 @@ import (
 	"github.com/cenkalti/backoff/v4"
 	"github.com/cucumber/godog"
 	"github.com/hyperledger/aries-framework-go/component/storageutil/mem"
-	"github.com/hyperledger/aries-framework-go/pkg/doc/jsonld"
+	"github.com/hyperledger/aries-framework-go/pkg/doc/ld"
 	"github.com/hyperledger/aries-framework-go/pkg/doc/verifiable"
+	ldstore "github.com/hyperledger/aries-framework-go/pkg/store/ld"
 
 	"github.com/trustbloc/vct/internal/pkg/ldcontext"
 	"github.com/trustbloc/vct/pkg/client/vct"
@@ -389,19 +390,47 @@ func (s *Steps) getSTH(treeSize string) error {
 	}, backoff.WithMaxRetries(backoff.NewConstantBackOff(time.Second), 15))
 }
 
-func getLoader() *jsonld.DocumentLoader {
-	documentLoader, err := jsonld.NewDocumentLoader(mem.NewProvider(),
-		jsonld.WithExtraContexts(ldcontext.MustGetAll()...),
+func readFile(msgFile string) ([]byte, error) {
+	return fs.ReadFile(filepath.Clean(strings.Join([]string{ // nolint: wrapcheck
+		"testdata", msgFile,
+	}, string(filepath.Separator))))
+}
+
+type provider struct {
+	ContextStore        ldstore.ContextStore
+	RemoteProviderStore ldstore.RemoteProviderStore
+}
+
+func (p *provider) JSONLDContextStore() ldstore.ContextStore {
+	return p.ContextStore
+}
+
+func (p *provider) JSONLDRemoteProviderStore() ldstore.RemoteProviderStore {
+	return p.RemoteProviderStore
+}
+
+func getLoader() *ld.DocumentLoader {
+	contextStore, err := ldstore.NewContextStore(mem.NewProvider())
+	if err != nil {
+		panic(fmt.Errorf("create JSON-LD context store: %w", err))
+	}
+
+	remoteProviderStore, err := ldstore.NewRemoteProviderStore(mem.NewProvider())
+	if err != nil {
+		panic(fmt.Errorf("create remote provider store: %w", err))
+	}
+
+	p := &provider{
+		ContextStore:        contextStore,
+		RemoteProviderStore: remoteProviderStore,
+	}
+
+	documentLoader, err := ld.NewDocumentLoader(p,
+		ld.WithExtraContexts(ldcontext.MustGetAll()...),
 	)
 	if err != nil {
 		panic(err)
 	}
 
 	return documentLoader
-}
-
-func readFile(msgFile string) ([]byte, error) {
-	return fs.ReadFile(filepath.Clean(strings.Join([]string{ // nolint: wrapcheck
-		"testdata", msgFile,
-	}, string(filepath.Separator))))
 }

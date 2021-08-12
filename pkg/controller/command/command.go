@@ -19,12 +19,14 @@ import (
 
 	"github.com/google/trillian"
 	"github.com/google/trillian/types"
-	cmdcontext "github.com/hyperledger/aries-framework-go/pkg/controller/command/jsonld/context"
+	ldcmd "github.com/hyperledger/aries-framework-go/pkg/controller/command/ld"
 	"github.com/hyperledger/aries-framework-go/pkg/crypto"
-	"github.com/hyperledger/aries-framework-go/pkg/doc/jsonld"
+	"github.com/hyperledger/aries-framework-go/pkg/doc/ld"
 	"github.com/hyperledger/aries-framework-go/pkg/doc/verifiable"
 	"github.com/hyperledger/aries-framework-go/pkg/framework/aries/api/vdr"
 	"github.com/hyperledger/aries-framework-go/pkg/kms"
+	ldsvc "github.com/hyperledger/aries-framework-go/pkg/ld"
+	ldstore "github.com/hyperledger/aries-framework-go/pkg/store/ld"
 	"github.com/hyperledger/aries-framework-go/spi/storage"
 
 	"github.com/trustbloc/vct/pkg/controller/errors"
@@ -196,40 +198,37 @@ func (c *Cmd) AddLdContext(w io.Writer, r io.Reader) error {
 		return fmt.Errorf("%w: get ctx cmd", errors.ErrInternal)
 	}
 
-	return ctxCmd.Add(w, bytes.NewBuffer(req.Context)) // nolint: wrapcheck
+	return ctxCmd.AddContexts(w, bytes.NewBuffer(req.Context)) // nolint: wrapcheck
 }
 
-func (c *Cmd) getCtxCmd(alias string) (*cmdcontext.Command, error) {
+func (c *Cmd) getCtxCmd(alias string) (*ldcmd.Command, error) {
 	val, ok := c.ctxCommands.Load(alias)
 	if ok {
-		return val.(*cmdcontext.Command), nil
+		return val.(*ldcmd.Command), nil
 	}
 
-	ctxCmd, err := cmdcontext.New(storageProviderFn(func() storage.Provider {
-		return &customizedStorageProvider{
-			alias:           alias,
-			StorageProvider: c.storageProvider,
-		}
-	}))
+	ldStore, err := c.getLDStoreProvider(alias)
 	if err != nil {
-		return nil, fmt.Errorf("%w: new cmd context", errors.ErrInternal)
+		return nil, fmt.Errorf("get LD store provider: %w", err)
 	}
 
-	c.ctxCommands.Store(alias, ctxCmd)
+	c.ctxCommands.Store(alias, ldcmd.New(ldsvc.New(ldStore)))
 
 	return c.getCtxCmd(alias)
 }
 
-func (c *Cmd) documentLoader(alias string) (*jsonld.DocumentLoader, error) {
+func (c *Cmd) documentLoader(alias string) (*ld.DocumentLoader, error) {
 	val, ok := c.loaders.Load(alias)
 	if ok {
-		return val.(*jsonld.DocumentLoader), nil
+		return val.(*ld.DocumentLoader), nil
 	}
 
-	loader, err := jsonld.NewDocumentLoader(&customizedStorageProvider{
-		alias:           alias,
-		StorageProvider: c.storageProvider,
-	})
+	ldStore, err := c.getLDStoreProvider(alias)
+	if err != nil {
+		return nil, fmt.Errorf("get LD store provider: %w", err)
+	}
+
+	loader, err := ld.NewDocumentLoader(ldStore)
 	if err != nil {
 		return nil, fmt.Errorf("new document loader: %w", err)
 	}
@@ -751,4 +750,41 @@ func contains(s []string, e string) bool {
 	}
 
 	return false
+}
+
+type ldStoreProvider struct {
+	ContextStore        ldstore.ContextStore
+	RemoteProviderStore ldstore.RemoteProviderStore
+}
+
+func (p *ldStoreProvider) JSONLDContextStore() ldstore.ContextStore {
+	return p.ContextStore
+}
+
+func (p *ldStoreProvider) JSONLDRemoteProviderStore() ldstore.RemoteProviderStore {
+	return p.RemoteProviderStore
+}
+
+func (c *Cmd) getLDStoreProvider(alias string) (*ldStoreProvider, error) {
+	storageProvider := storageProviderFn(func() storage.Provider {
+		return &customizedStorageProvider{
+			alias:           alias,
+			StorageProvider: c.storageProvider,
+		}
+	})()
+
+	contextStore, err := ldstore.NewContextStore(storageProvider)
+	if err != nil {
+		return nil, fmt.Errorf("create JSON-LD context store: %w", err)
+	}
+
+	providerStore, err := ldstore.NewRemoteProviderStore(storageProvider)
+	if err != nil {
+		return nil, fmt.Errorf("create remote provider store: %w", err)
+	}
+
+	return &ldStoreProvider{
+		ContextStore:        contextStore,
+		RemoteProviderStore: providerStore,
+	}, nil
 }
