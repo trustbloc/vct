@@ -16,7 +16,7 @@ require (
 	github.com/google/uuid v1.2.0
 	github.com/gorilla/mux v1.8.0
 	github.com/grpc-ecosystem/go-grpc-middleware v1.3.0
-	github.com/hyperledger/aries-framework-go v0.1.7-0.20210813122903-2b268f3c37dd
+	github.com/hyperledger/aries-framework-go v0.1.7-0.20210816113201-26c0665ef2b9
 	github.com/hyperledger/aries-framework-go-ext/component/storage/couchdb v0.0.0-20210714131038-41b5bccef1f9
 	github.com/hyperledger/aries-framework-go-ext/component/storage/mysql v0.0.0-20210714131038-41b5bccef1f9
 	github.com/hyperledger/aries-framework-go/component/storageutil v0.0.0-20210807121559-b41545a4f1e8
@@ -28,7 +28,7 @@ require (
 	github.com/rs/cors v1.7.0
 	github.com/spf13/cobra v1.1.3
 	github.com/stretchr/testify v1.7.0
-	github.com/trustbloc/edge-core v0.1.7-0.20210812092729-6c61997fa9dd
+	github.com/trustbloc/edge-core v0.1.7-0.20210816120552-ed93662ac716
 	go.etcd.io/etcd/client/v3 v3.5.0
 	google.golang.org/grpc v1.39.0
 	google.golang.org/protobuf v1.27.1
