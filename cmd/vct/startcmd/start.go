@@ -25,6 +25,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/gorilla/mux"
 	"github.com/hyperledger/aries-framework-go-ext/component/storage/couchdb"
+	"github.com/hyperledger/aries-framework-go-ext/component/storage/mongodb"
 	"github.com/hyperledger/aries-framework-go-ext/component/storage/mysql"
 	"github.com/hyperledger/aries-framework-go/component/storageutil/mem"
 	"github.com/hyperledger/aries-framework-go/pkg/common/log"
@@ -85,8 +86,9 @@ const (
 	datasourceNameFlagShorthand = "d"
 	datasourceNameFlagUsage     = "Datasource Name with credentials if required." +
 		" Format must be <driver>:[//]<driver-specific-dsn>." +
-		" Examples: 'mysql://root:secret@tcp(localhost:3306)/adapter', 'mem://test'." +
-		" Supported drivers are [mem, couchdb, mysql]." +
+		" Examples: 'mysql://root:secret@tcp(localhost:3306)/adapter', 'mem://test'," +
+		" 'mongodb://mongodb.example.com:27017'." +
+		" Supported drivers are [mem, couchdb, mysql, mongodb]." +
 		" Alternatively, this can be set with the following environment variable: " + datasourceNameEnvKey
 	datasourceNameEnvKey = envPrefix + "DSN"
 
@@ -146,6 +148,7 @@ const (
 	databaseTypeMemOption     = "mem"
 	databaseTypeMySQLOption   = "mysql"
 	databaseTypeCouchDBOption = "couchdb"
+	databaseTypeMongoDBOption = "mongodb"
 
 	webKeyStoreKey      = "web-key-store"
 	kidKey              = "kid"
@@ -166,6 +169,9 @@ var logger = log.New("vct/startcmd")
 var supportedStorageProviders = map[string]func(string, string) (storage.Provider, error){
 	databaseTypeCouchDBOption: func(dsn, prefix string) (storage.Provider, error) {
 		return couchdb.NewProvider(dsn, couchdb.WithDBPrefix(prefix)) // nolint: wrapcheck
+	},
+	databaseTypeMongoDBOption: func(dsn, prefix string) (storage.Provider, error) {
+		return mongodb.NewProvider("mongodb://"+dsn, mongodb.WithDBPrefix(prefix)) // nolint: wrapcheck
 	},
 	databaseTypeMySQLOption: func(dsn, prefix string) (storage.Provider, error) {
 		return mysql.NewProvider(dsn, mysql.WithDBPrefix(prefix)) // nolint: wrapcheck
