@@ -103,7 +103,7 @@ Flags:
       --base-url string             Base URL. e.g (https://vct.com) Alternatively, this can be set with the following environment variable: VCT_BASE_URL
       --database-prefix string      An optional prefix to be used when creating and retrieving underlying databases.  Alternatively, this can be set with the following environment variable: VCT_DATABASE_PREFIX
       --dev-mode string             Enable dev mode. Alternatively, this can be set with the following environment variable: VCT_DEV_MODE
-  -d, --dsn string                  Datasource Name with credentials if required. Format must be <driver>:[//]<driver-specific-dsn>. Examples: 'mysql://root:secret@tcp(localhost:3306)/adapter', 'mem://test'. Supported drivers are [mem, couchdb, mysql]. Alternatively, this can be set with the following environment variable: VCT_DSN (default "mem://test")
+  -d, --dsn string                  Datasource Name with credentials if required. Format must be <driver>:[//]<driver-specific-dsn>. Examples: 'mysql://root:secret@tcp(localhost:3306)/adapter', 'mem://test', 'mongodb://mongodb.example.com:27017'. Supported drivers are [mem, couchdb, mysql, mongodb]. Alternatively, this can be set with the following environment variable: VCT_DSN (default "mem://test")
   -h, --help                        help for start
       --issuers string              Comma-Separated list of supported issuers. Alternatively, this can be set with the following environment variable: VCT_ISSUERS
   -s, --kms-endpoint string         Remote KMS URL. Alternatively, this can be set with the following environment variable: VCT_KMS_ENDPOINT

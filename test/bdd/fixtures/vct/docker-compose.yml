@@ -55,16 +55,11 @@ services:
     ports:
       - 8091:8091
 
-  vct.couchdb:
-    container_name: vct.couchdb
-    image: couchdb:3.1.0
+  vct.mongodb:
+    container_name: vct.mongodb
+    image: mongo:4.0.0
     ports:
-      - 5984:5984
-    environment:
-      - COUCHDB_USER=admin
-      - COUCHDB_PASSWORD=password
-    volumes:
-      - ./config/config.ini:/opt/couchdb/etc/local.d/config.ini
+      - "27017:27017"
     networks:
       - witness_ledger_net
 
@@ -99,30 +94,30 @@ services:
 
   vct.kms:
     container_name: vct.kms
-    image: ghcr.io/trustbloc-cicd/kms:0.1.7-snapshot-03d0af8
+    image: ghcr.io/trustbloc-cicd/kms:0.1.7-snapshot-86b056c
     restart: always
     environment:
       - KMS_BASE_URL=http://vct.kms:7878
       - KMS_HOST_URL=0.0.0.0:7878
-      - KMS_DATABASE_TYPE=couchdb
-      - KMS_DATABASE_URL=admin:password@vct.couchdb:5984
-      - KMS_DATABASE_PREFIX=keystore
-      - KMS_PRIMARY_KEY_DATABASE_TYPE=couchdb
-      - KMS_PRIMARY_KEY_DATABASE_URL=admin:password@vct.couchdb:5984
-      - KMS_PRIMARY_KEY_DATABASE_PREFIX=kmspk
-      - KMS_LOCAL_KMS_DATABASE_TYPE=couchdb
-      - KMS_LOCAL_KMS_DATABASE_URL=admin:password@vct.couchdb:5984
-      - KMS_LOCAL_KMS_DATABASE_PREFIX=kmslocal
-      - KMS_KEY_MANAGER_STORAGE_TYPE=couchdb
-      - KMS_KEY_MANAGER_STORAGE_URL=admin:password@vct.couchdb:5984
-      - KMS_KEY_MANAGER_STORAGE_PREFIX=kmskm
+      - KMS_DATABASE_TYPE=mongodb
+      - KMS_DATABASE_URL=mongodb://vct.mongodb:27017
+      - KMS_DATABASE_PREFIX=keystore_
+      - KMS_PRIMARY_KEY_DATABASE_TYPE=mongodb
+      - KMS_PRIMARY_KEY_DATABASE_URL=mongodb://vct.mongodb:27017
+      - KMS_PRIMARY_KEY_DATABASE_PREFIX=kmspk_
+      - KMS_LOCAL_KMS_DATABASE_TYPE=mongodb
+      - KMS_LOCAL_KMS_DATABASE_URL=mongodb://vct.mongodb:27017
+      - KMS_LOCAL_KMS_DATABASE_PREFIX=kmslocal_
+      - KMS_KEY_MANAGER_STORAGE_TYPE=mongodb
+      - KMS_KEY_MANAGER_STORAGE_URL=mongodb://vct.mongodb:27017
+      - KMS_KEY_MANAGER_STORAGE_PREFIX=kmskm_
       - KMS_LOG_LEVEL=debug
     ports:
       - 7878:7878
     entrypoint: ""
     command: /bin/sh -c "kms-rest start"
     depends_on:
-      - vct.couchdb
+      - vct.mongodb
     networks:
       - witness_ledger_net
 
@@ -136,15 +131,15 @@ services:
       - VCT_LOGS=maple2020:rw@vct.trillian.log.server:8090,maple2021:rw@vct.trillian.log.server:8090,maple2022:r@vct.trillian.log.server:8090,maple2023:w@vct.trillian.log.server:8090,maple2024:rw@vct.trillian.log.server:8090
       - VCT_KMS_ENDPOINT=http://vct.kms:7878
       - VCT_TIMEOUT=60
-      - VCT_DSN=couchdb://admin:password@vct.couchdb:5984
-      - VCT_DATABASE_PREFIX=vctdb
+      - VCT_DSN=mongodb://vct.mongodb:27017
+      - VCT_DATABASE_PREFIX=vctdb_
       - VCT_ISSUERS=maple2021@did:key:zUC724vuGvHpnCGFG1qqpXb81SiBLu3KLSqVzenwEZNPoY35i2Bscb8DLaVwHvRFs6F2NkNNXRcPWvqnPDUd9ukdjLkjZd3u9zzL4wDZDUpkPAatLDGLEYVo8kkAzuAKJQMr7N2,maple2020@did:key:zUC724vuGvHpnCGFG1qqpXb81SiBLu3KLSqVzenwEZNPoY35i2Bscb8DLaVwHvRFs6F2NkNNXRcPWvqnPDUd9ukdjLkjZd3u9zzL4wDZDUpkPAatLDGLEYVo8kkAzuAKJQMr7N7
       - VCT_TLS_CACERTS=/etc/tls/vct.local.crt
     volumes:
       - ./keys/tls:/etc/tls
     command: start
     depends_on:
-      - vct.couchdb
+      - vct.mongodb
       - vct.kms
       - vct.trillian.log.server
     networks:
@@ -160,15 +155,15 @@ services:
       - VCT_LOGS=maple2020:rw@vct.trillian.log.server:8090,maple2021:rw@vct.trillian.log.server:8090,maple2022:r@vct.trillian.log.server:8090,maple2023:w@vct.trillian.log.server:8090,maple2024:rw@vct.trillian.log.server:8090
       - VCT_KMS_ENDPOINT=http://vct.kms:7878
       - VCT_TIMEOUT=60
-      - VCT_DSN=couchdb://admin:password@vct.couchdb:5984
-      - VCT_DATABASE_PREFIX=vctdb
+      - VCT_DSN=mongodb://vct.mongodb:27017
+      - VCT_DATABASE_PREFIX=vctdb_
       - VCT_ISSUERS=maple2021@did:key:zUC724vuGvHpnCGFG1qqpXb81SiBLu3KLSqVzenwEZNPoY35i2Bscb8DLaVwHvRFs6F2NkNNXRcPWvqnPDUd9ukdjLkjZd3u9zzL4wDZDUpkPAatLDGLEYVo8kkAzuAKJQMr7N2,maple2020@did:key:zUC724vuGvHpnCGFG1qqpXb81SiBLu3KLSqVzenwEZNPoY35i2Bscb8DLaVwHvRFs6F2NkNNXRcPWvqnPDUd9ukdjLkjZd3u9zzL4wDZDUpkPAatLDGLEYVo8kkAzuAKJQMr7N7
       - VCT_TLS_CACERTS=/etc/tls/vct.local.crt
     volumes:
       - ./keys/tls:/etc/tls
     command: start
     depends_on:
-      - vct.couchdb
+      - vct.mongodb
       - vct.kms
       - vct.trillian.log.server
     networks:

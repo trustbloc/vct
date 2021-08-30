@@ -25,6 +25,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/gorilla/mux"
 	"github.com/hyperledger/aries-framework-go-ext/component/storage/couchdb"
+	"github.com/hyperledger/aries-framework-go-ext/component/storage/mongodb"
 	"github.com/hyperledger/aries-framework-go-ext/component/storage/mysql"
 	"github.com/hyperledger/aries-framework-go/component/storageutil/mem"
 	"github.com/hyperledger/aries-framework-go/pkg/common/log"
@@ -85,8 +86,9 @@ const (
 	datasourceNameFlagShorthand = "d"
 	datasourceNameFlagUsage     = "Datasource Name with credentials if required." +
 		" Format must be <driver>:[//]<driver-specific-dsn>." +
-		" Examples: 'mysql://root:secret@tcp(localhost:3306)/adapter', 'mem://test'." +
-		" Supported drivers are [mem, couchdb, mysql]." +
+		" Examples: 'mysql://root:secret@tcp(localhost:3306)/adapter', 'mem://test'," +
+		" 'mongodb://mongodb.example.com:27017'." +
+		" Supported drivers are [mem, couchdb, mysql, mongodb]." +
 		" Alternatively, this can be set with the following environment variable: " + datasourceNameEnvKey
 	datasourceNameEnvKey = envPrefix + "DSN"
 
@@ -146,6 +148,7 @@ const (
 	databaseTypeMemOption     = "mem"
 	databaseTypeMySQLOption   = "mysql"
 	databaseTypeCouchDBOption = "couchdb"
+	databaseTypeMongoDBOption = "mongodb"
 
 	webKeyStoreKey      = "web-key-store"
 	kidKey              = "kid"
@@ -166,6 +169,9 @@ var logger = log.New("vct/startcmd")
 var supportedStorageProviders = map[string]func(string, string) (storage.Provider, error){
 	databaseTypeCouchDBOption: func(dsn, prefix string) (storage.Provider, error) {
 		return couchdb.NewProvider(dsn, couchdb.WithDBPrefix(prefix)) // nolint: wrapcheck
+	},
+	databaseTypeMongoDBOption: func(dsn, prefix string) (storage.Provider, error) {
+		return mongodb.NewProvider("mongodb://"+dsn, mongodb.WithDBPrefix(prefix)) // nolint: wrapcheck
 	},
 	databaseTypeMySQLOption: func(dsn, prefix string) (storage.Provider, error) {
 		return mysql.NewProvider(dsn, mysql.WithDBPrefix(prefix)) // nolint: wrapcheck
@@ -454,7 +460,7 @@ func startAgent(parameters *agentParameters) error { // nolint: funlen
 	conns := map[string]*grpc.ClientConn{}
 
 	for i := range parameters.logs {
-		var tree *trillian.Tree
+		var treeID int64
 
 		conn, ok := conns[parameters.logs[i].Endpoint]
 		if !ok {
@@ -466,13 +472,13 @@ func startAgent(parameters *agentParameters) error { // nolint: funlen
 			conns[parameters.logs[i].Endpoint] = conn
 		}
 
-		tree, err = createTreeAndInit(conn, configStore, parameters.logs[i].Alias,
+		treeID, err = createTreeAndInit(conn, configStore, parameters.logs[i].Alias,
 			parameters.timeout, parameters.syncTimeout)
 		if err != nil {
 			return fmt.Errorf("create tree: %w", err)
 		}
 
-		parameters.logs[i].ID = tree.TreeId
+		parameters.logs[i].ID = treeID
 		parameters.logs[i].Client = trillian.NewTrillianLogClient(conn)
 	}
 
@@ -550,10 +556,10 @@ func (w *webVDR) Read(didID string, opts ...vdrapi.DIDMethodOption) (*did.DocRes
 }
 
 func createTreeAndInit(conn *grpc.ClientConn, cfg storage.Store, alias string, timeout,
-	syncTimeout uint64) (*trillian.Tree, error) {
-	var tree *trillian.Tree
+	syncTimeout uint64) (int64, error) {
+	var treeID int64
 
-	err := getOrInit(cfg, treeLogKey+"-"+alias, &tree, func() (interface{}, error) {
+	err := getOrInit(cfg, treeLogKey+"-"+alias, &treeID, func() (interface{}, error) {
 		var (
 			createdTree *trillian.Tree
 			err         error
@@ -582,13 +588,17 @@ func createTreeAndInit(conn *grpc.ClientConn, cfg storage.Store, alias string, t
 			&trillian.InitLogRequest{LogId: createdTree.TreeId},
 		)
 
-		return createdTree, err // nolint: wrapcheck
+		if err != nil {
+			return nil, err
+		}
+
+		return createdTree.TreeId, nil // nolint: wrapcheck
 	}, syncTimeout)
 	if err != nil {
-		return nil, fmt.Errorf("create and init tree: %w", err)
+		return -1, fmt.Errorf("create and init tree: %w", err)
 	}
 
-	return tree, nil
+	return treeID, nil
 }
 
 func getOrInit(cfg storage.Store, key string, v interface{}, initFn func() (interface{}, error), timeout uint64) error {
