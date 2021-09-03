@@ -276,7 +276,10 @@ func ImportPostgres(query string) error {
 	defer db.Close() // nolint: errcheck
 
 	_, err = db.Exec(query)
-	if err != nil && strings.Contains(err.Error(), "already exists") {
+	// When starting with multiple instances, these errors are possible. They're benign - they just mean another
+	// server won the race and got the table set up first.
+	if err != nil && (strings.Contains(err.Error(), "already exists") ||
+		strings.Contains(err.Error(), "duplicate key value violates unique constraint")) {
 		return nil
 	}
 
