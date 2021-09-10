@@ -460,7 +460,7 @@ func startAgent(parameters *agentParameters) error { // nolint: funlen
 	conns := map[string]*grpc.ClientConn{}
 
 	for i := range parameters.logs {
-		var treeID int64
+		var tree *trillian.Tree
 
 		conn, ok := conns[parameters.logs[i].Endpoint]
 		if !ok {
@@ -472,13 +472,13 @@ func startAgent(parameters *agentParameters) error { // nolint: funlen
 			conns[parameters.logs[i].Endpoint] = conn
 		}
 
-		treeID, err = createTreeAndInit(conn, configStore, parameters.logs[i].Alias,
+		tree, err = createTreeAndInit(conn, configStore, parameters.logs[i].Alias,
 			parameters.timeout, parameters.syncTimeout)
 		if err != nil {
 			return fmt.Errorf("create tree: %w", err)
 		}
 
-		parameters.logs[i].ID = treeID
+		parameters.logs[i].ID = tree.TreeId
 		parameters.logs[i].Client = trillian.NewTrillianLogClient(conn)
 	}
 
@@ -556,10 +556,10 @@ func (w *webVDR) Read(didID string, opts ...vdrapi.DIDMethodOption) (*did.DocRes
 }
 
 func createTreeAndInit(conn *grpc.ClientConn, cfg storage.Store, alias string, timeout,
-	syncTimeout uint64) (int64, error) {
-	var treeID int64
+	syncTimeout uint64) (*trillian.Tree, error) {
+	var tree *trillian.Tree
 
-	err := getOrInit(cfg, treeLogKey+"-"+alias, &treeID, func() (interface{}, error) {
+	err := getOrInit(cfg, treeLogKey+"-"+alias, &tree, func() (interface{}, error) {
 		var (
 			createdTree *trillian.Tree
 			err         error
@@ -588,17 +588,13 @@ func createTreeAndInit(conn *grpc.ClientConn, cfg storage.Store, alias string, t
 			&trillian.InitLogRequest{LogId: createdTree.TreeId},
 		)
 
-		if err != nil {
-			return nil, err
-		}
-
-		return createdTree.TreeId, nil // nolint: wrapcheck
+		return createdTree, err // nolint: wrapcheck
 	}, syncTimeout)
 	if err != nil {
-		return -1, fmt.Errorf("create and init tree: %w", err)
+		return nil, fmt.Errorf("create and init tree: %w", err)
 	}
 
-	return treeID, nil
+	return tree, nil
 }
 
 func getOrInit(cfg storage.Store, key string, v interface{}, initFn func() (interface{}, error), timeout uint64) error {
