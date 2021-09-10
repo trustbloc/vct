@@ -94,7 +94,7 @@ services:
 
   vct.kms:
     container_name: vct.kms
-    image: ghcr.io/trustbloc-cicd/kms:0.1.7-snapshot-86b056c
+    image: ghcr.io/trustbloc-cicd/kms:0.1.7-snapshot-1221880
     restart: always
     environment:
       - KMS_BASE_URL=http://vct.kms:7878
