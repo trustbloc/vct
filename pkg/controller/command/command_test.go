@@ -1425,7 +1425,7 @@ func TestCreateLeaf(t *testing.T) {
 		Context: []string{"https://www.w3.org/2018/credentials/v1"},
 		Subject: "did:key:123",
 		Issuer:  verifiable.Issuer{ID: "did:key:123"},
-		Issued:  &util.TimeWithTrailingZeroMsec{},
+		Issued:  &util.TimeWrapper{},
 		Types:   []string{"VerifiableCredential"},
 		Proofs:  []verifiable.Proof{{}, {}},
 	}
