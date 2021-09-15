@@ -504,8 +504,8 @@ var simpleVC = &verifiable.Credential{ // nolint: gochecknoglobals // global vc
 	Context: []string{"https://www.w3.org/2018/credentials/v1"},
 	Subject: "did:key:123",
 	Issuer:  verifiable.Issuer{ID: "did:key:123"},
-	Issued: func() *util.TimeWithTrailingZeroMsec {
-		res := &util.TimeWithTrailingZeroMsec{}
+	Issued: func() *util.TimeWrapper {
+		res := &util.TimeWrapper{}
 
 		json.Unmarshal([]byte("\"2020-03-10T04:24:12.164Z\""), &res) // nolint: errcheck, gosec
 

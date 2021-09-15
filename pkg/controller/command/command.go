@@ -184,6 +184,10 @@ func (s *customizedStorageProvider) OpenStore(name string) (storage.Store, error
 	return s.StorageProvider.OpenStore(s.alias + name)
 }
 
+func (s *customizedStorageProvider) SetStoreConfig(name string, config storage.StoreConfiguration) error {
+	return s.StorageProvider.SetStoreConfig(s.alias+name, config)
+}
+
 // GetHandlers returns list of all commands supported by this controller.
 func (c *Cmd) GetHandlers() []Handler {
 	return []Handler{
