@@ -87,65 +87,6 @@ func TestOperation_AddVC(t *testing.T) {
 	})
 }
 
-func TestOperation_AddLdContext(t *testing.T) {
-	t.Run("Success", func(t *testing.T) {
-		ctrl := gomock.NewController(t)
-		defer ctrl.Finish()
-
-		const dummyPayload = `{"documents":[]}`
-
-		cmd := NewMockCmd(ctrl)
-		cmd.EXPECT().AddLdContext(gomock.Any(), gomock.Any()).Do(func(_ io.Writer, r io.Reader) {
-			var req *command.AddLdContextRequest
-			require.NoError(t, json.NewDecoder(r).Decode(&req))
-			require.Equal(t, alias, req.Alias)
-		}).Return(nil)
-
-		operation := New(cmd, nil)
-
-		_, code := sendRequestToHandler(t,
-			handlerLookup(t, operation, AddContextPath),
-			bytes.NewBufferString(dummyPayload), strings.Replace(AddContextPath, "{alias}", alias, 1),
-		)
-
-		require.Equal(t, http.StatusOK, code)
-	})
-
-	t.Run("Internal server error", func(t *testing.T) {
-		ctrl := gomock.NewController(t)
-		defer ctrl.Finish()
-
-		const dummyPayload = `{"documents":[]}`
-
-		cmd := NewMockCmd(ctrl)
-		cmd.EXPECT().AddLdContext(gomock.Any(), gomock.Any()).Do(func(_ io.Writer, r io.Reader) {
-			var req *command.AddLdContextRequest
-			require.NoError(t, json.NewDecoder(r).Decode(&req))
-			require.Equal(t, alias, req.Alias)
-		}).Return(errors.New("error"))
-
-		operation := New(cmd, nil)
-
-		_, code := sendRequestToHandler(t,
-			handlerLookup(t, operation, AddContextPath),
-			bytes.NewBufferString(dummyPayload), strings.Replace(AddContextPath, "{alias}", alias, 1),
-		)
-
-		require.Equal(t, http.StatusInternalServerError, code)
-	})
-
-	t.Run("Bad request", func(t *testing.T) {
-		operation := New(nil, nil)
-
-		_, code := sendRequestToHandler(t,
-			handlerLookup(t, operation, AddContextPath),
-			&readerMock{errors.New("EOF")}, AddContextPath,
-		)
-
-		require.Equal(t, http.StatusInternalServerError, code)
-	})
-}
-
 func TestOperation_GetSTH(t *testing.T) {
 	t.Run("Success", func(t *testing.T) {
 		ctrl := gomock.NewController(t)

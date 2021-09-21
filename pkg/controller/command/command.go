@@ -7,7 +7,6 @@ SPDX-License-Identifier: Apache-2.0
 package command
 
 import (
-	"bytes"
 	"context"
 	"crypto/sha256"
 	"encoding/base64"
@@ -20,15 +19,11 @@ import (
 	"github.com/google/trillian"
 	"github.com/google/trillian/monitoring"
 	"github.com/google/trillian/types"
-	ldcmd "github.com/hyperledger/aries-framework-go/pkg/controller/command/ld"
 	"github.com/hyperledger/aries-framework-go/pkg/crypto"
-	"github.com/hyperledger/aries-framework-go/pkg/doc/ld"
 	"github.com/hyperledger/aries-framework-go/pkg/doc/verifiable"
 	"github.com/hyperledger/aries-framework-go/pkg/framework/aries/api/vdr"
 	"github.com/hyperledger/aries-framework-go/pkg/kms"
-	ldsvc "github.com/hyperledger/aries-framework-go/pkg/ld"
-	ldstore "github.com/hyperledger/aries-framework-go/pkg/store/ld"
-	"github.com/hyperledger/aries-framework-go/spi/storage"
+	jsonld "github.com/piprate/json-gold/ld"
 
 	"github.com/trustbloc/vct/pkg/controller/errors"
 )
@@ -43,14 +38,10 @@ const (
 	GetIssuers        = "getIssuers"
 	Webfinger         = "webfinger"
 	AddVC             = "addVC"
-	AddLdContext      = "addLdContext"
 
 	PublicKeyType = "https://trustbloc.dev/ns/public-key"
 	LedgerType    = "https://trustbloc.dev/ns/ledger-type"
 )
-
-// StorageProvider represents a storage provider.
-type StorageProvider storage.Provider
 
 // KeyManager manages keys and their storage.
 type KeyManager kms.KeyManager
@@ -69,18 +60,16 @@ type Key struct {
 
 // Cmd is a controller for commands.
 type Cmd struct {
-	baseURL         string
-	logs            map[string]Log
-	VCLogID         [32]byte
-	kh              interface{}
-	vdr             vdr.Registry
-	kms             KeyManager
-	crypto          crypto.Crypto
-	PubKey          []byte
-	storageProvider StorageProvider
-	alg             *SignatureAndHashAlgorithm
-	loaders         sync.Map
-	ctxCommands     sync.Map
+	baseURL string
+	logs    map[string]Log
+	VCLogID [32]byte
+	kh      interface{}
+	vdr     vdr.Registry
+	kms     KeyManager
+	crypto  crypto.Crypto
+	PubKey  []byte
+	alg     *SignatureAndHashAlgorithm
+	loaders map[string]jsonld.DocumentLoader
 }
 
 type permission int32
@@ -104,18 +93,12 @@ type Log struct {
 // Config for the Cmd.
 type Config struct {
 	KMS             KeyManager
-	StorageProvider StorageProvider
 	Crypto          crypto.Crypto
 	VDR             vdr.Registry
 	Logs            []Log
+	DocumentLoaders map[string]jsonld.DocumentLoader // alias -> loader
 	Key             Key
 	BaseURL         string
-}
-
-type storageProviderFn func() storage.Provider
-
-func (spf storageProviderFn) StorageProvider() storage.Provider {
-	return spf()
 }
 
 // nolint: gochecknoglobals
@@ -162,30 +145,17 @@ func New(cfg *Config, mf monitoring.MetricFactory) (*Cmd, error) {
 	}
 
 	return &Cmd{
-		storageProvider: cfg.StorageProvider,
-		vdr:             cfg.VDR,
-		PubKey:          pubBytes,
-		VCLogID:         sha256.Sum256(pubBytes),
-		logs:            logs,
-		kms:             cfg.KMS,
-		kh:              kh,
-		crypto:          cfg.Crypto,
-		alg:             alg,
-		baseURL:         cfg.BaseURL,
+		vdr:     cfg.VDR,
+		PubKey:  pubBytes,
+		VCLogID: sha256.Sum256(pubBytes),
+		logs:    logs,
+		kms:     cfg.KMS,
+		kh:      kh,
+		crypto:  cfg.Crypto,
+		alg:     alg,
+		baseURL: cfg.BaseURL,
+		loaders: cfg.DocumentLoaders,
 	}, nil
-}
-
-type customizedStorageProvider struct {
-	alias string
-	StorageProvider
-}
-
-func (s *customizedStorageProvider) OpenStore(name string) (storage.Store, error) {
-	return s.StorageProvider.OpenStore(s.alias + name)
-}
-
-func (s *customizedStorageProvider) SetStoreConfig(name string, config storage.StoreConfiguration) error {
-	return s.StorageProvider.SetStoreConfig(s.alias+name, config)
 }
 
 // GetHandlers returns list of all commands supported by this controller.
@@ -199,65 +169,7 @@ func (c *Cmd) GetHandlers() []Handler {
 		NewCmdHandler(GetIssuers, c.GetIssuers),
 		NewCmdHandler(Webfinger, c.Webfinger),
 		NewCmdHandler(AddVC, c.AddVC),
-		NewCmdHandler(AddLdContext, c.AddLdContext),
 	}
-}
-
-// AddLdContext adds jsonld context.
-func (c *Cmd) AddLdContext(w io.Writer, r io.Reader) error {
-	var req AddLdContextRequest
-
-	if err := json.NewDecoder(r).Decode(&req); err != nil {
-		return fmt.Errorf("decode AddLdContext request: %w", err)
-	}
-
-	if err := c.hasPermissions(req.Alias, write); err != nil {
-		return fmt.Errorf("has permissions: %w", err)
-	}
-
-	ctxCmd, err := c.getCtxCmd(req.Alias)
-	if err != nil {
-		return fmt.Errorf("%w: get ctx cmd", errors.ErrInternal)
-	}
-
-	return ctxCmd.AddContexts(w, bytes.NewBuffer(req.Context)) // nolint: wrapcheck
-}
-
-func (c *Cmd) getCtxCmd(alias string) (*ldcmd.Command, error) {
-	val, ok := c.ctxCommands.Load(alias)
-	if ok {
-		return val.(*ldcmd.Command), nil
-	}
-
-	ldStore, err := c.getLDStoreProvider(alias)
-	if err != nil {
-		return nil, fmt.Errorf("get LD store provider: %w", err)
-	}
-
-	c.ctxCommands.Store(alias, ldcmd.New(ldsvc.New(ldStore)))
-
-	return c.getCtxCmd(alias)
-}
-
-func (c *Cmd) documentLoader(alias string) (*ld.DocumentLoader, error) {
-	val, ok := c.loaders.Load(alias)
-	if ok {
-		return val.(*ld.DocumentLoader), nil
-	}
-
-	ldStore, err := c.getLDStoreProvider(alias)
-	if err != nil {
-		return nil, fmt.Errorf("get LD store provider: %w", err)
-	}
-
-	loader, err := ld.NewDocumentLoader(ldStore)
-	if err != nil {
-		return nil, fmt.Errorf("new document loader: %w", err)
-	}
-
-	c.loaders.Store(alias, loader)
-
-	return c.documentLoader(alias)
 }
 
 // GetIssuers returns issuers.
@@ -346,9 +258,9 @@ func (c *Cmd) AddVC(w io.Writer, r io.Reader) error { // nolint: funlen
 		return fmt.Errorf("has permissions: %w", err)
 	}
 
-	loader, err := c.documentLoader(req.Alias)
-	if err != nil {
-		return fmt.Errorf("document loader: %w", err)
+	loader, ok := c.loaders[req.Alias]
+	if !ok {
+		return fmt.Errorf("no document loader found for alias %s", req.Alias)
 	}
 
 	parseCredentialTime := time.Now()
@@ -423,7 +335,7 @@ func (c *Cmd) AddVC(w io.Writer, r io.Reader) error { // nolint: funlen
 	})
 }
 
-// GetSTH retrieves latest signed tree head.
+// GetSTH retrieves the latest signed tree head.
 func (c *Cmd) GetSTH(w io.Writer, r io.Reader) error {
 	var alias string
 
@@ -776,41 +688,4 @@ func contains(s []string, e string) bool {
 	}
 
 	return false
-}
-
-type ldStoreProvider struct {
-	ContextStore        ldstore.ContextStore
-	RemoteProviderStore ldstore.RemoteProviderStore
-}
-
-func (p *ldStoreProvider) JSONLDContextStore() ldstore.ContextStore {
-	return p.ContextStore
-}
-
-func (p *ldStoreProvider) JSONLDRemoteProviderStore() ldstore.RemoteProviderStore {
-	return p.RemoteProviderStore
-}
-
-func (c *Cmd) getLDStoreProvider(alias string) (*ldStoreProvider, error) {
-	storageProvider := storageProviderFn(func() storage.Provider {
-		return &customizedStorageProvider{
-			alias:           alias,
-			StorageProvider: c.storageProvider,
-		}
-	})()
-
-	contextStore, err := ldstore.NewContextStore(storageProvider)
-	if err != nil {
-		return nil, fmt.Errorf("create JSON-LD context store: %w", err)
-	}
-
-	providerStore, err := ldstore.NewRemoteProviderStore(storageProvider)
-	if err != nil {
-		return nil, fmt.Errorf("create remote provider store: %w", err)
-	}
-
-	return &ldStoreProvider{
-		ContextStore:        contextStore,
-		RemoteProviderStore: providerStore,
-	}, nil
 }

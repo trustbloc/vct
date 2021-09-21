@@ -154,11 +154,11 @@ curl -X GET http://admin:password@127.0.0.1:5984/_all_dbs
 ```
 Output:
 ```
-["_replicator","_users","kmspkprimarykey","vctdbmaple2021jsonldcontexts","vctdbconfig"]
+["_replicator","_users","kmspkprimarykey","vctdbmaple2021ldcontexts","vctdbconfig"]
 ```
 
 Then, filter databases from the output above by `VCT_DATABASE_PREFIX=vctdb` env.
-Databases we need to backup are `vctdbmaple2021jsonldcontexts` and `vctdbconfig`
+Databases we need to backup are `vctdbmaple2021ldcontexts` and `vctdbconfig`
 Make a backup according to CouchDB documentation.
 
 ### Trillian Storage

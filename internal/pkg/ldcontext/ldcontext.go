@@ -10,8 +10,13 @@ import (
 	"encoding/json"
 	"os"
 	"sync"
+	"testing"
 
+	"github.com/hyperledger/aries-framework-go/pkg/doc/ld"
 	"github.com/hyperledger/aries-framework-go/pkg/doc/ldcontext"
+	mockldstore "github.com/hyperledger/aries-framework-go/pkg/mock/ld"
+	ldstore "github.com/hyperledger/aries-framework-go/pkg/store/ld"
+	"github.com/stretchr/testify/require"
 )
 
 const testdataDir = "testdata"
@@ -73,4 +78,32 @@ func MustGetAll() []ldcontext.Document {
 	}
 
 	return docs
+}
+
+type mockLDStoreProvider struct {
+	ContextStore        ldstore.ContextStore
+	RemoteProviderStore ldstore.RemoteProviderStore
+}
+
+func (p *mockLDStoreProvider) JSONLDContextStore() ldstore.ContextStore {
+	return p.ContextStore
+}
+
+func (p *mockLDStoreProvider) JSONLDRemoteProviderStore() ldstore.RemoteProviderStore {
+	return p.RemoteProviderStore
+}
+
+// DocumentLoader returns a document loader with preloaded test contexts.
+func DocumentLoader(t *testing.T) *ld.DocumentLoader {
+	t.Helper()
+
+	ldStore := &mockLDStoreProvider{
+		ContextStore:        mockldstore.NewMockContextStore(),
+		RemoteProviderStore: mockldstore.NewMockRemoteProviderStore(),
+	}
+
+	loader, err := ld.NewDocumentLoader(ldStore, ld.WithExtraContexts(MustGetAll()...))
+	require.NoError(t, err)
+
+	return loader
 }

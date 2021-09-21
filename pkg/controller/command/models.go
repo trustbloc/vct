@@ -263,12 +263,6 @@ type AddVCRequest struct {
 	VCEntry []byte `json:"vc_entry"`
 }
 
-// AddLdContextRequest represents the request to add ld context.
-type AddLdContextRequest struct {
-	Alias   string `json:"alias"`
-	Context []byte `json:"context"`
-}
-
 // WebFingerResponse web finger response.
 type WebFingerResponse struct {
 	Subject    string                 `json:"subject,omitempty"`

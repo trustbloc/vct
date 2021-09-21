@@ -29,20 +29,26 @@ import (
 	"github.com/hyperledger/aries-framework-go-ext/component/storage/mysql"
 	"github.com/hyperledger/aries-framework-go/component/storageutil/mem"
 	"github.com/hyperledger/aries-framework-go/pkg/common/log"
+	ldrest "github.com/hyperledger/aries-framework-go/pkg/controller/rest/ld"
 	"github.com/hyperledger/aries-framework-go/pkg/crypto"
 	"github.com/hyperledger/aries-framework-go/pkg/crypto/tinkcrypto"
 	webcrypto "github.com/hyperledger/aries-framework-go/pkg/crypto/webkms"
 	"github.com/hyperledger/aries-framework-go/pkg/doc/did"
+	"github.com/hyperledger/aries-framework-go/pkg/doc/ld"
+	"github.com/hyperledger/aries-framework-go/pkg/doc/ldcontext/remote"
 	vdrapi "github.com/hyperledger/aries-framework-go/pkg/framework/aries/api/vdr"
 	"github.com/hyperledger/aries-framework-go/pkg/kms"
 	"github.com/hyperledger/aries-framework-go/pkg/kms/localkms"
 	"github.com/hyperledger/aries-framework-go/pkg/kms/webkms"
+	ldsvc "github.com/hyperledger/aries-framework-go/pkg/ld"
 	"github.com/hyperledger/aries-framework-go/pkg/secretlock"
 	"github.com/hyperledger/aries-framework-go/pkg/secretlock/noop"
+	ldstore "github.com/hyperledger/aries-framework-go/pkg/store/ld"
 	"github.com/hyperledger/aries-framework-go/pkg/vdr"
 	vdrkey "github.com/hyperledger/aries-framework-go/pkg/vdr/key"
 	vdrweb "github.com/hyperledger/aries-framework-go/pkg/vdr/web"
 	"github.com/hyperledger/aries-framework-go/spi/storage"
+	jsonld "github.com/piprate/json-gold/ld"
 	"github.com/rs/cors"
 	"github.com/spf13/cobra"
 	tlsutils "github.com/trustbloc/edge-core/pkg/utils/tls"
@@ -142,6 +148,11 @@ const (
 	devModeFlagUsage = "Enable dev mode." +
 		" Alternatively, this can be set with the following environment variable: " + devModeFlagEnvKey
 	devModeFlagEnvKey = envPrefix + "DEV_MODE"
+
+	contextProviderFlagName  = "context-provider-url"
+	contextProviderFlagUsage = "Comma-separated list of remote context provider URLs to get JSON-LD contexts from." +
+		" Alternatively, this can be set with the following environment variable: " + contextProviderEnvKey
+	contextProviderEnvKey = envPrefix + "CONTEXT_PROVIDER_URL"
 )
 
 const (
@@ -197,6 +208,9 @@ func (s *HTTPServer) ListenAndServe(host string, router http.Handler, certFile, 
 	return http.ListenAndServe(host, router) // nolint: wrapcheck
 }
 
+// StorageProvider represents a storage provider.
+type StorageProvider storage.Provider
+
 // Cmd returns the Cobra start command.
 func Cmd(server server) (*cobra.Command, error) {
 	startCmd := createStartCMD(server)
@@ -207,18 +221,19 @@ func Cmd(server server) (*cobra.Command, error) {
 }
 
 type agentParameters struct {
-	logs           []command.Log
-	host           string
-	metricsHost    string
-	baseURL        string
-	datasourceName string
-	timeout        uint64
-	syncTimeout    uint64
-	databasePrefix string
-	kmsEndpoint    string
-	tlsParams      *tlsParameters
-	server         server
-	devMode        bool
+	logs                []command.Log
+	host                string
+	metricsHost         string
+	baseURL             string
+	datasourceName      string
+	timeout             uint64
+	syncTimeout         uint64
+	databasePrefix      string
+	kmsEndpoint         string
+	contextProviderURLs []string
+	tlsParams           *tlsParameters
+	server              server
+	devMode             bool
 }
 
 type tlsParameters struct {
@@ -290,10 +305,16 @@ func createStartCMD(server server) *cobra.Command { //nolint: funlen
 			syncTimeoutStr := getUserSetVarOptional(cmd, syncTimeoutFlagName, syncTimeoutEnvKey)
 			issuersStr := getUserSetVarOptional(cmd, issuersFlagName, issuersEnvKey)
 			devModeStr := getUserSetVarOptional(cmd, devModeFlagName, devModeFlagEnvKey)
+			contextProviderURLsStr := getUserSetVarOptional(cmd, contextProviderFlagName, contextProviderEnvKey)
 
 			var issuers []string
 			if issuersStr != "" {
 				issuers = strings.Split(issuersStr, ",")
+			}
+
+			var contextProviderURLs []string
+			if contextProviderURLsStr != "" {
+				contextProviderURLs = strings.Split(contextProviderURLsStr, ",")
 			}
 
 			timeout, err := strconv.ParseUint(timeoutStr, 10, 64)
@@ -326,18 +347,19 @@ func createStartCMD(server server) *cobra.Command { //nolint: funlen
 			}
 
 			parameters := &agentParameters{
-				server:         server,
-				host:           host,
-				metricsHost:    metricsHost,
-				logs:           parseLogs(logsVal, issuers),
-				timeout:        timeout,
-				syncTimeout:    syncTimeout,
-				kmsEndpoint:    kmsEndpoint,
-				datasourceName: datasourceName,
-				databasePrefix: databasePrefix,
-				tlsParams:      tlsParams,
-				baseURL:        baseURL,
-				devMode:        devMode,
+				server:              server,
+				host:                host,
+				metricsHost:         metricsHost,
+				logs:                parseLogs(logsVal, issuers),
+				timeout:             timeout,
+				syncTimeout:         syncTimeout,
+				kmsEndpoint:         kmsEndpoint,
+				datasourceName:      datasourceName,
+				databasePrefix:      databasePrefix,
+				tlsParams:           tlsParams,
+				baseURL:             baseURL,
+				devMode:             devMode,
+				contextProviderURLs: contextProviderURLs,
 			}
 
 			return startAgent(parameters)
@@ -411,7 +433,7 @@ func createKID(km kms.KeyManager, cfg storage.Store, syncTimeout uint64) (string
 	return keyID, keyType, err
 }
 
-func startAgent(parameters *agentParameters) error { // nolint: funlen
+func startAgent(parameters *agentParameters) error { //nolint:funlen,gocyclo,cyclop
 	store, err := createStoreProvider(
 		parameters.datasourceName,
 		parameters.databasePrefix,
@@ -457,6 +479,8 @@ func startAgent(parameters *agentParameters) error { // nolint: funlen
 		return fmt.Errorf("create kid: %w", err)
 	}
 
+	var aliases []string
+
 	conns := map[string]*grpc.ClientConn{}
 
 	for i := range parameters.logs {
@@ -480,6 +504,8 @@ func startAgent(parameters *agentParameters) error { // nolint: funlen
 
 		parameters.logs[i].ID = tree.TreeId
 		parameters.logs[i].Client = trillian.NewTrillianLogClient(conn)
+
+		aliases = append(aliases, parameters.logs[i].Alias)
 	}
 
 	defer func() {
@@ -487,6 +513,29 @@ func startAgent(parameters *agentParameters) error { // nolint: funlen
 			conn.Close() // nolint: errcheck,gosec
 		}
 	}()
+
+	loaders := map[string]jsonld.DocumentLoader{}
+	ldStoreProviders := map[string]*ldStoreProvider{}
+
+	for _, alias := range aliases {
+		storageProvider := &customizedStorageProvider{
+			alias:           alias,
+			StorageProvider: store,
+		}
+
+		ldStore, er := createLDStoreProvider(storageProvider)
+		if er != nil {
+			return fmt.Errorf("create ld store provider: %w", er)
+		}
+
+		loader, er := createJSONLDDocumentLoader(ldStore, httpClient, parameters.contextProviderURLs)
+		if er != nil {
+			return fmt.Errorf("create document loader: %w", er)
+		}
+
+		loaders[alias] = loader
+		ldStoreProviders[alias] = ldStore
+	}
 
 	mf := prometheus.MetricFactory{}
 
@@ -502,8 +551,8 @@ func startAgent(parameters *agentParameters) error { // nolint: funlen
 			ID:   keyID,
 			Type: keyType,
 		},
-		StorageProvider: store,
 		BaseURL:         parameters.baseURL,
+		DocumentLoaders: loaders,
 	}, mf)
 	if err != nil {
 		return fmt.Errorf("create command instance: %w", err)
@@ -519,6 +568,15 @@ func startAgent(parameters *agentParameters) error { // nolint: funlen
 			metricsRouter.HandleFunc(handler.Path(), handler.Handle()).Methods(handler.Method())
 		} else {
 			router.HandleFunc(handler.Path(), handler.Handle()).Methods(handler.Method())
+		}
+	}
+
+	for alias, ldStore := range ldStoreProviders {
+		r := router.PathPrefix(strings.ReplaceAll(rest.BasePath, rest.AliasPath, "/"+alias)).Subrouter()
+
+		// handlers for JSON-LD context operations
+		for _, handler := range ldrest.New(ldsvc.New(ldStore)).GetRESTHandlers() {
+			r.HandleFunc(handler.Path(), handler.Handle()).Methods(handler.Method())
 		}
 	}
 
@@ -676,6 +734,7 @@ func createFlags(startCmd *cobra.Command) {
 	startCmd.Flags().String(tlsServeKeyPathFlagName, "", tlsServeKeyPathFlagUsage)
 	startCmd.Flags().String(issuersFlagName, "", issuersFlagUsage)
 	startCmd.Flags().String(devModeFlagName, "", devModeFlagUsage)
+	startCmd.Flags().String(contextProviderFlagName, "", contextProviderFlagUsage)
 }
 
 func getTLS(cmd *cobra.Command) (*tlsParameters, error) {
@@ -750,4 +809,67 @@ func (k kmsProvider) StorageProvider() storage.Provider {
 
 func (k kmsProvider) SecretLock() secretlock.Service {
 	return k.secretLock
+}
+
+type customizedStorageProvider struct {
+	alias string
+	StorageProvider
+}
+
+func (p *customizedStorageProvider) OpenStore(name string) (storage.Store, error) {
+	return p.StorageProvider.OpenStore(p.alias + name)
+}
+
+func (p *customizedStorageProvider) SetStoreConfig(name string, config storage.StoreConfiguration) error {
+	return p.StorageProvider.SetStoreConfig(p.alias+name, config)
+}
+
+type ldStoreProvider struct {
+	ContextStore        ldstore.ContextStore
+	RemoteProviderStore ldstore.RemoteProviderStore
+}
+
+func (p *ldStoreProvider) JSONLDContextStore() ldstore.ContextStore {
+	return p.ContextStore
+}
+
+func (p *ldStoreProvider) JSONLDRemoteProviderStore() ldstore.RemoteProviderStore {
+	return p.RemoteProviderStore
+}
+
+func createLDStoreProvider(provider storage.Provider) (*ldStoreProvider, error) {
+	contextStore, err := ldstore.NewContextStore(provider)
+	if err != nil {
+		return nil, fmt.Errorf("create JSON-LD context store: %w", err)
+	}
+
+	remoteProviderStore, err := ldstore.NewRemoteProviderStore(provider)
+	if err != nil {
+		return nil, fmt.Errorf("create remote provider store: %w", err)
+	}
+
+	return &ldStoreProvider{
+		ContextStore:        contextStore,
+		RemoteProviderStore: remoteProviderStore,
+	}, nil
+}
+
+func createJSONLDDocumentLoader(ldStore *ldStoreProvider, httpClient *http.Client,
+	providerURLs []string) (jsonld.DocumentLoader, error) {
+	var loaderOpts []ld.DocumentLoaderOpts
+
+	for _, u := range providerURLs {
+		loaderOpts = append(loaderOpts,
+			ld.WithRemoteProvider(
+				remote.NewProvider(u, remote.WithHTTPClient(httpClient)),
+			),
+		)
+	}
+
+	loader, err := ld.NewDocumentLoader(ldStore, loaderOpts...)
+	if err != nil {
+		return nil, fmt.Errorf("new document loader: %w", err)
+	}
+
+	return loader, nil
 }

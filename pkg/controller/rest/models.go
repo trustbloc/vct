@@ -9,8 +9,6 @@ package rest
 import (
 	"time"
 
-	ldcmd "github.com/hyperledger/aries-framework-go/pkg/controller/command/ld"
-
 	"github.com/trustbloc/vct/pkg/controller/command"
 )
 
@@ -20,28 +18,6 @@ import (
 type genericError struct { // nolint:unused,deadcode
 	// in: body
 	Body ErrorResponse
-}
-
-// Request message
-//
-// swagger:parameters addLdContextRequest
-type addLdContextRequest struct { // nolint: unused,deadcode
-	// Alias
-	//
-	// in: path
-	// required: true
-	Alias string `json:"alias"`
-
-	// in: body
-	Body ldcmd.AddContextsRequest
-}
-
-// Response message
-//
-// swagger:response addLdContextResponse
-type addLdContextResponse struct { // nolint: unused,deadcode
-	// in: body
-	Body struct{}
 }
 
 // Request message

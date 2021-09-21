@@ -135,6 +135,7 @@ services:
       - VCT_DATABASE_PREFIX=vctdb_
       - VCT_ISSUERS=maple2021@did:key:zUC724vuGvHpnCGFG1qqpXb81SiBLu3KLSqVzenwEZNPoY35i2Bscb8DLaVwHvRFs6F2NkNNXRcPWvqnPDUd9ukdjLkjZd3u9zzL4wDZDUpkPAatLDGLEYVo8kkAzuAKJQMr7N2,maple2020@did:key:zUC724vuGvHpnCGFG1qqpXb81SiBLu3KLSqVzenwEZNPoY35i2Bscb8DLaVwHvRFs6F2NkNNXRcPWvqnPDUd9ukdjLkjZd3u9zzL4wDZDUpkPAatLDGLEYVo8kkAzuAKJQMr7N7
       - VCT_TLS_CACERTS=/etc/tls/vct.local.crt
+      - VCT_CONTEXT_PROVIDER_URL=https://web.vct.local:443/ld-contexts.json
     volumes:
       - ./keys/tls:/etc/tls
     command: start
@@ -142,6 +143,7 @@ services:
       - vct.mongodb
       - vct.kms
       - vct.trillian.log.server
+      - web.vct.local
     networks:
       - witness_ledger_net
 
@@ -159,6 +161,7 @@ services:
       - VCT_DATABASE_PREFIX=vctdb_
       - VCT_ISSUERS=maple2021@did:key:zUC724vuGvHpnCGFG1qqpXb81SiBLu3KLSqVzenwEZNPoY35i2Bscb8DLaVwHvRFs6F2NkNNXRcPWvqnPDUd9ukdjLkjZd3u9zzL4wDZDUpkPAatLDGLEYVo8kkAzuAKJQMr7N2,maple2020@did:key:zUC724vuGvHpnCGFG1qqpXb81SiBLu3KLSqVzenwEZNPoY35i2Bscb8DLaVwHvRFs6F2NkNNXRcPWvqnPDUd9ukdjLkjZd3u9zzL4wDZDUpkPAatLDGLEYVo8kkAzuAKJQMr7N7
       - VCT_TLS_CACERTS=/etc/tls/vct.local.crt
+      - VCT_CONTEXT_PROVIDER_URL=https://web.vct.local:443/ld-contexts.json
     volumes:
       - ./keys/tls:/etc/tls
     command: start
@@ -166,6 +169,7 @@ services:
       - vct.mongodb
       - vct.kms
       - vct.trillian.log.server
+      - web.vct.local
     networks:
       - witness_ledger_net
 
@@ -181,6 +185,7 @@ services:
     ports:
       - 443:443
     volumes:
+      - ./contexts/ld-contexts.json:/web/ld-contexts.json
       - ./wellknown/did.json:/web/.well-known/did.json
       - ./keys/tls:/etc/tls
     networks:
