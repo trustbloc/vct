@@ -80,10 +80,6 @@ Feature: Verifiable credentials transparency API.
     And   Retrieve entries from log and check that len is "1"
     And   Retrieve merkle audit proof from log by leaf hash for "maple2020/bachelor_degree_web_no_proof.json"
 
-  Scenario: Context is not supported
-    Given VCT agent is running on "http://localhost:5678/maple2024" without contexts
-    Then  Add verifiable credential "maple2020/bachelor_degree_web_no_proof.json" to Log is not a valid JSON-LD context
-
   Scenario: Checks issuers
     Given VCT agent is running on "http://localhost:5678/maple2020"
     Then The issuer "did:key:zUC724vuGvHpnCGFG1qqpXb81SiBLu3KLSqVzenwEZNPoY35i2Bscb8DLaVwHvRFs6F2NkNNXRcPWvqnPDUd9ukdjLkjZd3u9zzL4wDZDUpkPAatLDGLEYVo8kkAzuAKJQMr7N7" is supported

@@ -7,7 +7,7 @@ SPDX-License-Identifier: Apache-2.0
 package command_test
 
 // nolint: lll
-//go:generate mockgen -destination gomocks_test.go -self_package mocks -package command_test . KeyManager,TrillianLogClient,Crypto,StorageProvider
+//go:generate mockgen -destination gomocks_test.go -self_package mocks -package command_test . KeyManager,TrillianLogClient,Crypto
 
 import (
 	"bytes"
@@ -28,7 +28,6 @@ import (
 	"github.com/hyperledger/aries-framework-go/pkg/kms/localkms"
 	"github.com/hyperledger/aries-framework-go/pkg/secretlock"
 	"github.com/hyperledger/aries-framework-go/pkg/secretlock/noop"
-	ldstore "github.com/hyperledger/aries-framework-go/pkg/store/ld"
 	"github.com/hyperledger/aries-framework-go/pkg/vdr"
 	"github.com/hyperledger/aries-framework-go/pkg/vdr/key"
 	"github.com/hyperledger/aries-framework-go/spi/storage"
@@ -72,7 +71,6 @@ func TestNew(t *testing.T) {
 				ID:   kid,
 				Type: kms.ECDSAP256TypeDER,
 			},
-			StorageProvider: mem.NewProvider(),
 		}, nil)
 		require.NoError(t, err)
 		require.NotNil(t, cmd)
@@ -91,7 +89,6 @@ func TestNew(t *testing.T) {
 				ID:   kid,
 				Type: kms.ECDSAP256TypeDER,
 			},
-			StorageProvider: mem.NewProvider(),
 		}, nil)
 		require.EqualError(t, err, "public key is empty")
 		require.Nil(t, cmd)
@@ -135,132 +132,6 @@ func TestNew(t *testing.T) {
 	})
 }
 
-func TestCmd_AddLdContext(t *testing.T) {
-	const kid = "kid"
-
-	t.Run("Context URL is mandatory", func(t *testing.T) {
-		ctrl := gomock.NewController(t)
-		defer ctrl.Finish()
-
-		km := NewMockKeyManager(ctrl)
-		km.EXPECT().Get(kid).Return(nil, nil)
-		km.EXPECT().ExportPubKeyBytes(kid).Return([]byte(`public key`), nil)
-
-		cmd, err := New(&Config{
-			KMS: km, Key: Key{
-				ID:   kid,
-				Type: kms.ECDSAP256TypeIEEEP1363,
-			},
-			Logs: []Log{{
-				Alias:      alias,
-				Permission: "rw",
-			}},
-			StorageProvider: mem.NewProvider(),
-		}, nil)
-		require.NoError(t, err)
-		require.NotNil(t, cmd)
-
-		const payload = `{"alias":"maple2021","context":"eyJkb2N1bWVudHMiOlt7fV19"}`
-
-		require.Error(t, cmd.AddLdContext(nil, bytes.NewBufferString(payload)))
-		require.Error(t, lookupHandler(t, cmd, AddLdContext)(nil, bytes.NewBufferString(payload)))
-	})
-
-	t.Run("Create cmd failed", func(t *testing.T) {
-		ctrl := gomock.NewController(t)
-		defer ctrl.Finish()
-
-		km := NewMockKeyManager(ctrl)
-		km.EXPECT().Get(kid).Return(nil, nil)
-		km.EXPECT().ExportPubKeyBytes(kid).Return([]byte(`public key`), nil)
-
-		sp := NewMockStorageProvider(ctrl)
-		sp.EXPECT().OpenStore(gomock.Any()).Return(nil, errors.New("error")).Times(2)
-
-		cmd, err := New(&Config{
-			KMS: km, Key: Key{
-				ID:   kid,
-				Type: kms.ECDSAP256TypeIEEEP1363,
-			},
-			Logs: []Log{{
-				Alias:      alias,
-				Permission: "rw",
-			}},
-			StorageProvider: sp,
-		}, nil)
-		require.NoError(t, err)
-		require.NotNil(t, cmd)
-
-		const (
-			errorMsg = "internal error: get ctx cmd"
-			payload  = `{"alias":"maple2021","context":"eyJkb2N1bWVudHMiOlt7fV19"}`
-		)
-
-		require.EqualError(t, cmd.AddLdContext(nil, bytes.NewBufferString(payload)), errorMsg)
-		require.EqualError(t, lookupHandler(t, cmd, AddLdContext)(nil, bytes.NewBufferString(payload)), errorMsg)
-	})
-
-	t.Run("No permissions", func(t *testing.T) {
-		ctrl := gomock.NewController(t)
-		defer ctrl.Finish()
-
-		km := NewMockKeyManager(ctrl)
-		km.EXPECT().Get(kid).Return(nil, nil)
-		km.EXPECT().ExportPubKeyBytes(kid).Return([]byte(`public key`), nil)
-
-		cmd, err := New(&Config{
-			KMS: km, Key: Key{
-				ID:   kid,
-				Type: kms.ECDSAP256TypeIEEEP1363,
-			},
-			Logs: []Log{{
-				Alias:      alias,
-				Permission: "r",
-			}},
-			StorageProvider: mem.NewProvider(),
-		}, nil)
-		require.NoError(t, err)
-		require.NotNil(t, cmd)
-
-		const (
-			errorMsg = "has permissions: action forbidden for \"maple2021\""
-			payload  = `{"alias":"maple2021","context":"eyJkb2N1bWVudHMiOlt7fV19"}`
-		)
-
-		require.EqualError(t, cmd.AddLdContext(nil, bytes.NewBufferString(payload)), errorMsg)
-		require.EqualError(t, lookupHandler(t, cmd, AddLdContext)(nil, bytes.NewBufferString(payload)), errorMsg)
-	})
-
-	t.Run("Decode failed", func(t *testing.T) {
-		ctrl := gomock.NewController(t)
-		defer ctrl.Finish()
-
-		km := NewMockKeyManager(ctrl)
-		km.EXPECT().Get(kid).Return(nil, nil)
-		km.EXPECT().ExportPubKeyBytes(kid).Return([]byte(`public key`), nil)
-
-		cmd, err := New(&Config{
-			KMS: km, Key: Key{
-				ID:   kid,
-				Type: kms.ECDSAP256TypeIEEEP1363,
-			},
-			StorageProvider: mem.NewProvider(),
-		}, nil)
-		require.NoError(t, err)
-		require.NotNil(t, cmd)
-
-		const errMsg = "decode AddLdContext request: json: cannot unmarshal array into Go" +
-			" value of type command.AddLdContextRequest"
-
-		require.EqualError(t, cmd.AddLdContext(nil,
-			bytes.NewBufferString("[]")), errMsg,
-		)
-		require.EqualError(t, lookupHandler(t, cmd, AddLdContext)(nil,
-			bytes.NewBufferString("[]")), errMsg,
-		)
-	})
-}
-
 func TestCmd_GetIssuers(t *testing.T) {
 	const kid = "kid"
 
@@ -282,7 +153,6 @@ func TestCmd_GetIssuers(t *testing.T) {
 				Permission: "r",
 				Issuers:    []string{"issuer_a", "issuer_b"},
 			}},
-			StorageProvider: mem.NewProvider(),
 		}, nil)
 		require.NoError(t, err)
 		require.NotNil(t, cmd)
@@ -319,7 +189,6 @@ func TestCmd_GetIssuers(t *testing.T) {
 				Permission: "w",
 				Issuers:    []string{"issuer_a", "issuer_b"},
 			}},
-			StorageProvider: mem.NewProvider(),
 		}, nil)
 		require.NoError(t, err)
 		require.NotNil(t, cmd)
@@ -352,7 +221,6 @@ func TestCmd_GetIssuers(t *testing.T) {
 				Permission: "w",
 				Issuers:    []string{"issuer_a", "issuer_b"},
 			}},
-			StorageProvider: mem.NewProvider(),
 		}, nil)
 		require.NoError(t, err)
 		require.NotNil(t, cmd)
@@ -383,8 +251,7 @@ func TestCmd_Webfinger(t *testing.T) {
 			ID:   kid,
 			Type: kms.ECDSAP256TypeIEEEP1363,
 		},
-		BaseURL:         "https://vct.com",
-		StorageProvider: mem.NewProvider(),
+		BaseURL: "https://vct.com",
 	}, nil)
 	require.NoError(t, err)
 	require.NotNil(t, cmd)
@@ -440,7 +307,6 @@ func TestCmd_GetEntries(t *testing.T) {
 				Permission: "r",
 				Client:     client,
 			}},
-			StorageProvider: mem.NewProvider(),
 		}, nil)
 		require.NoError(t, err)
 		require.NotNil(t, cmd)
@@ -474,7 +340,6 @@ func TestCmd_GetEntries(t *testing.T) {
 				ID:   kid,
 				Type: keyType,
 			},
-			StorageProvider: mem.NewProvider(),
 		}, nil)
 		require.NoError(t, err)
 		require.NotNil(t, cmd)
@@ -499,7 +364,6 @@ func TestCmd_GetEntries(t *testing.T) {
 				ID:   kid,
 				Type: keyType,
 			},
-			StorageProvider: mem.NewProvider(),
 		}, nil)
 		require.NoError(t, err)
 		require.NotNil(t, cmd)
@@ -536,7 +400,6 @@ func TestCmd_GetEntries(t *testing.T) {
 				Permission: "r",
 				Client:     client,
 			}},
-			StorageProvider: mem.NewProvider(),
 		}, nil)
 		require.NoError(t, err)
 		require.NotNil(t, cmd)
@@ -573,7 +436,6 @@ func TestCmd_GetEntries(t *testing.T) {
 				ID:   kid,
 				Type: keyType,
 			},
-			StorageProvider: mem.NewProvider(),
 		}, nil)
 		require.NoError(t, err)
 		require.NotNil(t, cmd)
@@ -612,7 +474,6 @@ func TestCmd_GetEntries(t *testing.T) {
 				ID:   kid,
 				Type: keyType,
 			},
-			StorageProvider: mem.NewProvider(),
 		}, nil)
 		require.NoError(t, err)
 		require.NotNil(t, cmd)
@@ -654,7 +515,6 @@ func TestCmd_GetEntries(t *testing.T) {
 				ID:   kid,
 				Type: keyType,
 			},
-			StorageProvider: mem.NewProvider(),
 		}, nil)
 		require.NoError(t, err)
 		require.NotNil(t, cmd)
@@ -682,7 +542,6 @@ func TestCmd_GetEntries(t *testing.T) {
 				ID:   kid,
 				Type: keyType,
 			},
-			StorageProvider: mem.NewProvider(),
 		}, nil)
 		require.NoError(t, err)
 		require.NotNil(t, cmd)
@@ -727,7 +586,6 @@ func TestCmd_GetProofByHash(t *testing.T) {
 				ID:   kid,
 				Type: keyType,
 			},
-			StorageProvider: mem.NewProvider(),
 		}, nil)
 		require.NoError(t, err)
 		require.NotNil(t, cmd)
@@ -764,7 +622,6 @@ func TestCmd_GetProofByHash(t *testing.T) {
 				ID:   kid,
 				Type: keyType,
 			},
-			StorageProvider: mem.NewProvider(),
 		}, nil)
 		require.NoError(t, err)
 		require.NotNil(t, cmd)
@@ -789,7 +646,6 @@ func TestCmd_GetProofByHash(t *testing.T) {
 				ID:   kid,
 				Type: keyType,
 			},
-			StorageProvider: mem.NewProvider(),
 		}, nil)
 		require.NoError(t, err)
 		require.NotNil(t, cmd)
@@ -831,7 +687,6 @@ func TestCmd_GetProofByHash(t *testing.T) {
 				ID:   kid,
 				Type: keyType,
 			},
-			StorageProvider: mem.NewProvider(),
 		}, nil)
 		require.NoError(t, err)
 		require.NotNil(t, cmd)
@@ -880,7 +735,6 @@ func TestCmd_GetSTHConsistency(t *testing.T) {
 				ID:   kid,
 				Type: keyType,
 			},
-			StorageProvider: mem.NewProvider(),
 		}, nil)
 		require.NoError(t, err)
 		require.NotNil(t, cmd)
@@ -921,7 +775,6 @@ func TestCmd_GetSTHConsistency(t *testing.T) {
 				Alias:      alias,
 				Permission: "r",
 			}},
-			StorageProvider: mem.NewProvider(),
 		}, nil)
 		require.NoError(t, err)
 		require.NotNil(t, cmd)
@@ -958,7 +811,6 @@ func TestCmd_GetSTHConsistency(t *testing.T) {
 				ID:   kid,
 				Type: keyType,
 			},
-			StorageProvider: mem.NewProvider(),
 		}, nil)
 		require.NoError(t, err)
 		require.NotNil(t, cmd)
@@ -983,7 +835,6 @@ func TestCmd_GetSTHConsistency(t *testing.T) {
 				ID:   kid,
 				Type: keyType,
 			},
-			StorageProvider: mem.NewProvider(),
 		}, nil)
 		require.NoError(t, err)
 		require.NotNil(t, cmd)
@@ -1025,7 +876,6 @@ func TestCmd_GetSTHConsistency(t *testing.T) {
 				ID:   kid,
 				Type: keyType,
 			},
-			StorageProvider: mem.NewProvider(),
 		}, nil)
 		require.NoError(t, err)
 		require.NotNil(t, cmd)
@@ -1054,7 +904,6 @@ func TestCmd_GetSTHConsistency(t *testing.T) {
 				ID:   kid,
 				Type: keyType,
 			},
-			StorageProvider: mem.NewProvider(),
 		}, nil)
 		require.NoError(t, err)
 		require.NotNil(t, cmd)
@@ -1104,7 +953,6 @@ func TestCmd_GetSTH(t *testing.T) {
 				ID:   newKID,
 				Type: keyType,
 			},
-			StorageProvider: mem.NewProvider(),
 		}, nil)
 		require.NoError(t, err)
 		require.NotNil(t, cmd)
@@ -1151,7 +999,6 @@ func TestCmd_GetSTH(t *testing.T) {
 				ID:   kid,
 				Type: keyType,
 			},
-			StorageProvider: mem.NewProvider(),
 		}, nil)
 		require.NoError(t, err)
 		require.NotNil(t, cmd)
@@ -1185,7 +1032,6 @@ func TestCmd_GetSTH(t *testing.T) {
 				ID:   kid,
 				Type: keyType,
 			},
-			StorageProvider: mem.NewProvider(),
 		}, nil)
 		require.NoError(t, err)
 		require.NotNil(t, cmd)
@@ -1221,7 +1067,6 @@ func TestCmd_GetSTH(t *testing.T) {
 				ID:   kid,
 				Type: keyType,
 			},
-			StorageProvider: mem.NewProvider(),
 		}, nil)
 		require.NoError(t, err)
 		require.NotNil(t, cmd)
@@ -1261,7 +1106,6 @@ func TestCmd_GetSTH(t *testing.T) {
 				ID:   kid,
 				Type: keyType,
 			},
-			StorageProvider: mem.NewProvider(),
 		}, nil)
 		require.NoError(t, err)
 		require.NotNil(t, cmd)
@@ -1309,7 +1153,6 @@ func TestCmd_GetEntryAndProof(t *testing.T) {
 				ID:   newKID,
 				Type: keyType,
 			},
-			StorageProvider: mem.NewProvider(),
 		}, nil)
 		require.NoError(t, err)
 		require.NotNil(t, cmd)
@@ -1362,7 +1205,6 @@ func TestCmd_GetEntryAndProof(t *testing.T) {
 				ID:   newKID,
 				Type: keyType,
 			},
-			StorageProvider: mem.NewProvider(),
 		}, nil)
 		require.NoError(t, err)
 		require.NotNil(t, cmd)
@@ -1404,7 +1246,6 @@ func TestCmd_GetEntryAndProof(t *testing.T) {
 				ID:   newKID,
 				Type: keyType,
 			},
-			StorageProvider: mem.NewProvider(),
 		}, nil)
 		require.NoError(t, err)
 		require.NotNil(t, cmd)
@@ -1442,6 +1283,8 @@ func TestCmd_AddVC(t *testing.T) {
 		keyType = kms.ECDSAP256TypeIEEEP1363
 	)
 
+	documentLoader := ldcontext.DocumentLoader(t)
+
 	t.Run("Success", func(t *testing.T) {
 		ctrl := gomock.NewController(t)
 		defer ctrl.Finish()
@@ -1459,9 +1302,6 @@ func TestCmd_AddVC(t *testing.T) {
 			}, nil,
 		).Times(2)
 
-		db := mem.NewProvider()
-		loadContexts(t, db, alias)
-
 		cmd, err := New(&Config{
 			KMS:    km,
 			Crypto: cr,
@@ -1475,7 +1315,7 @@ func TestCmd_AddVC(t *testing.T) {
 				ID:   newKID,
 				Type: keyType,
 			},
-			StorageProvider: db,
+			DocumentLoaders: map[string]jsonld.DocumentLoader{alias: documentLoader},
 		}, nil)
 		require.NoError(t, err)
 		require.NotNil(t, cmd)
@@ -1521,9 +1361,6 @@ func TestCmd_AddVC(t *testing.T) {
 		newKID, _, err := km.Create(keyType)
 		require.NoError(t, err)
 
-		db := NewMockStorageProvider(ctrl)
-		db.EXPECT().OpenStore(gomock.Any()).Return(nil, errors.New("error")).Times(2)
-
 		cmd, err := New(&Config{
 			KMS:    km,
 			Crypto: cr,
@@ -1537,7 +1374,6 @@ func TestCmd_AddVC(t *testing.T) {
 				ID:   newKID,
 				Type: keyType,
 			},
-			StorageProvider: db,
 		}, nil)
 		require.NoError(t, err)
 		require.NotNil(t, cmd)
@@ -1567,7 +1403,6 @@ func TestCmd_AddVC(t *testing.T) {
 				ID:   kid,
 				Type: keyType,
 			},
-			StorageProvider: mem.NewProvider(),
 		}, nil)
 		require.NoError(t, err)
 		require.NotNil(t, cmd)
@@ -1595,7 +1430,7 @@ func TestCmd_AddVC(t *testing.T) {
 				Alias:      alias,
 				Permission: "w",
 			}},
-			StorageProvider: mem.NewProvider(),
+			DocumentLoaders: map[string]jsonld.DocumentLoader{alias: documentLoader},
 		}, nil)
 		require.NoError(t, err)
 		require.NotNil(t, cmd)
@@ -1613,9 +1448,6 @@ func TestCmd_AddVC(t *testing.T) {
 		km.EXPECT().Get(kid).Return(nil, nil)
 		km.EXPECT().ExportPubKeyBytes(kid).Return([]byte(`public key`), nil)
 
-		db := mem.NewProvider()
-		loadContexts(t, db, alias)
-
 		cmd, err := New(&Config{
 			KMS: km,
 			Logs: []Log{{
@@ -1628,7 +1460,7 @@ func TestCmd_AddVC(t *testing.T) {
 				ID:   kid,
 				Type: keyType,
 			},
-			StorageProvider: db,
+			DocumentLoaders: map[string]jsonld.DocumentLoader{alias: documentLoader},
 		}, nil)
 		require.NoError(t, err)
 		require.NotNil(t, cmd)
@@ -1655,9 +1487,6 @@ func TestCmd_AddVC(t *testing.T) {
 		client := NewMockTrillianLogClient(ctrl)
 		client.EXPECT().QueueLeaf(gomock.Any(), gomock.Any()).Return(nil, errors.New("error")).Times(2)
 
-		db := mem.NewProvider()
-		loadContexts(t, db, alias)
-
 		cmd, err := New(&Config{
 			KMS: km,
 			Logs: []Log{{
@@ -1670,7 +1499,7 @@ func TestCmd_AddVC(t *testing.T) {
 				ID:   kid,
 				Type: keyType,
 			},
-			StorageProvider: db,
+			DocumentLoaders: map[string]jsonld.DocumentLoader{alias: documentLoader},
 		}, nil)
 		require.NoError(t, err)
 		require.NotNil(t, cmd)
@@ -1697,9 +1526,6 @@ func TestCmd_AddVC(t *testing.T) {
 		client := NewMockTrillianLogClient(ctrl)
 		client.EXPECT().QueueLeaf(gomock.Any(), gomock.Any()).Return(&trillian.QueueLeafResponse{}, nil).Times(2)
 
-		db := mem.NewProvider()
-		loadContexts(t, db, alias)
-
 		cmd, err := New(&Config{
 			KMS: km,
 			Logs: []Log{{
@@ -1712,7 +1538,7 @@ func TestCmd_AddVC(t *testing.T) {
 				ID:   kid,
 				Type: keyType,
 			},
-			StorageProvider: db,
+			DocumentLoaders: map[string]jsonld.DocumentLoader{alias: documentLoader},
 		}, nil)
 		require.NoError(t, err)
 		require.NotNil(t, cmd)
@@ -1745,9 +1571,6 @@ func TestCmd_AddVC(t *testing.T) {
 			},
 		}, nil).Times(2)
 
-		db := mem.NewProvider()
-		loadContexts(t, db, alias)
-
 		cmd, err := New(&Config{
 			KMS: km,
 			Logs: []Log{{
@@ -1760,7 +1583,7 @@ func TestCmd_AddVC(t *testing.T) {
 				ID:   kid,
 				Type: keyType,
 			},
-			StorageProvider: db,
+			DocumentLoaders: map[string]jsonld.DocumentLoader{alias: documentLoader},
 		}, nil)
 		require.NoError(t, err)
 		require.NotNil(t, cmd)
@@ -1796,9 +1619,6 @@ func TestCmd_AddVC(t *testing.T) {
 			},
 		}, nil).Times(2)
 
-		db := mem.NewProvider()
-		loadContexts(t, db, alias)
-
 		cmd, err := New(&Config{
 			KMS: km,
 			Logs: []Log{{
@@ -1812,7 +1632,7 @@ func TestCmd_AddVC(t *testing.T) {
 				ID:   kid,
 				Type: keyType,
 			},
-			StorageProvider: db,
+			DocumentLoaders: map[string]jsonld.DocumentLoader{alias: documentLoader},
 		}, nil)
 		require.NoError(t, err)
 		require.NotNil(t, cmd)
@@ -1836,9 +1656,6 @@ func TestCmd_AddVC(t *testing.T) {
 		km.EXPECT().Get(kid).Return(nil, nil)
 		km.EXPECT().ExportPubKeyBytes(kid).Return([]byte(`public key`), nil)
 
-		db := mem.NewProvider()
-		loadContexts(t, db, alias)
-
 		cmd, err := New(&Config{
 			KMS: km,
 			Logs: []Log{{
@@ -1851,7 +1668,7 @@ func TestCmd_AddVC(t *testing.T) {
 				ID:   kid,
 				Type: keyType,
 			},
-			StorageProvider: db,
+			DocumentLoaders: map[string]jsonld.DocumentLoader{alias: documentLoader},
 		}, nil)
 		require.NoError(t, err)
 		require.NotNil(t, cmd)
@@ -1882,32 +1699,6 @@ func lookupHandler(t *testing.T, cmd *Cmd, name string) Exec {
 	return func(rw io.Writer, req io.Reader) error {
 		return nil
 	}
-}
-
-func loadContexts(t *testing.T, p storage.Provider, prefix string) { // nolint: unparam
-	t.Helper()
-
-	store, err := p.OpenStore(prefix + ldstore.ContextStoreName)
-	require.NoError(t, err)
-
-	var ops []storage.Operation
-
-	for _, doc := range ldcontext.MustGetAll() {
-		var content interface{}
-		content, err = jsonld.DocumentFromReader(bytes.NewReader(doc.Content))
-		require.NoError(t, err)
-
-		var b []byte
-		b, err = json.Marshal(jsonld.RemoteDocument{
-			DocumentURL: doc.URL,
-			Document:    content,
-		})
-		require.NoError(t, err)
-
-		ops = append(ops, storage.Operation{Key: doc.URL, Value: b})
-	}
-
-	require.NoError(t, store.Batch(ops))
 }
 
 func createKMSAndCrypto(t *testing.T) (kms.KeyManager, crypto.Crypto) {

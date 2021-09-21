@@ -32,16 +32,15 @@ var logger = log.New("controller/rest")
 const (
 	aliasVarName          = "alias"
 	AliasPath             = "/{" + aliasVarName + "}"
-	basePath              = AliasPath + "/v1"
-	AddVCPath             = basePath + "/add-vc"
-	GetSTHPath            = basePath + "/get-sth"
-	GetSTHConsistencyPath = basePath + "/get-sth-consistency"
-	GetProofByHashPath    = basePath + "/get-proof-by-hash"
-	GetEntriesPath        = basePath + "/get-entries"
-	GetIssuersPath        = basePath + "/get-issuers"
-	GetEntryAndProofPath  = basePath + "/get-entry-and-proof"
+	BasePath              = AliasPath + "/v1"
+	AddVCPath             = BasePath + "/add-vc"
+	GetSTHPath            = BasePath + "/get-sth"
+	GetSTHConsistencyPath = BasePath + "/get-sth-consistency"
+	GetProofByHashPath    = BasePath + "/get-proof-by-hash"
+	GetEntriesPath        = BasePath + "/get-entries"
+	GetIssuersPath        = BasePath + "/get-issuers"
+	GetEntryAndProofPath  = BasePath + "/get-entry-and-proof"
 	WebfingerPath         = AliasPath + "/.well-known/webfinger"
-	AddContextPath        = basePath + "/context/add"
 	HealthCheckPath       = "/healthcheck"
 	MetricsPath           = "/metrics"
 )
@@ -68,8 +67,6 @@ var (
 	getEntryAndProofLatency  monitoring.Histogram
 	getIssuersCounter        monitoring.Counter
 	getIssuersLatency        monitoring.Histogram
-	contextAddCounter        monitoring.Counter
-	contextAddLatency        monitoring.Histogram
 	webfingerCounter         monitoring.Counter
 	webfingerLatency         monitoring.Histogram
 )
@@ -97,9 +94,6 @@ func createMetrics(mf monitoring.MetricFactory) {
 	getIssuersCounter = mf.NewCounter("get_issuers", "Number of /get-issuers operation", "alias")
 	getIssuersLatency = mf.NewHistogram("get_issuers_latency", "Latency of /get-issuers operation in seconds", "alias")
 
-	contextAddCounter = mf.NewCounter("context_add", "Number of /context/add operation", "alias")
-	contextAddLatency = mf.NewHistogram("context_add_latency", "Latency of /context/add operation in seconds", "alias")
-
 	webfingerCounter = mf.NewCounter("webfinger", "Number of /webfinger operation", "alias")
 	webfingerLatency = mf.NewHistogram("webfinger_latency", "Latency of /webfinger operation in seconds", "alias")
 }
@@ -114,7 +108,6 @@ type Cmd interface {
 	GetEntries(io.Writer, io.Reader) error
 	GetEntryAndProof(io.Writer, io.Reader) error
 	Webfinger(io.Writer, io.Reader) error
-	AddLdContext(io.Writer, io.Reader) error
 }
 
 // Operation represents REST API controller.
@@ -146,8 +139,6 @@ func (c *Operation) GetRESTHandlers() []Handler {
 		NewHTTPHandler(WebfingerPath, http.MethodGet, c.Webfinger),
 		NewHTTPHandler(GetEntryAndProofPath, http.MethodGet, c.GetEntryAndProof),
 		NewHTTPHandler(HealthCheckPath, http.MethodGet, c.HealthCheck),
-		// JSON-LD contexts API
-		NewHTTPHandler(AddContextPath, http.MethodPost, c.AddLdContext),
 		// Metrics
 		NewHTTPHandler(MetricsPath, http.MethodGet, c.metrics()),
 	}
@@ -164,48 +155,6 @@ func (c *Operation) metrics() http.HandlerFunc {
 	return func(writer http.ResponseWriter, request *http.Request) {
 		ph.ServeHTTP(writer, request)
 	}
-}
-
-// AddLdContext swagger:route POST /{alias}/v1/context/add vct addLdContextRequest
-//
-// Adds jsonld context.
-//
-// Responses:
-//    default: genericError
-//        200: addLdContextResponse
-func (c *Operation) AddLdContext(w http.ResponseWriter, r *http.Request) {
-	var (
-		context bytes.Buffer
-		start   = time.Now()
-	)
-
-	_, err := io.Copy(&context, r.Body)
-	if err != nil {
-		sendError(w, fmt.Errorf("%w: copy context", errors.ErrInternal))
-
-		return
-	}
-
-	req, err := json.Marshal(command.AddLdContextRequest{
-		Alias:   mux.Vars(r)[aliasVarName],
-		Context: context.Bytes(),
-	})
-	if err != nil {
-		sendError(w, fmt.Errorf("%w: marshal AddLdContextRequest", errors.ErrInternal))
-
-		return
-	}
-
-	execute(func(rw io.Writer, req io.Reader) error {
-		if err := c.cmd.AddLdContext(rw, req); err != nil {
-			return err
-		}
-
-		contextAddCounter.Add(1, mux.Vars(r)[aliasVarName])
-		contextAddLatency.Observe(time.Since(start).Seconds(), mux.Vars(r)[aliasVarName])
-
-		return nil
-	}, w, bytes.NewBuffer(req))
 }
 
 // AddVC swagger:route POST /{alias}/v1/add-vc vct addVCRequest

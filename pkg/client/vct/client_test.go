@@ -19,7 +19,6 @@ import (
 
 	"github.com/golang/mock/gomock"
 	"github.com/hyperledger/aries-framework-go/pkg/doc/ld"
-	"github.com/hyperledger/aries-framework-go/pkg/doc/ldcontext"
 	"github.com/hyperledger/aries-framework-go/pkg/doc/util"
 	"github.com/hyperledger/aries-framework-go/pkg/doc/verifiable"
 	mockldstore "github.com/hyperledger/aries-framework-go/pkg/mock/ld"
@@ -95,42 +94,6 @@ func TestClient_AddVC(t *testing.T) {
 		client := vct.New(endpoint, vct.WithHTTPClient(httpClient))
 		_, err = client.AddVC(context.Background(), []byte{})
 		require.EqualError(t, err, "add VC: error")
-	})
-}
-
-func TestClient_AddJSONLDContexts(t *testing.T) {
-	t.Run("Success", func(t *testing.T) {
-		ctrl := gomock.NewController(t)
-		defer ctrl.Finish()
-
-		httpClient := NewMockHTTPClient(ctrl)
-		httpClient.EXPECT().Do(gomock.Any()).Return(&http.Response{
-			Body:       ioutil.NopCloser(bytes.NewBuffer([]byte(`{}`))),
-			StatusCode: http.StatusOK,
-		}, nil)
-
-		client := vct.New(endpoint+"/maple2020", vct.WithHTTPClient(httpClient))
-		require.NoError(t, client.AddJSONLDContexts(context.Background(), ldcontext.Document{}))
-	})
-
-	t.Run("Error", func(t *testing.T) {
-		ctrl := gomock.NewController(t)
-		defer ctrl.Finish()
-
-		expected := rest.ErrorResponse{Message: "error"}
-
-		fakeResp, err := json.Marshal(expected)
-		require.NoError(t, err)
-
-		httpClient := NewMockHTTPClient(ctrl)
-		httpClient.EXPECT().Do(gomock.Any()).Return(&http.Response{
-			Body:       ioutil.NopCloser(bytes.NewBuffer(fakeResp)),
-			StatusCode: http.StatusInternalServerError,
-		}, nil)
-
-		client := vct.New(endpoint, vct.WithHTTPClient(httpClient))
-		err = client.AddJSONLDContexts(context.Background(), ldcontext.Document{})
-		require.EqualError(t, err, "add JSON ld contexts: error")
 	})
 }
 
