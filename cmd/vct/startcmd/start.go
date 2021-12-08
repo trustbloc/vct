@@ -380,7 +380,7 @@ func createKMSAndCrypto(parameters *agentParameters, client *http.Client,
 		var keystoreURL string
 
 		err := getOrInit(cfg, webKeyStoreKey, &keystoreURL, func() (interface{}, error) {
-			location, _, err := webkms.CreateKeyStore(client, parameters.kmsEndpoint, uuid.New().String(), "")
+			location, _, err := webkms.CreateKeyStore(client, parameters.kmsEndpoint, uuid.New().String(), "", nil)
 
 			return location, err // nolint: wrapcheck
 		}, syncTimeout)
