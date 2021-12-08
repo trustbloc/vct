@@ -53,3 +53,7 @@ openssl x509 -req -in ${CERTS_OUTPUT_DIR}/vct.local.csr \
 cat ${CERTS_OUTPUT_DIR}/trustbloc-dev-ca.crt >> ${CERTS_OUTPUT_DIR}/vct.local.crt
 
 echo "... Done generating test certs"
+
+#create primary key for kms secret lock
+mkdir -p test/bdd/fixtures/vct/keys/kms
+openssl rand 32 | base64 | sed 's/+/-/g; s/\//_/g' > test/bdd/fixtures/vct/keys/kms/secret-lock.key
