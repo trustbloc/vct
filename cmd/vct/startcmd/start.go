@@ -462,6 +462,7 @@ func startAgent(parameters *agentParameters) error { //nolint:funlen,gocyclo,cyc
 	httpClient := &http.Client{
 		Timeout: time.Minute,
 		Transport: &http.Transport{
+			ForceAttemptHTTP2: true,
 			TLSClientConfig: &tls.Config{
 				RootCAs:    rootCAs,
 				MinVersion: tls.VersionTLS12,
