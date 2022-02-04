@@ -14,7 +14,6 @@ package serverutil
 import (
 	"context"
 	"database/sql"
-	"flag"
 	"fmt"
 	"net"
 	"net/http"
@@ -250,24 +249,8 @@ func AnnounceSelf(ctx context.Context, client *clientv3.Client, etcdService, end
 	}
 }
 
-const (
-	importConnStrFlag = "import_conn_str"
-	storageSystemFlag = "storage_system"
-	pgConnStrFlag     = "pg_conn_str"
-	mysqlURIFlag      = "mysql_uri"
-)
-
 // ImportPostgres imports schema.
-func ImportPostgres(query string) error {
-	var (
-		connStr       = flag.Lookup(importConnStrFlag).Value.String()
-		storageSystem = flag.Lookup(storageSystemFlag).Value.String()
-	)
-
-	if strings.TrimSpace(connStr) == "" {
-		connStr = flag.Lookup(pgConnStrFlag).Value.String()
-	}
-
+func ImportPostgres(query, connStr, storageSystem string) error {
 	db, err := sql.Open(storageSystem, connStr)
 	if err != nil {
 		return fmt.Errorf("error opening %s: %w", storageSystem, err)
@@ -284,44 +267,4 @@ func ImportPostgres(query string) error {
 	}
 
 	return err
-}
-
-// ImportMySQL imports schema.
-func ImportMySQL(queries ...string) error {
-	var (
-		connStr       = flag.Lookup("import_conn_str").Value.String()
-		storageSystem = flag.Lookup(storageSystemFlag).Value.String()
-	)
-
-	if strings.TrimSpace(connStr) == "" {
-		connStr = flag.Lookup(mysqlURIFlag).Value.String()
-	}
-
-	db, err := sql.Open(storageSystem, connStr)
-	if err != nil {
-		return fmt.Errorf("error opening %s: %w", storageSystem, err)
-	}
-
-	defer db.Close() // nolint: errcheck
-
-	tx, err := db.Begin()
-	if err != nil {
-		logger.Fatalf("Failed to begin %s transaction: %v", storageSystem, err)
-	}
-
-	defer func() { tx.Rollback() }() // nolint: errcheck,gosec
-
-	for _, query := range queries {
-		query = strings.TrimSpace(query)
-		if query == "" {
-			continue
-		}
-
-		_, err = tx.Exec(query)
-		if err != nil && !strings.Contains(err.Error(), "Duplicate key name") {
-			logger.Fatalf("Error importing %s schema: %v", storageSystem, err)
-		}
-	}
-
-	return tx.Commit()
 }

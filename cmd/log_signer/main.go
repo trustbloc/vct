@@ -12,44 +12,19 @@ SPDX-License-Identifier: Apache-2.0
 package main
 
 import (
-	"context"
 	"flag"
 	"fmt"
-
-	// nolint:gosec
-	_ "net/http/pprof"
-	"os"
-	"strings"
 	"time"
 
-	"github.com/google/trillian/cmd"
-	"github.com/google/trillian/extension"
 	"github.com/google/trillian/log"
-	"github.com/google/trillian/monitoring"
-	"github.com/google/trillian/monitoring/opencensus"
-	"github.com/google/trillian/monitoring/prometheus"
 	"github.com/google/trillian/quota"
-	"github.com/google/trillian/quota/etcd"
-	_ "github.com/google/trillian/quota/mysqlqm"
 	"github.com/google/trillian/storage"
-	_ "github.com/google/trillian/storage/cloudspanner"
-	_ "github.com/google/trillian/storage/mysql"
-	"github.com/google/trillian/util"
-	"github.com/google/trillian/util/clock"
-	"github.com/google/trillian/util/election"
-	"github.com/google/trillian/util/election2"
-	etcdelect "github.com/google/trillian/util/election2/etcd"
 	arieslog "github.com/hyperledger/aries-framework-go/pkg/common/log"
-	clientv3 "go.etcd.io/etcd/client/v3"
-	"google.golang.org/grpc"
 
-	"github.com/trustbloc/vct/cmd/internal/serverutil"
-	mysqlschema "github.com/trustbloc/vct/pkg/storage/mysql/schema"
-	_ "github.com/trustbloc/vct/pkg/storage/postgres"
-	postgresschema "github.com/trustbloc/vct/pkg/storage/postgres/schema"
+	"github.com/trustbloc/vct/cmd/log_signer/startcmd"
+	"github.com/trustbloc/vct/pkg/storage/memory"
+	"github.com/trustbloc/vct/pkg/storage/postgres"
 )
-
-var logger = arieslog.New("log-signer")
 
 const (
 	sequencerInterval         = 100 * time.Millisecond
@@ -86,138 +61,48 @@ var (
 	masterHoldJitter   = flag.Duration("master_hold_jitter", defaultMasterHoldJitter, "Maximal random addition to --master_hold_interval")
 
 	configFile = flag.String("config", "", "Config file containing flags, file contents can be overridden by command line flags")
-
-	_ = flag.String("import_conn_str", "", "Connection string for Postgres or MySQL database")
+	pgConnStr  = flag.String("pg_conn_str", "user=postgres dbname=test sslmode=disable", "Connection string for Postgres database")
 )
 
-func main() { // nolint: funlen,cyclop
+var logger = arieslog.New("log-signer")
+
+func main() {
 	flag.Parse()
 
-	if *configFile != "" {
-		if err := cmd.ParseFlagFile(*configFile); err != nil {
-			logger.Fatalf("Failed to load flags from config file %q: %s", *configFile, err)
-		}
+	if err := storage.RegisterProvider("mem", memory.NewMemoryStorageProvider); err != nil {
+		logger.Errorf(err.Error())
 	}
 
-	logger.Infof("**** Log Signer Starting ****")
+	postgres.PGConnStr = *pgConnStr
 
-	mf := prometheus.MetricFactory{}
-
-	monitoring.SetStartSpan(opencensus.StartSpan)
-
-	if *storageSystem == "postgres" {
-		if err := serverutil.ImportPostgres(string(postgresschema.SQL)); err != nil {
-			logger.Fatalf("Failed to load %s schema: %v", *storageSystem, err)
-		}
+	if err := storage.RegisterProvider("postgres", postgres.NewPGProvider); err != nil {
+		logger.Errorf(err.Error())
 	}
 
-	if *storageSystem == "mysql" {
-		if err := serverutil.ImportMySQL(strings.Split(string(mysqlschema.SQL), ";")...); err != nil {
-			logger.Fatalf("Failed to load %s schema: %v", *storageSystem, err)
-		}
+	startCMD := startcmd.CMD{
+		RPCEndpoint:              *rpcEndpoint,
+		HTTPEndpoint:             *httpEndpoint,
+		HealthzTimeout:           *healthzTimeout,
+		TLSCertFile:              *tlsCertFile,
+		TLSKeyFile:               *tlsKeyFile,
+		SequencerIntervalFlag:    *sequencerIntervalFlag,
+		ETCDHTTPService:          *etcdHTTPService,
+		QuotaSystem:              *quotaSystem,
+		BatchSizeFlag:            *batchSizeFlag,
+		StorageSystem:            *storageSystem,
+		NumSeqFlag:               *numSeqFlag,
+		SequencerGuardWindowFlag: *sequencerGuardWindowFlag,
+		LockDir:                  *lockDir,
+		ForceMaster:              *forceMaster,
+		PREElectionPause:         *preElectionPause,
+		QuotaIncreaseFactor:      *quotaIncreaseFactor,
+		ConfigFile:               *configFile,
+		PGConnStr:                *pgConnStr,
+		MasterHoldInterval:       *masterHoldInterval,
+		MasterHoldJitter:         *masterHoldJitter,
 	}
 
-	sp, err := storage.NewProvider(*storageSystem, mf)
-	if err != nil {
-		logger.Fatalf("Failed to get storage provider: %v", err)
+	if err := startCMD.Start(); err != nil {
+		logger.Fatalf("failed to start log signer: %v", err)
 	}
-	defer sp.Close() // nolint: errcheck
-
-	var client *clientv3.Client
-
-	const defaultDialTimeout = 5 * time.Second
-
-	if servers := *etcd.Servers; servers != "" {
-		if client, err = clientv3.New(clientv3.Config{
-			Endpoints:   strings.Split(servers, ","),
-			DialTimeout: defaultDialTimeout,
-		}); err != nil {
-			logger.Fatalf("Failed to connect to etcd at %v: %v", servers, err)
-		}
-		defer client.Close() // nolint: errcheck
-	}
-
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
-	go util.AwaitSignal(ctx, cancel)
-
-	hostname, _ := os.Hostname() // nolint: errcheck
-	instanceID := fmt.Sprintf("%s.%d", hostname, os.Getpid())
-
-	var electionFactory election2.Factory
-
-	switch {
-	case *forceMaster:
-		logger.Warnf("**** Acting as master for all logs ****")
-
-		electionFactory = election2.NoopFactory{}
-	case client != nil:
-		electionFactory = etcdelect.NewFactory(instanceID, client, *lockDir)
-	default:
-		logger.Fatalf("Either --force_master or --etcd_servers must be supplied")
-	}
-
-	qm, err := quota.NewManager(*quotaSystem)
-	if err != nil {
-		logger.Fatalf("Error creating quota manager: %v", err)
-	}
-
-	registry := extension.Registry{
-		AdminStorage:    sp.AdminStorage(),
-		LogStorage:      sp.LogStorage(),
-		ElectionFactory: electionFactory,
-		QuotaManager:    qm,
-		MetricFactory:   mf,
-	}
-
-	// Start HTTP server (optional)
-	if *httpEndpoint != "" {
-		// Announce our endpoint to etcd if so configured.
-		unannounceHTTP := serverutil.AnnounceSelf(ctx, client, *etcdHTTPService, *httpEndpoint)
-		defer unannounceHTTP()
-	}
-
-	// Start the sequencing loop, which will run until we terminate the process. This controls
-	// both sequencing and signing.
-	// TODO(Martin2112): Should respect read only mode and the flags in tree control etc
-	log.QuotaIncreaseFactor = *quotaIncreaseFactor
-	sequencerManager := log.NewSequencerManager(registry, *sequencerGuardWindowFlag)
-	info := log.OperationInfo{
-		Registry:    registry,
-		BatchSize:   *batchSizeFlag,
-		NumWorkers:  *numSeqFlag,
-		RunInterval: *sequencerIntervalFlag,
-		TimeSource:  clock.System,
-		ElectionConfig: election.RunnerConfig{
-			PreElectionPause:   *preElectionPause,
-			MasterHoldInterval: *masterHoldInterval,
-			MasterHoldJitter:   *masterHoldJitter,
-			TimeSource:         clock.System,
-		},
-	}
-	sequencerTask := log.NewOperationManager(info, sequencerManager)
-
-	go sequencerTask.OperationLoop(ctx)
-
-	m := serverutil.Main{
-		RPCEndpoint:      *rpcEndpoint,
-		HTTPEndpoint:     *httpEndpoint,
-		TLSCertFile:      *tlsCertFile,
-		TLSKeyFile:       *tlsKeyFile,
-		StatsPrefix:      "logsigner",
-		DBClose:          sp.Close,
-		Registry:         registry,
-		RegisterServerFn: func(s *grpc.Server, _ extension.Registry) error { return nil },
-		IsHealthy:        sp.AdminStorage().CheckDatabaseAccessible,
-		HealthyDeadline:  *healthzTimeout,
-	}
-
-	if err := m.Run(ctx); err != nil {
-		logger.Fatalf("Server exited with error: %v", err)
-	}
-
-	// Give things a few seconds to tidy up
-	logger.Infof("Stopping server, about to exit")
-	time.Sleep(time.Second * 5) // nolint: gomnd
 }

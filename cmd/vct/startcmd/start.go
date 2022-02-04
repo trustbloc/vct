@@ -22,6 +22,7 @@ import (
 	"github.com/cenkalti/backoff/v4"
 	"github.com/google/trillian"
 	"github.com/google/trillian/monitoring/prometheus"
+	trillianstorage "github.com/google/trillian/storage"
 	"github.com/google/uuid"
 	"github.com/gorilla/mux"
 	"github.com/hyperledger/aries-framework-go-ext/component/storage/couchdb"
@@ -55,8 +56,13 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/protobuf/types/known/durationpb"
 
+	"github.com/trustbloc/vct/cmd/internal/serverutil"
+	"github.com/trustbloc/vct/cmd/log_server/startcmd"
+	logsignerstart "github.com/trustbloc/vct/cmd/log_signer/startcmd"
 	"github.com/trustbloc/vct/pkg/controller/command"
 	"github.com/trustbloc/vct/pkg/controller/rest"
+	"github.com/trustbloc/vct/pkg/storage/memory"
+	"github.com/trustbloc/vct/pkg/storage/postgres"
 )
 
 const (
@@ -153,6 +159,11 @@ const (
 	contextProviderFlagUsage = "Comma-separated list of remote context provider URLs to get JSON-LD contexts from." +
 		" Alternatively, this can be set with the following environment variable: " + contextProviderEnvKey
 	contextProviderEnvKey = envPrefix + "CONTEXT_PROVIDER_URL"
+
+	trillianDBConnFlagName  = "trillian-db-conn"
+	trillianDBConnFlagUsage = "Trillian db conn" +
+		" Alternatively, this can be set with the following environment variable: " + contextProviderEnvKey
+	trillianDBConnEnvKey = envPrefix + "TRILLIAN_DB_CONN"
 )
 
 const (
@@ -161,10 +172,12 @@ const (
 	databaseTypeCouchDBOption = "couchdb"
 	databaseTypeMongoDBOption = "mongodb"
 
-	webKeyStoreKey      = "web-key-store"
-	kidKey              = "kid"
-	treeLogKey          = "tree-log"
-	defaultMasterKeyURI = "local-lock://default/master/key/"
+	webKeyStoreKey        = "web-key-store"
+	kidKey                = "kid"
+	treeLogKey            = "tree-log"
+	defaultMasterKeyURI   = "local-lock://default/master/key/"
+	embeddedLogServerHost = "0.0.0.0:8090"
+	embeddedLogSignerHost = "0.0.0.0:8099"
 )
 
 type (
@@ -243,10 +256,12 @@ type tlsParameters struct {
 	serveKeyPath   string
 }
 
-func parseLogs(logsRaw string, issuersRaw []string) []command.Log {
+func parseLogs(logsRaw string, issuersRaw []string) ([]command.Log, bool) { //nolint:funlen
 	logsSet := map[string]command.Log{}
 
 	issuersSet := map[string]map[string]struct{}{}
+
+	starTrillian := false
 
 	for _, issuerRaw := range issuersRaw {
 		parts := strings.Split(issuerRaw, "@")
@@ -262,13 +277,32 @@ func parseLogs(logsRaw string, issuersRaw []string) []command.Log {
 	}
 
 	for _, rawLog := range strings.Split(logsRaw, ",") {
-		parts := strings.Split(rawLog, "@")
-		apParts := strings.Split(parts[0], ":")
+		var alias string
+
+		var permission string
+
+		var endpoint string
+
+		if strings.Contains(rawLog, "@") {
+			parts := strings.Split(rawLog, "@")
+			apParts := strings.Split(parts[0], ":")
+
+			alias = apParts[0]
+			permission = apParts[1]
+			endpoint = parts[1]
+		} else {
+			parts := strings.Split(rawLog, ":")
+
+			alias = parts[0]
+			permission = parts[1]
+			endpoint = embeddedLogServerHost
+			starTrillian = true
+		}
 
 		logEntity := command.Log{
-			Alias:      strings.TrimSpace(apParts[0]),
-			Permission: strings.TrimSpace(apParts[1]),
-			Endpoint:   strings.TrimSpace(parts[1]),
+			Alias:      strings.TrimSpace(alias),
+			Permission: strings.TrimSpace(permission),
+			Endpoint:   strings.TrimSpace(endpoint),
 		}
 
 		var issuers []string
@@ -286,10 +320,10 @@ func parseLogs(logsRaw string, issuersRaw []string) []command.Log {
 		result = append(result, v)
 	}
 
-	return result
+	return result, starTrillian
 }
 
-func createStartCMD(server server) *cobra.Command { //nolint: funlen
+func createStartCMD(server server) *cobra.Command { //nolint: funlen,gocognit,gocyclo,cyclop
 	return &cobra.Command{
 		Use:   "start",
 		Short: "Starts vct service",
@@ -306,6 +340,7 @@ func createStartCMD(server server) *cobra.Command { //nolint: funlen
 			issuersStr := getUserSetVarOptional(cmd, issuersFlagName, issuersEnvKey)
 			devModeStr := getUserSetVarOptional(cmd, devModeFlagName, devModeFlagEnvKey)
 			contextProviderURLsStr := getUserSetVarOptional(cmd, contextProviderFlagName, contextProviderEnvKey)
+			trillianDBConnStr := getUserSetVarOptional(cmd, trillianDBConnFlagName, trillianDBConnEnvKey)
 
 			var issuers []string
 			if issuersStr != "" {
@@ -346,11 +381,70 @@ func createStartCMD(server server) *cobra.Command { //nolint: funlen
 				}
 			}
 
+			logs, starTrillian := parseLogs(logsVal, issuers)
+
+			if starTrillian { //nolint: nestif
+				if err := trillianstorage.RegisterProvider("mem", memory.NewMemoryStorageProvider); err != nil {
+					logger.Errorf(err.Error())
+				}
+
+				postgres.PGConnStr = trillianDBConnStr
+
+				if err := trillianstorage.RegisterProvider("postgres", postgres.NewPGProvider); err != nil {
+					logger.Errorf(err.Error())
+				}
+
+				go func() {
+					startCMD := startcmd.CMD{
+						RPCEndpoint:              embeddedLogServerHost,
+						ETCDService:              "trillian-logserver",
+						QuotaSystem:              "noop",
+						StorageSystem:            "mem",
+						TreeDeleteThreshold:      serverutil.DefaultTreeDeleteThreshold,
+						TreeDeleteMinRunInterval: serverutil.DefaultTreeDeleteMinInterval,
+					}
+
+					if trillianDBConnStr != "" {
+						startCMD.PGConnStr = trillianDBConnStr
+						startCMD.StorageSystem = "postgres"
+					}
+
+					// start log server
+					if err := startCMD.Start(); err != nil {
+						panic(err)
+					}
+				}()
+
+				go func() {
+					startCMD := logsignerstart.CMD{
+						RPCEndpoint:           embeddedLogSignerHost,
+						HealthzTimeout:        5 * time.Second,        //nolint: gomnd
+						SequencerIntervalFlag: 100 * time.Millisecond, //nolint: gomnd
+						QuotaSystem:           "noop",
+						BatchSizeFlag:         1000, //nolint: gomnd
+						StorageSystem:         "mem",
+						NumSeqFlag:            10, //nolint: gomnd
+						ForceMaster:           true,
+						PREElectionPause:      1 * time.Second,
+					}
+
+					if trillianDBConnStr != "" {
+						startCMD.PGConnStr = trillianDBConnStr
+						startCMD.StorageSystem = "postgres"
+					}
+
+					// start log signer
+					if err := startCMD.Start(); err != nil {
+						panic(err)
+					}
+				}()
+			}
+
 			parameters := &agentParameters{
 				server:              server,
 				host:                host,
 				metricsHost:         metricsHost,
-				logs:                parseLogs(logsVal, issuers),
+				logs:                logs,
 				timeout:             timeout,
 				syncTimeout:         syncTimeout,
 				kmsEndpoint:         kmsEndpoint,
@@ -736,6 +830,7 @@ func createFlags(startCmd *cobra.Command) {
 	startCmd.Flags().String(issuersFlagName, "", issuersFlagUsage)
 	startCmd.Flags().String(devModeFlagName, "", devModeFlagUsage)
 	startCmd.Flags().String(contextProviderFlagName, "", contextProviderFlagUsage)
+	startCmd.Flags().String(trillianDBConnFlagName, "", trillianDBConnFlagUsage)
 }
 
 func getTLS(cmd *cobra.Command) (*tlsParameters, error) {

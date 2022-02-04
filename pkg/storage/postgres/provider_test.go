@@ -15,6 +15,10 @@ import (
 )
 
 func TestNewProvider(t *testing.T) {
+	PGConnStr = "user=postgres dbname=test sslmode=disable"
+
+	require.NoError(t, storage.RegisterProvider("postgres", NewPGProvider))
+
 	t.Run("success", func(t *testing.T) {
 		p, err := storage.NewProvider("postgres", nil)
 		require.NoError(t, err)

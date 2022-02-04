@@ -90,6 +90,18 @@ func TestCmd(t *testing.T) {
 		require.NoError(t, startCmd.Execute())
 	})
 
+	t.Run("Success with embedded trillian", func(t *testing.T) {
+		startCmd, err := startcmd.Cmd(&mockServer{})
+		require.NoError(t, err)
+
+		args := []string{
+			"--" + agentHostFlagName, "",
+			"--" + logsFlagName, "maple2021:rw",
+		}
+		startCmd.SetArgs(args)
+		require.NoError(t, startCmd.Execute())
+	})
+
 	t.Run("wrong dev mode flag", func(t *testing.T) {
 		startCmd, err := startcmd.Cmd(&mockServer{})
 		require.NoError(t, err)
