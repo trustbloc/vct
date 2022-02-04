@@ -12,7 +12,6 @@ package postgres
 
 import (
 	"database/sql"
-	"flag"
 	"sync"
 
 	"github.com/google/trillian/monitoring"
@@ -24,32 +23,22 @@ import (
 
 // nolint: gochecknoglobals
 var (
-	pgConnStr = flag.String(
-		"pg_conn_str",
-		"user=postgres dbname=test sslmode=disable",
-		"Connection string for Postgres database",
-	)
+	PGConnStr         string
 	pgOnce            sync.Once
 	pgOnceErr         error
 	pgStorageInstance *pgProvider
 )
-
-// nolint: gochecknoinits
-func init() {
-	if err := storage.RegisterProvider("postgres", newPGProvider); err != nil {
-		logger.Fatalf("Failed to register storage provider postgres: %v", err)
-	}
-}
 
 type pgProvider struct {
 	db *sql.DB
 	mf monitoring.MetricFactory
 }
 
-func newPGProvider(mf monitoring.MetricFactory) (storage.Provider, error) {
+// NewPGProvider return new pg provider.
+func NewPGProvider(mf monitoring.MetricFactory) (storage.Provider, error) {
 	pgOnce.Do(func() {
 		var db *sql.DB
-		db, pgOnceErr = OpenDB(*pgConnStr)
+		db, pgOnceErr = OpenDB(PGConnStr)
 		if pgOnceErr != nil {
 			return
 		}

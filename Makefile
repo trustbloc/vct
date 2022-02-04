@@ -47,6 +47,8 @@ unit-test: mocks
 .PHONY: bdd-test
 bdd-test: generate-test-keys build-vct-docker build-log-server-docker build-log-signer-docker
 	@go test github.com/trustbloc/vct/test/bdd -count=1 -v -cover . -p 1 -timeout=20m -race
+	@VCT_LOGS=maple2020:rw,maple2021:rw,maple2022:r,maple2023:w,maple2024:rw go test github.com/trustbloc/vct/test/bdd -count=1 -v -cover . -p 1 -timeout=20m -race
+
 
 .PHONY: build-vct
 build-vct:

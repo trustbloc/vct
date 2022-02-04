@@ -13,42 +13,19 @@ SPDX-License-Identifier: Apache-2.0
 package main
 
 import (
-	"context"
 	"flag"
 	"fmt"
-
-	// nolint:gosec
-	_ "net/http/pprof"
-	"strings"
 	"time"
 
-	"github.com/google/trillian"
-	"github.com/google/trillian/cmd"
-	"github.com/google/trillian/extension"
-	"github.com/google/trillian/monitoring"
-	"github.com/google/trillian/monitoring/opencensus"
-	"github.com/google/trillian/monitoring/prometheus"
 	"github.com/google/trillian/quota"
-	"github.com/google/trillian/quota/etcd"
-	"github.com/google/trillian/quota/etcd/quotaapi"
-	"github.com/google/trillian/quota/etcd/quotapb"
-	_ "github.com/google/trillian/quota/mysqlqm"
-	"github.com/google/trillian/server"
 	"github.com/google/trillian/storage"
-	_ "github.com/google/trillian/storage/cloudspanner"
-	_ "github.com/google/trillian/storage/mysql"
-	"github.com/google/trillian/util/clock"
 	"github.com/hyperledger/aries-framework-go/pkg/common/log"
-	clientv3 "go.etcd.io/etcd/client/v3"
-	"google.golang.org/grpc"
 
 	"github.com/trustbloc/vct/cmd/internal/serverutil"
-	mysqlschema "github.com/trustbloc/vct/pkg/storage/mysql/schema"
-	_ "github.com/trustbloc/vct/pkg/storage/postgres"
-	postgresschema "github.com/trustbloc/vct/pkg/storage/postgres/schema"
+	"github.com/trustbloc/vct/cmd/log_server/startcmd"
+	"github.com/trustbloc/vct/pkg/storage/memory"
+	"github.com/trustbloc/vct/pkg/storage/postgres"
 )
-
-var logger = log.New("log-server")
 
 const defaultHealthzTimeout = time.Second * 5
 
@@ -76,124 +53,46 @@ var (
 	tracingPercent   = flag.Int("tracing_percent", 0, "Percent of requests to be traced. Zero is a special case to use the DefaultSampler")
 
 	configFile = flag.String("config", "", "Config file containing flags, file contents can be overridden by command line flags")
-
-	_ = flag.String("import_conn_str", "", "Connection string for Postgres or MySQL database")
+	pgConnStr  = flag.String("pg_conn_str", "user=postgres dbname=test sslmode=disable", "Connection string for Postgres database")
 )
 
-func main() { // nolint: funlen,gocyclo,cyclop
+var logger = log.New("log-server")
+
+func main() {
 	flag.Parse()
 
-	if *configFile != "" {
-		if err := cmd.ParseFlagFile(*configFile); err != nil {
-			logger.Fatalf("Failed to load flags from config file %q: %s", *configFile, err)
-		}
+	if err := storage.RegisterProvider("mem", memory.NewMemoryStorageProvider); err != nil {
+		logger.Errorf(err.Error())
 	}
 
-	ctx := context.Background()
+	postgres.PGConnStr = *pgConnStr
 
-	var options []grpc.ServerOption
-
-	mf := prometheus.MetricFactory{}
-
-	monitoring.SetStartSpan(opencensus.StartSpan)
-
-	if *tracing {
-		opts, err := opencensus.EnableRPCServerTracing(*tracingProjectID, *tracingPercent)
-		if err != nil {
-			logger.Fatalf("Failed to initialize stackdriver / opencensus tracing: %v", err)
-		}
-		// Enable the server request counter tracing etc.
-		options = append(options, opts...)
+	if err := storage.RegisterProvider("postgres", postgres.NewPGProvider); err != nil {
+		logger.Errorf(err.Error())
 	}
 
-	if *storageSystem == "postgres" {
-		if err := serverutil.ImportPostgres(string(postgresschema.SQL)); err != nil {
-			logger.Fatalf("Failed to load %s schema: %v", *storageSystem, err)
-		}
+	startCMD := startcmd.CMD{
+		RPCEndpoint:              *rpcEndpoint,
+		HTTPEndpoint:             *httpEndpoint,
+		HealthzTimeout:           *healthzTimeout,
+		TLSCertFile:              *tlsCertFile,
+		TLSKeyFile:               *tlsKeyFile,
+		ETCDService:              *etcdService,
+		ETCDHTTPService:          *etcdHTTPService,
+		QuotaSystem:              *quotaSystem,
+		QuotaDryRun:              *quotaDryRun,
+		StorageSystem:            *storageSystem,
+		TreeGCEnabled:            *treeGCEnabled,
+		TreeDeleteThreshold:      *treeDeleteThreshold,
+		TreeDeleteMinRunInterval: *treeDeleteMinRunInterval,
+		Tracing:                  *tracing,
+		TracingProjectID:         *tracingProjectID,
+		TracingPercent:           *tracingPercent,
+		ConfigFile:               *configFile,
+		PGConnStr:                *pgConnStr,
 	}
 
-	if *storageSystem == "mysql" {
-		if err := serverutil.ImportMySQL(strings.Split(string(mysqlschema.SQL), ";")...); err != nil {
-			logger.Fatalf("Failed to load %s schema: %v", *storageSystem, err)
-		}
-	}
-
-	sp, err := storage.NewProvider(*storageSystem, mf)
-	if err != nil {
-		logger.Fatalf("Failed to get storage provider: %v", err)
-	}
-	defer sp.Close() // nolint: errcheck
-
-	var client *clientv3.Client
-
-	const defaultDialTimeout = 5 * time.Second
-
-	if servers := *etcd.Servers; servers != "" {
-		if client, err = clientv3.New(clientv3.Config{
-			Endpoints:   strings.Split(servers, ","),
-			DialTimeout: defaultDialTimeout,
-		}); err != nil {
-			logger.Fatalf("Failed to connect to etcd at %v: %v", servers, err)
-		}
-		defer client.Close() // nolint: errcheck
-	}
-
-	// Announce our endpoints to etcd if so configured.
-	unannounce := serverutil.AnnounceSelf(ctx, client, *etcdService, *rpcEndpoint)
-	defer unannounce()
-
-	if *httpEndpoint != "" {
-		unannounceHTTP := serverutil.AnnounceSelf(ctx, client, *etcdHTTPService, *httpEndpoint)
-		defer unannounceHTTP()
-	}
-
-	qm, err := quota.NewManager(*quotaSystem)
-	if err != nil {
-		logger.Fatalf("Error creating quota manager: %v", err)
-	}
-
-	registry := extension.Registry{
-		AdminStorage:  sp.AdminStorage(),
-		LogStorage:    sp.LogStorage(),
-		QuotaManager:  qm,
-		MetricFactory: mf,
-	}
-
-	m := serverutil.Main{
-		RPCEndpoint:  *rpcEndpoint,
-		HTTPEndpoint: *httpEndpoint,
-		TLSCertFile:  *tlsCertFile,
-		TLSKeyFile:   *tlsKeyFile,
-		StatsPrefix:  "log",
-		ExtraOptions: options,
-		QuotaDryRun:  *quotaDryRun,
-		DBClose:      sp.Close,
-		Registry:     registry,
-		RegisterServerFn: func(s *grpc.Server, registry extension.Registry) error {
-			logServer := server.NewTrillianLogRPCServer(registry, clock.System)
-			if err := logServer.IsHealthy(); err != nil {
-				return err
-			}
-			trillian.RegisterTrillianLogServer(s, logServer)
-			if *quotaSystem == etcd.QuotaManagerName {
-				quotapb.RegisterQuotaServer(s, quotaapi.NewServer(client))
-			}
-
-			return nil
-		},
-		IsHealthy: func(ctx context.Context) error {
-			as := sp.AdminStorage()
-
-			return as.CheckDatabaseAccessible(ctx)
-		},
-		HealthyDeadline:       *healthzTimeout,
-		AllowedTreeTypes:      []trillian.TreeType{trillian.TreeType_LOG, trillian.TreeType_PREORDERED_LOG},
-		TreeGCEnabled:         *treeGCEnabled,
-		TreeDeleteThreshold:   *treeDeleteThreshold,
-		TreeDeleteMinInterval: *treeDeleteMinRunInterval,
-	}
-
-	if err := m.Run(ctx); err != nil {
-		logger.Fatalf("Server exited with error: %v", err)
+	if err := startCMD.Start(); err != nil {
+		logger.Fatalf("failed to start log server: %v", err)
 	}
 }

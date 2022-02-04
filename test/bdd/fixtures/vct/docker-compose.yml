@@ -122,7 +122,7 @@ services:
     environment:
       - VCT_BASE_URL=http://vct:5678
       - VCT_API_HOST=0.0.0.0:56561
-      - VCT_LOGS=maple2020:rw@vct.trillian.log.server:8090,maple2021:rw@vct.trillian.log.server:8090,maple2022:r@vct.trillian.log.server:8090,maple2023:w@vct.trillian.log.server:8090,maple2024:rw@vct.trillian.log.server:8090
+      - VCT_LOGS=${VCT_LOGS}
       - VCT_KMS_ENDPOINT=http://vct.kms:7878
       - VCT_TIMEOUT=60
       - VCT_DSN=mongodb://vct.mongodb:27017
@@ -130,6 +130,7 @@ services:
       - VCT_ISSUERS=maple2021@did:key:zUC724vuGvHpnCGFG1qqpXb81SiBLu3KLSqVzenwEZNPoY35i2Bscb8DLaVwHvRFs6F2NkNNXRcPWvqnPDUd9ukdjLkjZd3u9zzL4wDZDUpkPAatLDGLEYVo8kkAzuAKJQMr7N2,maple2020@did:key:zUC724vuGvHpnCGFG1qqpXb81SiBLu3KLSqVzenwEZNPoY35i2Bscb8DLaVwHvRFs6F2NkNNXRcPWvqnPDUd9ukdjLkjZd3u9zzL4wDZDUpkPAatLDGLEYVo8kkAzuAKJQMr7N7
       - VCT_TLS_CACERTS=/etc/tls/vct.local.crt
       - VCT_CONTEXT_PROVIDER_URL=https://web.vct.local:443/ld-contexts.json
+      - VCT_TRILLIAN_DB_CONN=user=postgres host=vct.postgres password=password dbname=test port=5432 sslmode=disable
     volumes:
       - ./keys/tls:/etc/tls
     command: start
@@ -148,7 +149,7 @@ services:
     environment:
       - VCT_BASE_URL=http://vct:5678
       - VCT_API_HOST=0.0.0.0:56562
-      - VCT_LOGS=maple2020:rw@vct.trillian.log.server:8090,maple2021:rw@vct.trillian.log.server:8090,maple2022:r@vct.trillian.log.server:8090,maple2023:w@vct.trillian.log.server:8090,maple2024:rw@vct.trillian.log.server:8090
+      - VCT_LOGS=${VCT_LOGS}
       - VCT_KMS_ENDPOINT=http://vct.kms:7878
       - VCT_TIMEOUT=60
       - VCT_DSN=mongodb://vct.mongodb:27017
@@ -156,6 +157,7 @@ services:
       - VCT_ISSUERS=maple2021@did:key:zUC724vuGvHpnCGFG1qqpXb81SiBLu3KLSqVzenwEZNPoY35i2Bscb8DLaVwHvRFs6F2NkNNXRcPWvqnPDUd9ukdjLkjZd3u9zzL4wDZDUpkPAatLDGLEYVo8kkAzuAKJQMr7N2,maple2020@did:key:zUC724vuGvHpnCGFG1qqpXb81SiBLu3KLSqVzenwEZNPoY35i2Bscb8DLaVwHvRFs6F2NkNNXRcPWvqnPDUd9ukdjLkjZd3u9zzL4wDZDUpkPAatLDGLEYVo8kkAzuAKJQMr7N7
       - VCT_TLS_CACERTS=/etc/tls/vct.local.crt
       - VCT_CONTEXT_PROVIDER_URL=https://web.vct.local:443/ld-contexts.json
+      - VCT_TRILLIAN_DB_CONN=user=postgres host=vct.postgres password=password dbname=test port=5432 sslmode=disable
     volumes:
       - ./keys/tls:/etc/tls
     command: start
