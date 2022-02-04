@@ -16,10 +16,7 @@ import (
 	"github.com/google/trillian/monitoring"
 	"github.com/google/trillian/storage"
 	"github.com/google/trillian/storage/memory"
-	"github.com/hyperledger/aries-framework-go/pkg/common/log"
 )
-
-var logger = log.New("memory")
 
 var (
 	newOnce     sync.Once        //nolint: gochecknoglobals
@@ -34,13 +31,11 @@ type memProvider struct {
 // NewMemoryStorageProvider return new memory provider.
 func NewMemoryStorageProvider(mf monitoring.MetricFactory) (storage.Provider, error) {
 	newOnce.Do(func() {
-		logger.Errorf("once")
 		newInstance = &memProvider{
 			mf: mf,
 			ts: memory.NewTreeStorage(),
 		}
 	})
-	logger.Errorf("return from new")
 
 	return newInstance, nil
 }
