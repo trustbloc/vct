@@ -42,7 +42,7 @@ lint: mocks
 
 .PHONY: unit-test
 unit-test: mocks
-	@go test $(shell go list ./... | grep -v /test/bdd) -count=1 -race -coverprofile=coverage.out -covermode=atomic -timeout=10m
+	@scripts/check_unit.sh
 
 .PHONY: bdd-test
 bdd-test: generate-test-keys build-vct-docker build-log-server-docker build-log-signer-docker

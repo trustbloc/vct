@@ -64,7 +64,7 @@ func TestNew(t *testing.T) {
 
 		km := NewMockKeyManager(ctrl)
 		km.EXPECT().Get(kid).Return(nil, nil)
-		km.EXPECT().ExportPubKeyBytes(kid).Return([]byte(`public key`), nil)
+		km.EXPECT().ExportPubKeyBytes(kid).Return([]byte(`public key`), kms.ECDSAP256TypeDER, nil)
 
 		cmd, err := New(&Config{
 			KMS: km, Key: Key{
@@ -82,7 +82,7 @@ func TestNew(t *testing.T) {
 
 		km := NewMockKeyManager(ctrl)
 		km.EXPECT().Get(kid).Return(nil, nil)
-		km.EXPECT().ExportPubKeyBytes(kid).Return(nil, nil)
+		km.EXPECT().ExportPubKeyBytes(kid).Return(nil, kms.ECDSAP256TypeDER, nil)
 
 		cmd, err := New(&Config{
 			KMS: km, Key: Key{
@@ -121,7 +121,7 @@ func TestNew(t *testing.T) {
 
 		km := NewMockKeyManager(ctrl)
 		km.EXPECT().Get(kid).Return(nil, nil)
-		km.EXPECT().ExportPubKeyBytes(kid).Return(nil, errors.New("internal error"))
+		km.EXPECT().ExportPubKeyBytes(kid).Return(nil, kms.ECDSAP256TypeDER, errors.New("internal error"))
 
 		cmd, err := New(&Config{KMS: km, Key: Key{
 			ID:   kid,
@@ -141,7 +141,7 @@ func TestCmd_GetIssuers(t *testing.T) {
 
 		km := NewMockKeyManager(ctrl)
 		km.EXPECT().Get(kid).Return(nil, nil)
-		km.EXPECT().ExportPubKeyBytes(kid).Return([]byte(`public key`), nil)
+		km.EXPECT().ExportPubKeyBytes(kid).Return([]byte(`public key`), kms.ECDSAP256TypeIEEEP1363, nil)
 
 		cmd, err := New(&Config{
 			KMS: km, Key: Key{
@@ -177,7 +177,7 @@ func TestCmd_GetIssuers(t *testing.T) {
 
 		km := NewMockKeyManager(ctrl)
 		km.EXPECT().Get(kid).Return(nil, nil)
-		km.EXPECT().ExportPubKeyBytes(kid).Return([]byte(`public key`), nil)
+		km.EXPECT().ExportPubKeyBytes(kid).Return([]byte(`public key`), kms.ECDSAP256TypeIEEEP1363, nil)
 
 		cmd, err := New(&Config{
 			KMS: km, Key: Key{
@@ -209,7 +209,7 @@ func TestCmd_GetIssuers(t *testing.T) {
 
 		km := NewMockKeyManager(ctrl)
 		km.EXPECT().Get(kid).Return(nil, nil)
-		km.EXPECT().ExportPubKeyBytes(kid).Return([]byte(`public key`), nil)
+		km.EXPECT().ExportPubKeyBytes(kid).Return([]byte(`public key`), kms.ECDSAP256TypeIEEEP1363, nil)
 
 		cmd, err := New(&Config{
 			KMS: km, Key: Key{
@@ -244,7 +244,7 @@ func TestCmd_Webfinger(t *testing.T) {
 
 	km := NewMockKeyManager(ctrl)
 	km.EXPECT().Get(kid).Return(nil, nil)
-	km.EXPECT().ExportPubKeyBytes(kid).Return([]byte(`public key`), nil)
+	km.EXPECT().ExportPubKeyBytes(kid).Return([]byte(`public key`), kms.ECDSAP256TypeIEEEP1363, nil)
 
 	cmd, err := New(&Config{
 		KMS: km, Key: Key{
@@ -286,7 +286,7 @@ func TestCmd_GetEntries(t *testing.T) {
 
 		km := NewMockKeyManager(ctrl)
 		km.EXPECT().Get(kid).Return(nil, nil)
-		km.EXPECT().ExportPubKeyBytes(kid).Return([]byte(`public key`), nil)
+		km.EXPECT().ExportPubKeyBytes(kid).Return([]byte(`public key`), keyType, nil)
 
 		client := NewMockTrillianLogClient(ctrl)
 		client.EXPECT().GetLeavesByRange(gomock.Any(), gomock.Any()).Return(
@@ -332,7 +332,7 @@ func TestCmd_GetEntries(t *testing.T) {
 
 		km := NewMockKeyManager(ctrl)
 		km.EXPECT().Get(kid).Return(nil, nil)
-		km.EXPECT().ExportPubKeyBytes(kid).Return([]byte(`public key`), nil)
+		km.EXPECT().ExportPubKeyBytes(kid).Return([]byte(`public key`), keyType, nil)
 
 		cmd, err := New(&Config{
 			KMS: km,
@@ -356,7 +356,7 @@ func TestCmd_GetEntries(t *testing.T) {
 
 		km := NewMockKeyManager(ctrl)
 		km.EXPECT().Get(kid).Return(nil, nil)
-		km.EXPECT().ExportPubKeyBytes(kid).Return([]byte(`public key`), nil)
+		km.EXPECT().ExportPubKeyBytes(kid).Return([]byte(`public key`), keyType, nil)
 
 		cmd, err := New(&Config{
 			KMS: km,
@@ -384,7 +384,7 @@ func TestCmd_GetEntries(t *testing.T) {
 
 		km := NewMockKeyManager(ctrl)
 		km.EXPECT().Get(kid).Return(nil, nil)
-		km.EXPECT().ExportPubKeyBytes(kid).Return([]byte(`public key`), nil)
+		km.EXPECT().ExportPubKeyBytes(kid).Return([]byte(`public key`), keyType, nil)
 
 		client := NewMockTrillianLogClient(ctrl)
 		client.EXPECT().GetLeavesByRange(gomock.Any(), gomock.Any()).Return(nil, errors.New("error")).Times(2)
@@ -416,7 +416,7 @@ func TestCmd_GetEntries(t *testing.T) {
 
 		km := NewMockKeyManager(ctrl)
 		km.EXPECT().Get(kid).Return(nil, nil)
-		km.EXPECT().ExportPubKeyBytes(kid).Return([]byte(`public key`), nil)
+		km.EXPECT().ExportPubKeyBytes(kid).Return([]byte(`public key`), keyType, nil)
 
 		client := NewMockTrillianLogClient(ctrl)
 		client.EXPECT().GetLeavesByRange(gomock.Any(), gomock.Any()).Return(
@@ -452,7 +452,7 @@ func TestCmd_GetEntries(t *testing.T) {
 
 		km := NewMockKeyManager(ctrl)
 		km.EXPECT().Get(kid).Return(nil, nil)
-		km.EXPECT().ExportPubKeyBytes(kid).Return([]byte(`public key`), nil)
+		km.EXPECT().ExportPubKeyBytes(kid).Return([]byte(`public key`), keyType, nil)
 
 		client := NewMockTrillianLogClient(ctrl)
 		client.EXPECT().GetLeavesByRange(gomock.Any(), gomock.Any()).Return(
@@ -494,7 +494,7 @@ func TestCmd_GetEntries(t *testing.T) {
 
 		km := NewMockKeyManager(ctrl)
 		km.EXPECT().Get(kid).Return(nil, nil)
-		km.EXPECT().ExportPubKeyBytes(kid).Return([]byte(`public key`), nil)
+		km.EXPECT().ExportPubKeyBytes(kid).Return([]byte(`public key`), keyType, nil)
 
 		client := NewMockTrillianLogClient(ctrl)
 		client.EXPECT().GetLeavesByRange(gomock.Any(), gomock.Any()).Return(
@@ -531,7 +531,7 @@ func TestCmd_GetEntries(t *testing.T) {
 
 		km := NewMockKeyManager(ctrl)
 		km.EXPECT().Get(kid).Return(nil, nil)
-		km.EXPECT().ExportPubKeyBytes(kid).Return([]byte(`public key`), nil)
+		km.EXPECT().ExportPubKeyBytes(kid).Return([]byte(`public key`), keyType, nil)
 
 		cmd, err := New(&Config{
 			KMS: km,
@@ -565,7 +565,7 @@ func TestCmd_GetProofByHash(t *testing.T) {
 
 		km := NewMockKeyManager(ctrl)
 		km.EXPECT().Get(kid).Return(nil, nil)
-		km.EXPECT().ExportPubKeyBytes(kid).Return([]byte(`public key`), nil)
+		km.EXPECT().ExportPubKeyBytes(kid).Return([]byte(`public key`), keyType, nil)
 
 		client := NewMockTrillianLogClient(ctrl)
 		client.EXPECT().GetInclusionProofByHash(gomock.Any(), gomock.Any()).Return(
@@ -614,7 +614,7 @@ func TestCmd_GetProofByHash(t *testing.T) {
 
 		km := NewMockKeyManager(ctrl)
 		km.EXPECT().Get(kid).Return(nil, nil)
-		km.EXPECT().ExportPubKeyBytes(kid).Return([]byte(`public key`), nil)
+		km.EXPECT().ExportPubKeyBytes(kid).Return([]byte(`public key`), keyType, nil)
 
 		cmd, err := New(&Config{
 			KMS: km,
@@ -638,7 +638,7 @@ func TestCmd_GetProofByHash(t *testing.T) {
 
 		km := NewMockKeyManager(ctrl)
 		km.EXPECT().Get(kid).Return(nil, nil)
-		km.EXPECT().ExportPubKeyBytes(kid).Return([]byte(`public key`), nil)
+		km.EXPECT().ExportPubKeyBytes(kid).Return([]byte(`public key`), keyType, nil)
 
 		cmd, err := New(&Config{
 			KMS: km,
@@ -666,7 +666,7 @@ func TestCmd_GetProofByHash(t *testing.T) {
 
 		km := NewMockKeyManager(ctrl)
 		km.EXPECT().Get(kid).Return(nil, nil)
-		km.EXPECT().ExportPubKeyBytes(kid).Return([]byte(`public key`), nil)
+		km.EXPECT().ExportPubKeyBytes(kid).Return([]byte(`public key`), keyType, nil)
 
 		client := NewMockTrillianLogClient(ctrl)
 		client.EXPECT().GetInclusionProofByHash(gomock.Any(), gomock.Any()).Return(
@@ -714,7 +714,7 @@ func TestCmd_GetSTHConsistency(t *testing.T) {
 
 		km := NewMockKeyManager(ctrl)
 		km.EXPECT().Get(kid).Return(nil, nil)
-		km.EXPECT().ExportPubKeyBytes(kid).Return([]byte(`public key`), nil)
+		km.EXPECT().ExportPubKeyBytes(kid).Return([]byte(`public key`), keyType, nil)
 
 		client := NewMockTrillianLogClient(ctrl)
 		client.EXPECT().GetConsistencyProof(gomock.Any(), gomock.Any()).Return(
@@ -763,7 +763,7 @@ func TestCmd_GetSTHConsistency(t *testing.T) {
 
 		km := NewMockKeyManager(ctrl)
 		km.EXPECT().Get(kid).Return(nil, nil)
-		km.EXPECT().ExportPubKeyBytes(kid).Return([]byte(`public key`), nil)
+		km.EXPECT().ExportPubKeyBytes(kid).Return([]byte(`public key`), keyType, nil)
 
 		cmd, err := New(&Config{
 			KMS: km,
@@ -803,7 +803,7 @@ func TestCmd_GetSTHConsistency(t *testing.T) {
 
 		km := NewMockKeyManager(ctrl)
 		km.EXPECT().Get(kid).Return(nil, nil)
-		km.EXPECT().ExportPubKeyBytes(kid).Return([]byte(`public key`), nil)
+		km.EXPECT().ExportPubKeyBytes(kid).Return([]byte(`public key`), keyType, nil)
 
 		cmd, err := New(&Config{
 			KMS: km,
@@ -827,7 +827,7 @@ func TestCmd_GetSTHConsistency(t *testing.T) {
 
 		km := NewMockKeyManager(ctrl)
 		km.EXPECT().Get(kid).Return(nil, nil)
-		km.EXPECT().ExportPubKeyBytes(kid).Return([]byte(`public key`), nil)
+		km.EXPECT().ExportPubKeyBytes(kid).Return([]byte(`public key`), keyType, nil)
 
 		cmd, err := New(&Config{
 			KMS: km,
@@ -855,7 +855,7 @@ func TestCmd_GetSTHConsistency(t *testing.T) {
 
 		km := NewMockKeyManager(ctrl)
 		km.EXPECT().Get(kid).Return(nil, nil)
-		km.EXPECT().ExportPubKeyBytes(kid).Return([]byte(`public key`), nil)
+		km.EXPECT().ExportPubKeyBytes(kid).Return([]byte(`public key`), keyType, nil)
 
 		client := NewMockTrillianLogClient(ctrl)
 		client.EXPECT().GetConsistencyProof(gomock.Any(), gomock.Any()).Return(
@@ -896,7 +896,7 @@ func TestCmd_GetSTHConsistency(t *testing.T) {
 
 		km := NewMockKeyManager(ctrl)
 		km.EXPECT().Get(kid).Return(nil, nil)
-		km.EXPECT().ExportPubKeyBytes(kid).Return([]byte(`public key`), nil)
+		km.EXPECT().ExportPubKeyBytes(kid).Return([]byte(`public key`), keyType, nil)
 
 		cmd, err := New(&Config{
 			KMS: km,
@@ -981,7 +981,7 @@ func TestCmd_GetSTH(t *testing.T) {
 
 		km := NewMockKeyManager(ctrl)
 		km.EXPECT().Get(kid).Return(nil, nil)
-		km.EXPECT().ExportPubKeyBytes(kid).Return([]byte(`public key`), nil)
+		km.EXPECT().ExportPubKeyBytes(kid).Return([]byte(`public key`), keyType, nil)
 
 		client := NewMockTrillianLogClient(ctrl)
 		client.EXPECT().GetLatestSignedLogRoot(
@@ -1014,7 +1014,7 @@ func TestCmd_GetSTH(t *testing.T) {
 
 		km := NewMockKeyManager(ctrl)
 		km.EXPECT().Get(kid).Return(nil, nil)
-		km.EXPECT().ExportPubKeyBytes(kid).Return([]byte(`public key`), nil)
+		km.EXPECT().ExportPubKeyBytes(kid).Return([]byte(`public key`), keyType, nil)
 
 		client := NewMockTrillianLogClient(ctrl)
 		client.EXPECT().GetLatestSignedLogRoot(
@@ -1047,7 +1047,7 @@ func TestCmd_GetSTH(t *testing.T) {
 
 		km := NewMockKeyManager(ctrl)
 		km.EXPECT().Get(kid).Return(nil, nil)
-		km.EXPECT().ExportPubKeyBytes(kid).Return([]byte(`public key`), nil)
+		km.EXPECT().ExportPubKeyBytes(kid).Return([]byte(`public key`), keyType, nil)
 
 		client := NewMockTrillianLogClient(ctrl)
 		client.EXPECT().GetLatestSignedLogRoot(gomock.Any(), gomock.Any()).Return(
@@ -1082,7 +1082,7 @@ func TestCmd_GetSTH(t *testing.T) {
 
 		km := NewMockKeyManager(ctrl)
 		km.EXPECT().Get(kid).Return(nil, nil)
-		km.EXPECT().ExportPubKeyBytes(kid).Return([]byte(`public key`), nil)
+		km.EXPECT().ExportPubKeyBytes(kid).Return([]byte(`public key`), keyType, nil)
 
 		cr := NewMockCrypto(ctrl)
 		cr.EXPECT().Sign(gomock.Any(), gomock.Any()).Return([]byte{}, errors.New("error")).Times(2)
@@ -1395,7 +1395,7 @@ func TestCmd_AddVC(t *testing.T) {
 
 		km := NewMockKeyManager(ctrl)
 		km.EXPECT().Get(kid).Return(nil, nil)
-		km.EXPECT().ExportPubKeyBytes(kid).Return([]byte(`public key`), nil)
+		km.EXPECT().ExportPubKeyBytes(kid).Return([]byte(`public key`), keyType, nil)
 
 		cmd, err := New(&Config{
 			KMS: km,
@@ -1418,7 +1418,7 @@ func TestCmd_AddVC(t *testing.T) {
 
 		km := NewMockKeyManager(ctrl)
 		km.EXPECT().Get(kid).Return(nil, nil)
-		km.EXPECT().ExportPubKeyBytes(kid).Return([]byte(`public key`), nil)
+		km.EXPECT().ExportPubKeyBytes(kid).Return([]byte(`public key`), keyType, nil)
 
 		cmd, err := New(&Config{
 			KMS: km,
@@ -1446,7 +1446,7 @@ func TestCmd_AddVC(t *testing.T) {
 
 		km := NewMockKeyManager(ctrl)
 		km.EXPECT().Get(kid).Return(nil, nil)
-		km.EXPECT().ExportPubKeyBytes(kid).Return([]byte(`public key`), nil)
+		km.EXPECT().ExportPubKeyBytes(kid).Return([]byte(`public key`), keyType, nil)
 
 		cmd, err := New(&Config{
 			KMS: km,
@@ -1482,7 +1482,7 @@ func TestCmd_AddVC(t *testing.T) {
 
 		km := NewMockKeyManager(ctrl)
 		km.EXPECT().Get(kid).Return(nil, nil)
-		km.EXPECT().ExportPubKeyBytes(kid).Return([]byte(`public key`), nil)
+		km.EXPECT().ExportPubKeyBytes(kid).Return([]byte(`public key`), keyType, nil)
 
 		client := NewMockTrillianLogClient(ctrl)
 		client.EXPECT().QueueLeaf(gomock.Any(), gomock.Any()).Return(nil, errors.New("error")).Times(2)
@@ -1521,7 +1521,7 @@ func TestCmd_AddVC(t *testing.T) {
 
 		km := NewMockKeyManager(ctrl)
 		km.EXPECT().Get(kid).Return(nil, nil)
-		km.EXPECT().ExportPubKeyBytes(kid).Return([]byte(`public key`), nil)
+		km.EXPECT().ExportPubKeyBytes(kid).Return([]byte(`public key`), keyType, nil)
 
 		client := NewMockTrillianLogClient(ctrl)
 		client.EXPECT().QueueLeaf(gomock.Any(), gomock.Any()).Return(&trillian.QueueLeafResponse{}, nil).Times(2)
@@ -1560,7 +1560,7 @@ func TestCmd_AddVC(t *testing.T) {
 
 		km := NewMockKeyManager(ctrl)
 		km.EXPECT().Get(kid).Return(nil, nil)
-		km.EXPECT().ExportPubKeyBytes(kid).Return([]byte(`public key`), nil)
+		km.EXPECT().ExportPubKeyBytes(kid).Return([]byte(`public key`), keyType, nil)
 
 		client := NewMockTrillianLogClient(ctrl)
 		client.EXPECT().QueueLeaf(gomock.Any(), gomock.Any()).Return(&trillian.QueueLeafResponse{
@@ -1605,7 +1605,7 @@ func TestCmd_AddVC(t *testing.T) {
 
 		km := NewMockKeyManager(ctrl)
 		km.EXPECT().Get(kid).Return(nil, nil)
-		km.EXPECT().ExportPubKeyBytes(kid).Return([]byte(`public key`), nil)
+		km.EXPECT().ExportPubKeyBytes(kid).Return([]byte(`public key`), keyType, nil)
 
 		cr := NewMockCrypto(ctrl)
 		cr.EXPECT().Sign(gomock.Any(), gomock.Any()).Return([]byte{}, errors.New("error")).Times(2)
@@ -1654,7 +1654,7 @@ func TestCmd_AddVC(t *testing.T) {
 
 		km := NewMockKeyManager(ctrl)
 		km.EXPECT().Get(kid).Return(nil, nil)
-		km.EXPECT().ExportPubKeyBytes(kid).Return([]byte(`public key`), nil)
+		km.EXPECT().ExportPubKeyBytes(kid).Return([]byte(`public key`), keyType, nil)
 
 		cmd, err := New(&Config{
 			KMS: km,
