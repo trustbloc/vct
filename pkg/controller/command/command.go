@@ -130,7 +130,7 @@ func New(cfg *Config, mf monitoring.MetricFactory) (*Cmd, error) {
 		return nil, fmt.Errorf("kms get kh: %w", err)
 	}
 
-	pubBytes, err := cfg.KMS.ExportPubKeyBytes(cfg.Key.ID)
+	pubBytes, _, err := cfg.KMS.ExportPubKeyBytes(cfg.Key.ID)
 	if err != nil {
 		return nil, fmt.Errorf("export pub key bytes: %w", err)
 	}
