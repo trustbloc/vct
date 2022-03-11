@@ -17,6 +17,15 @@ jobs:
       matrix:
         os: [windows-latest, macos-latest, ubuntu-latest]
     steps:
+      # for windows-latest os, this step fixes "Windows Subsystem for Linux has no installed distributions." error
+      # when a makefile tries to execute a shell script (as in "make unit-test" further below).
+      - name: Rename wsl bash
+        if: matrix.os == 'windows-latest'
+        run: |
+          takeown /F C:\Windows\System32\bash.exe
+          icacls C:\Windows\System32\bash.exe /grant administrators:F
+          ren C:\Windows\System32\bash.exe wsl-bash.exe
+
       - name: Setup Go 1.16
         uses: actions/setup-go@v2
         with:
