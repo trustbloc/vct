@@ -125,7 +125,7 @@ services:
       - VCT_LOGS=${VCT_LOGS}
       - VCT_KMS_ENDPOINT=http://vct.kms:7878
       - VCT_TIMEOUT=60
-      - VCT_DSN=mongodb://vct.mongodb:27017
+      - VCT_DSN=postgres://postgres:password@vct.postgres:5432
       - VCT_DATABASE_PREFIX=vctdb_
       - VCT_ISSUERS=maple2021@did:key:zUC724vuGvHpnCGFG1qqpXb81SiBLu3KLSqVzenwEZNPoY35i2Bscb8DLaVwHvRFs6F2NkNNXRcPWvqnPDUd9ukdjLkjZd3u9zzL4wDZDUpkPAatLDGLEYVo8kkAzuAKJQMr7N2,maple2020@did:key:zUC724vuGvHpnCGFG1qqpXb81SiBLu3KLSqVzenwEZNPoY35i2Bscb8DLaVwHvRFs6F2NkNNXRcPWvqnPDUd9ukdjLkjZd3u9zzL4wDZDUpkPAatLDGLEYVo8kkAzuAKJQMr7N7
       - VCT_TLS_CACERTS=/etc/tls/vct.local.crt
@@ -135,7 +135,7 @@ services:
       - ./keys/tls:/etc/tls
     command: start
     depends_on:
-      - vct.mongodb
+      - vct.postgres
       - vct.kms
       - vct.trillian.log.server
       - web.vct.local
@@ -152,7 +152,7 @@ services:
       - VCT_LOGS=${VCT_LOGS}
       - VCT_KMS_ENDPOINT=http://vct.kms:7878
       - VCT_TIMEOUT=60
-      - VCT_DSN=mongodb://vct.mongodb:27017
+      - VCT_DSN=postgres://postgres:password@vct.postgres:5432
       - VCT_DATABASE_PREFIX=vctdb_
       - VCT_ISSUERS=maple2021@did:key:zUC724vuGvHpnCGFG1qqpXb81SiBLu3KLSqVzenwEZNPoY35i2Bscb8DLaVwHvRFs6F2NkNNXRcPWvqnPDUd9ukdjLkjZd3u9zzL4wDZDUpkPAatLDGLEYVo8kkAzuAKJQMr7N2,maple2020@did:key:zUC724vuGvHpnCGFG1qqpXb81SiBLu3KLSqVzenwEZNPoY35i2Bscb8DLaVwHvRFs6F2NkNNXRcPWvqnPDUd9ukdjLkjZd3u9zzL4wDZDUpkPAatLDGLEYVo8kkAzuAKJQMr7N7
       - VCT_TLS_CACERTS=/etc/tls/vct.local.crt
@@ -162,7 +162,7 @@ services:
       - ./keys/tls:/etc/tls
     command: start
     depends_on:
-      - vct.mongodb
+      - vct.postgres
       - vct.kms
       - vct.trillian.log.server
       - web.vct.local
