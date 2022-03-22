@@ -27,7 +27,7 @@ import (
 	"github.com/gorilla/mux"
 	"github.com/hyperledger/aries-framework-go-ext/component/storage/couchdb"
 	"github.com/hyperledger/aries-framework-go-ext/component/storage/mongodb"
-	"github.com/hyperledger/aries-framework-go-ext/component/storage/mysql"
+	"github.com/hyperledger/aries-framework-go-ext/component/storage/postgresql"
 	"github.com/hyperledger/aries-framework-go/component/storageutil/mem"
 	"github.com/hyperledger/aries-framework-go/pkg/common/log"
 	ldrest "github.com/hyperledger/aries-framework-go/pkg/controller/rest/ld"
@@ -98,9 +98,9 @@ const (
 	datasourceNameFlagShorthand = "d"
 	datasourceNameFlagUsage     = "Datasource Name with credentials if required." +
 		" Format must be <driver>:[//]<driver-specific-dsn>." +
-		" Examples: 'mysql://root:secret@tcp(localhost:3306)/adapter', 'mem://test'," +
+		" Examples: 'postgres://jack:secret@pg.example.com:5432/mydb', 'mem://test'," +
 		" 'mongodb://mongodb.example.com:27017'." +
-		" Supported drivers are [mem, couchdb, mysql, mongodb]." +
+		" Supported drivers are [mem, couchdb, postgres, mongodb]." +
 		" Alternatively, this can be set with the following environment variable: " + datasourceNameEnvKey
 	datasourceNameEnvKey = envPrefix + "DSN"
 
@@ -167,10 +167,10 @@ const (
 )
 
 const (
-	databaseTypeMemOption     = "mem"
-	databaseTypeMySQLOption   = "mysql"
-	databaseTypeCouchDBOption = "couchdb"
-	databaseTypeMongoDBOption = "mongodb"
+	databaseTypeMemOption         = "mem"
+	databaseTypePostgresSQLOption = "postgres"
+	databaseTypeCouchDBOption     = "couchdb"
+	databaseTypeMongoDBOption     = "mongodb"
 
 	webKeyStoreKey        = "web-key-store"
 	kidKey                = "kid"
@@ -197,8 +197,8 @@ var supportedStorageProviders = map[string]func(string, string) (storage.Provide
 	databaseTypeMongoDBOption: func(dsn, prefix string) (storage.Provider, error) {
 		return mongodb.NewProvider("mongodb://"+dsn, mongodb.WithDBPrefix(prefix)) // nolint: wrapcheck
 	},
-	databaseTypeMySQLOption: func(dsn, prefix string) (storage.Provider, error) {
-		return mysql.NewProvider(dsn, mysql.WithDBPrefix(prefix)) // nolint: wrapcheck
+	databaseTypePostgresSQLOption: func(dsn, prefix string) (storage.Provider, error) {
+		return postgresql.NewProvider("postgres://"+dsn, postgresql.WithDBPrefix(prefix)) // nolint: wrapcheck
 	},
 	databaseTypeMemOption: func(_, _ string) (storage.Provider, error) { // nolint: unparam
 		return mem.NewProvider(), nil
@@ -292,7 +292,6 @@ func parseLogs(logsRaw string, issuersRaw []string) ([]command.Log, bool) { //no
 			endpoint = parts[1]
 		} else {
 			parts := strings.Split(rawLog, ":")
-
 			alias = parts[0]
 			permission = parts[1]
 			endpoint = embeddedLogServerHost
