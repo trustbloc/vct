@@ -15,8 +15,8 @@ VCT_IMAGE_NAME 		?=trustbloc/vct
 LOG_SERVER_IMAGE_NAME ?=trustbloc/vct-log-server
 LOG_SIGNER_IMAGE_NAME ?=trustbloc/vct-log-signer
 
-ALPINE_VER ?= 3.12
-GO_VER ?= 1.16
+ALPINE_VER ?= 3.15
+GO_VER ?= 1.17
 
 OS := $(shell uname)
 ifeq  ($(OS),$(filter $(OS),Darwin Linux))

@@ -92,29 +92,6 @@ services:
     networks:
       - witness_ledger_net
 
-  vct.kms:
-    container_name: vct.kms
-    image: ghcr.io/trustbloc-cicd/kms:v0.1.8-snapshot-2dff373
-    restart: always
-    environment:
-      - KMS_BASE_URL=http://vct.kms:7878
-      - KMS_HOST=0.0.0.0:7878
-      - KMS_DATABASE_TYPE=mongodb
-      - KMS_DATABASE_URL=mongodb://vct.mongodb:27017
-      - KMS_DATABASE_PREFIX=keystore_
-      - KMS_SECRET_LOCK_TYPE=local
-      - KMS_SECRET_LOCK_KEY_PATH=/etc/kms/secret-lock.key
-      - KMS_LOG_LEVEL=debug
-    volumes:
-      - ./keys/kms:/etc/kms
-    ports:
-      - 7878:7878
-    command: start
-    depends_on:
-      - vct.mongodb
-    networks:
-      - witness_ledger_net
-
   vct-1.backend:
     container_name: vct-1.backend
     image: ghcr.io/trustbloc/vct:latest
@@ -123,7 +100,11 @@ services:
       - VCT_BASE_URL=http://vct:5678
       - VCT_API_HOST=0.0.0.0:56561
       - VCT_LOGS=${VCT_LOGS}
-      - VCT_KMS_ENDPOINT=http://vct.kms:7878
+      - VCT_KMS_TYPE=aws
+      - VCT_KMS_ENDPOINT=http://aws-kms:8020
+      - VCT_LOG_SIGN_ACTIVE_KEY_ID=aws-kms://arn:aws:kms:ca-central-1:111122223333:alias/log-sign
+      - AWS_ACCESS_KEY_ID=mock
+      - AWS_SECRET_ACCESS_KEY=mock
       - VCT_TIMEOUT=60
       - VCT_DSN=postgres://postgres:password@vct.postgres:5432
       - VCT_DATABASE_PREFIX=vctdb_
@@ -136,7 +117,7 @@ services:
     command: start
     depends_on:
       - vct.postgres
-      - vct.kms
+      - vct.aws
       - vct.trillian.log.server
       - web.vct.local
     networks:
@@ -150,7 +131,11 @@ services:
       - VCT_BASE_URL=http://vct:5678
       - VCT_API_HOST=0.0.0.0:56562
       - VCT_LOGS=${VCT_LOGS}
-      - VCT_KMS_ENDPOINT=http://vct.kms:7878
+      - VCT_KMS_TYPE=aws
+      - VCT_KMS_ENDPOINT=http://aws-kms:8020
+      - VCT_LOG_SIGN_ACTIVE_KEY_ID=aws-kms://arn:aws:kms:ca-central-1:111122223333:alias/log-sign
+      - AWS_ACCESS_KEY_ID=mock
+      - AWS_SECRET_ACCESS_KEY=mock
       - VCT_TIMEOUT=60
       - VCT_DSN=postgres://postgres:password@vct.postgres:5432
       - VCT_DATABASE_PREFIX=vctdb_
@@ -163,7 +148,7 @@ services:
     command: start
     depends_on:
       - vct.postgres
-      - vct.kms
+      - vct.aws
       - vct.trillian.log.server
       - web.vct.local
     networks:
@@ -186,6 +171,23 @@ services:
       - ./keys/tls:/etc/tls
     networks:
       - witness_ledger_net
+
+  vct.aws:
+    container_name: aws-kms
+    image: nsmithuk/local-kms:latest
+    environment:
+      - PORT=8020
+      - KMS_SEED_PATH=/init/seed.yaml
+      - KMS_REGION=ca-central-1
+      - KMS_ACCOUNT_ID=111122223333
+    ports:
+      - 8020:8020
+    entrypoint: "local-kms"
+    volumes:
+      - ./aws-config/init:/init/
+    networks:
+      - witness_ledger_net
+
 
 networks:
   witness_ledger_net:

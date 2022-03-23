@@ -26,6 +26,8 @@ import (
 const (
 	agentHostFlagName         = "api-host"
 	kmsEndpointFlagName       = "kms-endpoint"
+	logKeyIDFlagName          = "log-active-key-id"
+	kmsTypeFlagName           = "kms-type"
 	logsFlagName              = "logs"
 	devModeFlagName           = "dev-mode"
 	issuersFlagName           = "issuers"
@@ -85,6 +87,7 @@ func TestCmd(t *testing.T) {
 		args := []string{
 			"--" + agentHostFlagName, "",
 			"--" + logsFlagName, "maple2021:rw@localhost:50051",
+			"--" + kmsTypeFlagName, "local",
 		}
 		startCmd.SetArgs(args)
 		require.NoError(t, startCmd.Execute())
@@ -97,6 +100,7 @@ func TestCmd(t *testing.T) {
 		args := []string{
 			"--" + agentHostFlagName, "",
 			"--" + logsFlagName, "maple2021:rw",
+			"--" + kmsTypeFlagName, "local",
 		}
 		startCmd.SetArgs(args)
 		require.NoError(t, startCmd.Execute())
@@ -110,6 +114,7 @@ func TestCmd(t *testing.T) {
 			"--" + agentHostFlagName, "",
 			"--" + logsFlagName, "maple2021:rw@localhost:50051",
 			"--" + devModeFlagName, "wrong",
+			"--" + kmsTypeFlagName, "local",
 		}
 		startCmd.SetArgs(args)
 		err = startCmd.Execute()
@@ -123,6 +128,7 @@ func TestCmd(t *testing.T) {
 
 		args := []string{
 			"--" + agentHostFlagName, "",
+			"--" + kmsTypeFlagName, "local",
 		}
 		startCmd.SetArgs(args)
 
@@ -139,6 +145,7 @@ func TestCmd(t *testing.T) {
 			"--" + agentHostFlagName, "",
 			"--" + issuersFlagName, "maple2021@issuer",
 			"--" + logsFlagName, "maple2021:rw@https://vct.example.com",
+			"--" + kmsTypeFlagName, "local",
 		}
 		startCmd.SetArgs(args)
 
@@ -155,6 +162,7 @@ func TestCmd(t *testing.T) {
 			"--" + agentHostFlagName, ":98989",
 			"--" + logsFlagName, "11111:rw@https://vct.example.com",
 			"--" + kmsEndpointFlagName, "https://vct.example.com",
+			"--" + kmsTypeFlagName, "web",
 		}
 		startCmd.SetArgs(args)
 
@@ -171,6 +179,7 @@ func TestCmd(t *testing.T) {
 			"--" + agentHostFlagName, ":98989",
 			"--" + logsFlagName, "11111:rw@https://vct.example.com",
 			"--" + tlsSystemCertPoolFlagName, "invalid",
+			"--" + kmsTypeFlagName, "local",
 		}
 		startCmd.SetArgs(args)
 
@@ -187,6 +196,7 @@ func TestCmd(t *testing.T) {
 			"--" + agentHostFlagName, ":98989",
 			"--" + logsFlagName, "11111:rw@https://vct.example.com",
 			"--" + datasourceNameFlagName, "mem1://test",
+			"--" + kmsTypeFlagName, "local",
 		}
 		startCmd.SetArgs(args)
 
@@ -203,6 +213,7 @@ func TestCmd(t *testing.T) {
 			"--" + agentHostFlagName, ":98989",
 			"--" + logsFlagName, "11111:rw@https://vct.example.com",
 			"--" + datasourceNameFlagName, "mem",
+			"--" + kmsTypeFlagName, "local",
 		}
 		startCmd.SetArgs(args)
 
@@ -220,6 +231,7 @@ func TestCmd(t *testing.T) {
 			"--" + logsFlagName, "11111:rw@https://vct.example.com",
 			"--" + datasourceNameFlagName, "mem://test",
 			"--" + timeoutFlagName, "w1",
+			"--" + kmsTypeFlagName, "local",
 		}
 		startCmd.SetArgs(args)
 
@@ -237,6 +249,7 @@ func TestCmd(t *testing.T) {
 			"--" + logsFlagName, "11111:rw@https://vct.example.com",
 			"--" + datasourceNameFlagName, "mem://test",
 			"--" + syncTimeoutFlagName, "w1",
+			"--" + kmsTypeFlagName, "local",
 		}
 		startCmd.SetArgs(args)
 
@@ -255,6 +268,7 @@ func TestCmd(t *testing.T) {
 			"--" + agentHostFlagName, ":98989",
 			"--" + logsFlagName, "11111:rw@https://vct.example.com",
 			"--" + datasourceNameFlagName, "mem://test",
+			"--" + kmsTypeFlagName, "local",
 		}
 		startCmd.SetArgs(args)
 
@@ -273,6 +287,7 @@ func TestCmd(t *testing.T) {
 			"--" + agentHostFlagName, ":98989",
 			"--" + logsFlagName, "11111:rw@https://vct.example.com",
 			"--" + datasourceNameFlagName, "mem://test",
+			"--" + kmsTypeFlagName, "local",
 		}
 		startCmd.SetArgs(args)
 
@@ -290,11 +305,86 @@ func TestCmd(t *testing.T) {
 			"--" + logsFlagName, "11111:rw@https://vct.example.com",
 			"--" + datasourceNameFlagName, "mem://test",
 			"--" + tlsCACertsFlagName, "invalid",
+			"--" + kmsTypeFlagName, "local",
 		}
 		startCmd.SetArgs(args)
 
 		err = startCmd.Execute()
 		require.Error(t, err)
 		require.Contains(t, err.Error(), "get cert pool: failed to read cert: open invalid")
+	})
+
+	t.Run("unsupported kms type", func(t *testing.T) {
+		startCmd, err := startcmd.Cmd(&mockServer{})
+		require.NoError(t, err)
+
+		args := []string{
+			"--" + agentHostFlagName, ":98989",
+			"--" + logsFlagName, "11111:rw@https://vct.example.com",
+			"--" + datasourceNameFlagName, "mem://test",
+			"--" + tlsCACertsFlagName, "invalid",
+			"--" + kmsTypeFlagName, "wrong",
+		}
+		startCmd.SetArgs(args)
+
+		err = startCmd.Execute()
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "unsupported kms type")
+	})
+
+	t.Run("failed to get region", func(t *testing.T) {
+		startCmd, err := startcmd.Cmd(&mockServer{})
+		require.NoError(t, err)
+
+		args := []string{
+			"--" + agentHostFlagName, ":98989",
+			"--" + logsFlagName, "11111:rw@https://vct.example.com",
+			"--" + datasourceNameFlagName, "mem://test",
+			"--" + kmsTypeFlagName, "aws",
+		}
+		startCmd.SetArgs(args)
+
+		err = startCmd.Execute()
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "extracting region from URI failed")
+	})
+
+	t.Run("kms aws error", func(t *testing.T) {
+		startCmd, err := startcmd.Cmd(&mockServer{})
+		require.NoError(t, err)
+
+		lis, err := net.Listen("tcp", "localhost:50052")
+		require.NoError(t, err)
+
+		ctrl := gomock.NewController(t)
+		defer ctrl.Finish()
+
+		logServer := NewMockTrillianLogServer(ctrl)
+		logServer.EXPECT().InitLog(gomock.Any(), gomock.Any()).Return(&trillian.InitLogResponse{}, nil)
+
+		adminServer := NewMockTrillianAdminServer(ctrl)
+		adminServer.EXPECT().CreateTree(gomock.Any(), gomock.Any()).Return(&trillian.Tree{}, nil)
+
+		s := grpc.NewServer()
+
+		trillian.RegisterTrillianLogServer(s, logServer)
+		trillian.RegisterTrillianAdminServer(s, adminServer)
+
+		go func() {
+			require.NoError(t, s.Serve(lis))
+		}()
+
+		args := []string{
+			"--" + agentHostFlagName, "",
+			"--" + logsFlagName, "maple2021:rw@localhost:50052",
+			"--" + kmsTypeFlagName, "aws",
+			"--" + kmsEndpointFlagName, "http://localhost:8072",
+			"--" + logKeyIDFlagName, "aws-kms://arn:aws:kms:ca-central-1:111122223333:alias/log-sign",
+		}
+		startCmd.SetArgs(args)
+
+		err = startCmd.Execute()
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "no valid providers in chain")
 	})
 }

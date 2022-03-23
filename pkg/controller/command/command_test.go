@@ -64,16 +64,31 @@ func TestNew(t *testing.T) {
 
 		km := NewMockKeyManager(ctrl)
 		km.EXPECT().Get(kid).Return(nil, nil)
-		km.EXPECT().ExportPubKeyBytes(kid).Return([]byte(`public key`), kms.ECDSAP256TypeDER, nil)
+		km.EXPECT().ExportPubKeyBytes(kid).Return([]byte(`public key`), kms.ED25519Type, nil)
 
 		cmd, err := New(&Config{
 			KMS: km, Key: Key{
-				ID:   kid,
-				Type: kms.ECDSAP256TypeDER,
+				ID: kid,
 			},
 		}, nil)
 		require.NoError(t, err)
 		require.NotNil(t, cmd)
+	})
+
+	t.Run("key not supported", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		defer ctrl.Finish()
+
+		km := NewMockKeyManager(ctrl)
+		km.EXPECT().ExportPubKeyBytes(kid).Return([]byte(`public key`), kms.ECDSASecp256k1TypeIEEEP1363, nil)
+
+		_, err := New(&Config{
+			KMS: km, Key: Key{
+				ID: kid,
+			},
+		}, nil)
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "key type ECDSASecp256k1IEEEP1363 is not supported")
 	})
 
 	t.Run("Empty key", func(t *testing.T) {
@@ -81,22 +96,15 @@ func TestNew(t *testing.T) {
 		defer ctrl.Finish()
 
 		km := NewMockKeyManager(ctrl)
-		km.EXPECT().Get(kid).Return(nil, nil)
 		km.EXPECT().ExportPubKeyBytes(kid).Return(nil, kms.ECDSAP256TypeDER, nil)
 
 		cmd, err := New(&Config{
 			KMS: km, Key: Key{
-				ID:   kid,
-				Type: kms.ECDSAP256TypeDER,
+				ID: kid,
 			},
 		}, nil)
-		require.EqualError(t, err, "public key is empty")
-		require.Nil(t, cmd)
-	})
 
-	t.Run("Key is not supported", func(t *testing.T) {
-		cmd, err := New(&Config{Key: Key{Type: "test"}}, nil)
-		require.EqualError(t, err, "key type test is not supported")
+		require.EqualError(t, err, "public key is empty")
 		require.Nil(t, cmd)
 	})
 
@@ -106,10 +114,10 @@ func TestNew(t *testing.T) {
 
 		km := NewMockKeyManager(ctrl)
 		km.EXPECT().Get(kid).Return(nil, errors.New("no key"))
+		km.EXPECT().ExportPubKeyBytes(kid).Return([]byte(`public key`), kms.ECDSAP256TypeDER, nil)
 
 		cmd, err := New(&Config{KMS: km, Key: Key{
-			ID:   kid,
-			Type: kms.ECDSAP256TypeDER,
+			ID: kid,
 		}}, nil)
 		require.EqualError(t, err, "kms get kh: no key")
 		require.Nil(t, cmd)
@@ -120,12 +128,10 @@ func TestNew(t *testing.T) {
 		defer ctrl.Finish()
 
 		km := NewMockKeyManager(ctrl)
-		km.EXPECT().Get(kid).Return(nil, nil)
 		km.EXPECT().ExportPubKeyBytes(kid).Return(nil, kms.ECDSAP256TypeDER, errors.New("internal error"))
 
 		cmd, err := New(&Config{KMS: km, Key: Key{
-			ID:   kid,
-			Type: kms.ECDSAP256TypeDER,
+			ID: kid,
 		}}, nil)
 		require.EqualError(t, err, "export pub key bytes: internal error")
 		require.Nil(t, cmd)
@@ -145,8 +151,7 @@ func TestCmd_GetIssuers(t *testing.T) {
 
 		cmd, err := New(&Config{
 			KMS: km, Key: Key{
-				ID:   kid,
-				Type: kms.ECDSAP256TypeIEEEP1363,
+				ID: kid,
 			},
 			Logs: []Log{{
 				Alias:      alias,
@@ -181,8 +186,7 @@ func TestCmd_GetIssuers(t *testing.T) {
 
 		cmd, err := New(&Config{
 			KMS: km, Key: Key{
-				ID:   kid,
-				Type: kms.ECDSAP256TypeIEEEP1363,
+				ID: kid,
 			},
 			Logs: []Log{{
 				Alias:      alias,
@@ -213,8 +217,7 @@ func TestCmd_GetIssuers(t *testing.T) {
 
 		cmd, err := New(&Config{
 			KMS: km, Key: Key{
-				ID:   kid,
-				Type: kms.ECDSAP256TypeIEEEP1363,
+				ID: kid,
 			},
 			Logs: []Log{{
 				Alias:      alias,
@@ -248,8 +251,7 @@ func TestCmd_Webfinger(t *testing.T) {
 
 	cmd, err := New(&Config{
 		KMS: km, Key: Key{
-			ID:   kid,
-			Type: kms.ECDSAP256TypeIEEEP1363,
+			ID: kid,
 		},
 		BaseURL: "https://vct.com",
 	}, nil)
@@ -299,8 +301,7 @@ func TestCmd_GetEntries(t *testing.T) {
 		cmd, err := New(&Config{
 			KMS: km,
 			Key: Key{
-				ID:   kid,
-				Type: keyType,
+				ID: kid,
 			},
 			Logs: []Log{{
 				Alias:      alias,
@@ -337,8 +338,7 @@ func TestCmd_GetEntries(t *testing.T) {
 		cmd, err := New(&Config{
 			KMS: km,
 			Key: Key{
-				ID:   kid,
-				Type: keyType,
+				ID: kid,
 			},
 		}, nil)
 		require.NoError(t, err)
@@ -361,8 +361,7 @@ func TestCmd_GetEntries(t *testing.T) {
 		cmd, err := New(&Config{
 			KMS: km,
 			Key: Key{
-				ID:   kid,
-				Type: keyType,
+				ID: kid,
 			},
 		}, nil)
 		require.NoError(t, err)
@@ -392,8 +391,7 @@ func TestCmd_GetEntries(t *testing.T) {
 		cmd, err := New(&Config{
 			KMS: km,
 			Key: Key{
-				ID:   kid,
-				Type: keyType,
+				ID: kid,
 			},
 			Logs: []Log{{
 				Alias:      alias,
@@ -433,8 +431,7 @@ func TestCmd_GetEntries(t *testing.T) {
 				Client:     client,
 			}},
 			Key: Key{
-				ID:   kid,
-				Type: keyType,
+				ID: kid,
 			},
 		}, nil)
 		require.NoError(t, err)
@@ -471,8 +468,7 @@ func TestCmd_GetEntries(t *testing.T) {
 				Client:     client,
 			}},
 			Key: Key{
-				ID:   kid,
-				Type: keyType,
+				ID: kid,
 			},
 		}, nil)
 		require.NoError(t, err)
@@ -512,8 +508,7 @@ func TestCmd_GetEntries(t *testing.T) {
 				Client:     client,
 			}},
 			Key: Key{
-				ID:   kid,
-				Type: keyType,
+				ID: kid,
 			},
 		}, nil)
 		require.NoError(t, err)
@@ -539,8 +534,7 @@ func TestCmd_GetEntries(t *testing.T) {
 				Alias: alias,
 			}},
 			Key: Key{
-				ID:   kid,
-				Type: keyType,
+				ID: kid,
 			},
 		}, nil)
 		require.NoError(t, err)
@@ -583,8 +577,7 @@ func TestCmd_GetProofByHash(t *testing.T) {
 				Client:     client,
 			}},
 			Key: Key{
-				ID:   kid,
-				Type: keyType,
+				ID: kid,
 			},
 		}, nil)
 		require.NoError(t, err)
@@ -619,8 +612,7 @@ func TestCmd_GetProofByHash(t *testing.T) {
 		cmd, err := New(&Config{
 			KMS: km,
 			Key: Key{
-				ID:   kid,
-				Type: keyType,
+				ID: kid,
 			},
 		}, nil)
 		require.NoError(t, err)
@@ -643,8 +635,7 @@ func TestCmd_GetProofByHash(t *testing.T) {
 		cmd, err := New(&Config{
 			KMS: km,
 			Key: Key{
-				ID:   kid,
-				Type: keyType,
+				ID: kid,
 			},
 		}, nil)
 		require.NoError(t, err)
@@ -684,8 +675,7 @@ func TestCmd_GetProofByHash(t *testing.T) {
 				Client:     client,
 			}},
 			Key: Key{
-				ID:   kid,
-				Type: keyType,
+				ID: kid,
 			},
 		}, nil)
 		require.NoError(t, err)
@@ -732,8 +722,7 @@ func TestCmd_GetSTHConsistency(t *testing.T) {
 				Client:     client,
 			}},
 			Key: Key{
-				ID:   kid,
-				Type: keyType,
+				ID: kid,
 			},
 		}, nil)
 		require.NoError(t, err)
@@ -768,8 +757,7 @@ func TestCmd_GetSTHConsistency(t *testing.T) {
 		cmd, err := New(&Config{
 			KMS: km,
 			Key: Key{
-				ID:   kid,
-				Type: keyType,
+				ID: kid,
 			},
 			Logs: []Log{{
 				Alias:      alias,
@@ -808,8 +796,7 @@ func TestCmd_GetSTHConsistency(t *testing.T) {
 		cmd, err := New(&Config{
 			KMS: km,
 			Key: Key{
-				ID:   kid,
-				Type: keyType,
+				ID: kid,
 			},
 		}, nil)
 		require.NoError(t, err)
@@ -832,8 +819,7 @@ func TestCmd_GetSTHConsistency(t *testing.T) {
 		cmd, err := New(&Config{
 			KMS: km,
 			Key: Key{
-				ID:   kid,
-				Type: keyType,
+				ID: kid,
 			},
 		}, nil)
 		require.NoError(t, err)
@@ -873,8 +859,7 @@ func TestCmd_GetSTHConsistency(t *testing.T) {
 				Client:     client,
 			}},
 			Key: Key{
-				ID:   kid,
-				Type: keyType,
+				ID: kid,
 			},
 		}, nil)
 		require.NoError(t, err)
@@ -901,8 +886,7 @@ func TestCmd_GetSTHConsistency(t *testing.T) {
 		cmd, err := New(&Config{
 			KMS: km,
 			Key: Key{
-				ID:   kid,
-				Type: keyType,
+				ID: kid,
 			},
 		}, nil)
 		require.NoError(t, err)
@@ -950,8 +934,7 @@ func TestCmd_GetSTH(t *testing.T) {
 				Client:     client,
 			}},
 			Key: Key{
-				ID:   newKID,
-				Type: keyType,
+				ID: newKID,
 			},
 		}, nil)
 		require.NoError(t, err)
@@ -996,8 +979,7 @@ func TestCmd_GetSTH(t *testing.T) {
 				Client:     client,
 			}},
 			Key: Key{
-				ID:   kid,
-				Type: keyType,
+				ID: kid,
 			},
 		}, nil)
 		require.NoError(t, err)
@@ -1029,8 +1011,7 @@ func TestCmd_GetSTH(t *testing.T) {
 				Client:     client,
 			}},
 			Key: Key{
-				ID:   kid,
-				Type: keyType,
+				ID: kid,
 			},
 		}, nil)
 		require.NoError(t, err)
@@ -1064,8 +1045,7 @@ func TestCmd_GetSTH(t *testing.T) {
 				Client:     client,
 			}},
 			Key: Key{
-				ID:   kid,
-				Type: keyType,
+				ID: kid,
 			},
 		}, nil)
 		require.NoError(t, err)
@@ -1103,8 +1083,7 @@ func TestCmd_GetSTH(t *testing.T) {
 				Client:     client,
 			}},
 			Key: Key{
-				ID:   kid,
-				Type: keyType,
+				ID: kid,
 			},
 		}, nil)
 		require.NoError(t, err)
@@ -1150,8 +1129,7 @@ func TestCmd_GetEntryAndProof(t *testing.T) {
 				Client:     client,
 			}},
 			Key: Key{
-				ID:   newKID,
-				Type: keyType,
+				ID: newKID,
 			},
 		}, nil)
 		require.NoError(t, err)
@@ -1202,8 +1180,7 @@ func TestCmd_GetEntryAndProof(t *testing.T) {
 				Client:     client,
 			}},
 			Key: Key{
-				ID:   newKID,
-				Type: keyType,
+				ID: newKID,
 			},
 		}, nil)
 		require.NoError(t, err)
@@ -1243,8 +1220,7 @@ func TestCmd_GetEntryAndProof(t *testing.T) {
 				Client:     client,
 			}},
 			Key: Key{
-				ID:   newKID,
-				Type: keyType,
+				ID: newKID,
 			},
 		}, nil)
 		require.NoError(t, err)
@@ -1312,8 +1288,7 @@ func TestCmd_AddVC(t *testing.T) {
 			}},
 			VDR: vdr.New(vdr.WithVDR(key.New())),
 			Key: Key{
-				ID:   newKID,
-				Type: keyType,
+				ID: newKID,
 			},
 			DocumentLoaders: map[string]jsonld.DocumentLoader{alias: documentLoader},
 		}, nil)
@@ -1348,7 +1323,6 @@ func TestCmd_AddVC(t *testing.T) {
 		require.NoError(t, json.Unmarshal(hrs.Signature, &sig))
 
 		require.NotEmpty(t, sig.Signature)
-		require.NotEmpty(t, sig.Algorithm.Hash)
 		require.NotEmpty(t, sig.Algorithm.Type)
 		require.NotEmpty(t, sig.Algorithm.Signature)
 	})
@@ -1371,8 +1345,7 @@ func TestCmd_AddVC(t *testing.T) {
 			}},
 			VDR: vdr.New(vdr.WithVDR(key.New())),
 			Key: Key{
-				ID:   newKID,
-				Type: keyType,
+				ID: newKID,
 			},
 		}, nil)
 		require.NoError(t, err)
@@ -1400,8 +1373,7 @@ func TestCmd_AddVC(t *testing.T) {
 		cmd, err := New(&Config{
 			KMS: km,
 			Key: Key{
-				ID:   kid,
-				Type: keyType,
+				ID: kid,
 			},
 		}, nil)
 		require.NoError(t, err)
@@ -1423,8 +1395,7 @@ func TestCmd_AddVC(t *testing.T) {
 		cmd, err := New(&Config{
 			KMS: km,
 			Key: Key{
-				ID:   kid,
-				Type: keyType,
+				ID: kid,
 			},
 			Logs: []Log{{
 				Alias:      alias,
@@ -1457,8 +1428,7 @@ func TestCmd_AddVC(t *testing.T) {
 			}},
 			VDR: vdr.New(vdr.WithVDR(key.New())),
 			Key: Key{
-				ID:   kid,
-				Type: keyType,
+				ID: kid,
 			},
 			DocumentLoaders: map[string]jsonld.DocumentLoader{alias: documentLoader},
 		}, nil)
@@ -1496,8 +1466,7 @@ func TestCmd_AddVC(t *testing.T) {
 			}},
 			VDR: vdr.New(vdr.WithVDR(key.New())),
 			Key: Key{
-				ID:   kid,
-				Type: keyType,
+				ID: kid,
 			},
 			DocumentLoaders: map[string]jsonld.DocumentLoader{alias: documentLoader},
 		}, nil)
@@ -1535,8 +1504,7 @@ func TestCmd_AddVC(t *testing.T) {
 			}},
 			VDR: vdr.New(vdr.WithVDR(key.New())),
 			Key: Key{
-				ID:   kid,
-				Type: keyType,
+				ID: kid,
 			},
 			DocumentLoaders: map[string]jsonld.DocumentLoader{alias: documentLoader},
 		}, nil)
@@ -1580,8 +1548,7 @@ func TestCmd_AddVC(t *testing.T) {
 			}},
 			VDR: vdr.New(vdr.WithVDR(key.New())),
 			Key: Key{
-				ID:   kid,
-				Type: keyType,
+				ID: kid,
 			},
 			DocumentLoaders: map[string]jsonld.DocumentLoader{alias: documentLoader},
 		}, nil)
@@ -1629,8 +1596,7 @@ func TestCmd_AddVC(t *testing.T) {
 			Crypto: cr,
 			VDR:    vdr.New(vdr.WithVDR(key.New())),
 			Key: Key{
-				ID:   kid,
-				Type: keyType,
+				ID: kid,
 			},
 			DocumentLoaders: map[string]jsonld.DocumentLoader{alias: documentLoader},
 		}, nil)
@@ -1665,8 +1631,7 @@ func TestCmd_AddVC(t *testing.T) {
 			Crypto: NewMockCrypto(ctrl),
 			VDR:    vdr.New(vdr.WithVDR(key.New())),
 			Key: Key{
-				ID:   kid,
-				Type: keyType,
+				ID: kid,
 			},
 			DocumentLoaders: map[string]jsonld.DocumentLoader{alias: documentLoader},
 		}, nil)
