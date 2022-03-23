@@ -19,7 +19,6 @@ import (
 	"github.com/google/trillian"
 	"github.com/google/trillian/monitoring"
 	"github.com/google/trillian/types"
-	"github.com/hyperledger/aries-framework-go/pkg/crypto"
 	"github.com/hyperledger/aries-framework-go/pkg/doc/verifiable"
 	"github.com/hyperledger/aries-framework-go/pkg/framework/aries/api/vdr"
 	"github.com/hyperledger/aries-framework-go/pkg/kms"
@@ -43,19 +42,12 @@ const (
 	LedgerType    = "https://trustbloc.dev/ns/ledger-type"
 )
 
-// KeyManager manages keys and their storage.
-type KeyManager kms.KeyManager
-
 // TrillianLogClient is the API client for TrillianLog service.
 type TrillianLogClient trillian.TrillianLogClient
 
-// Crypto provides all crypto operations.
-type Crypto crypto.Crypto
-
 // Key holds info about a key that is using for signing.
 type Key struct {
-	ID   string
-	Type kms.KeyType
+	ID string
 }
 
 // Cmd is a controller for commands.
@@ -66,7 +58,7 @@ type Cmd struct {
 	kh      interface{}
 	vdr     vdr.Registry
 	kms     KeyManager
-	crypto  crypto.Crypto
+	crypto  Crypto
 	PubKey  []byte
 	alg     *SignatureAndHashAlgorithm
 	loaders map[string]jsonld.DocumentLoader
@@ -93,12 +85,24 @@ type Log struct {
 // Config for the Cmd.
 type Config struct {
 	KMS             KeyManager
-	Crypto          crypto.Crypto
+	Crypto          Crypto
 	VDR             vdr.Registry
 	Logs            []Log
 	DocumentLoaders map[string]jsonld.DocumentLoader // alias -> loader
 	Key             Key
 	BaseURL         string
+}
+
+// KeyManager key manager.
+type KeyManager interface {
+	Create(kt kms.KeyType) (string, interface{}, error)
+	Get(keyID string) (interface{}, error)
+	ExportPubKeyBytes(keyID string) ([]byte, kms.KeyType, error)
+}
+
+// Crypto interface.
+type Crypto interface {
+	Sign(msg []byte, kh interface{}) ([]byte, error)
 }
 
 // nolint: gochecknoglobals
@@ -120,23 +124,23 @@ func New(cfg *Config, mf monitoring.MetricFactory) (*Cmd, error) {
 
 	once.Do(func() { createMetrics(mf) })
 
-	alg, err := signatureAndHashAlgorithmByKeyType(cfg.Key.Type)
-	if err != nil {
-		return nil, fmt.Errorf("key type %v is not supported", cfg.Key.Type)
-	}
-
-	kh, err := cfg.KMS.Get(cfg.Key.ID)
-	if err != nil {
-		return nil, fmt.Errorf("kms get kh: %w", err)
-	}
-
-	pubBytes, _, err := cfg.KMS.ExportPubKeyBytes(cfg.Key.ID)
+	pubBytes, keyType, err := cfg.KMS.ExportPubKeyBytes(cfg.Key.ID)
 	if err != nil {
 		return nil, fmt.Errorf("export pub key bytes: %w", err)
 	}
 
 	if len(pubBytes) == 0 {
 		return nil, fmt.Errorf("public key is empty")
+	}
+
+	alg, err := signatureAndHashAlgorithmByKeyType(keyType)
+	if err != nil {
+		return nil, fmt.Errorf("key type %v is not supported", keyType)
+	}
+
+	kh, err := cfg.KMS.Get(cfg.Key.ID)
+	if err != nil {
+		return nil, fmt.Errorf("kms get kh: %w", err)
 	}
 
 	logs := make(map[string]Log)
@@ -660,20 +664,19 @@ func (c *Cmd) signV1TreeHead(root types.LogRootV1) (DigitallySigned, error) {
 	}, nil
 }
 
-// TODO: Need to support more keys.
 func signatureAndHashAlgorithmByKeyType(keyType kms.KeyType) (*SignatureAndHashAlgorithm, error) {
-	switch keyType { // nolint: exhaustive
-	case kms.ECDSAP256TypeDER:
+	switch {
+	case keyType == kms.ECDSAP256DER || keyType == kms.ECDSAP256IEEEP1363 ||
+		keyType == kms.ECDSAP384DER || keyType == kms.ECDSAP384IEEEP1363 ||
+		keyType == kms.ECDSAP521DER || keyType == kms.ECDSAP521IEEEP1363:
 		return &SignatureAndHashAlgorithm{
-			Hash:      SHA256Hash,
 			Signature: ECDSASignature,
-			Type:      kms.ECDSAP256TypeDER,
+			Type:      keyType,
 		}, nil
-	case kms.ECDSAP256TypeIEEEP1363:
+	case keyType == kms.ED25519:
 		return &SignatureAndHashAlgorithm{
-			Hash:      SHA256Hash,
-			Signature: ECDSASignature,
-			Type:      kms.ECDSAP256TypeIEEEP1363,
+			Signature: EDDSASignature,
+			Type:      keyType,
 		}, nil
 	default:
 		return nil, fmt.Errorf("%w: key type %v is not supported", errors.ErrInternal, keyType)

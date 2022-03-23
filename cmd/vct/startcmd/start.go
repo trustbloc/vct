@@ -13,12 +13,14 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
-	"os"
 	"reflect"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
 
+	"github.com/aws/aws-sdk-go/aws"
+	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/cenkalti/backoff/v4"
 	"github.com/google/trillian"
 	"github.com/google/trillian/monitoring/prometheus"
@@ -31,7 +33,6 @@ import (
 	"github.com/hyperledger/aries-framework-go/component/storageutil/mem"
 	"github.com/hyperledger/aries-framework-go/pkg/common/log"
 	ldrest "github.com/hyperledger/aries-framework-go/pkg/controller/rest/ld"
-	"github.com/hyperledger/aries-framework-go/pkg/crypto"
 	"github.com/hyperledger/aries-framework-go/pkg/crypto/tinkcrypto"
 	webcrypto "github.com/hyperledger/aries-framework-go/pkg/crypto/webkms"
 	"github.com/hyperledger/aries-framework-go/pkg/doc/did"
@@ -52,8 +53,11 @@ import (
 	jsonld "github.com/piprate/json-gold/ld"
 	"github.com/rs/cors"
 	"github.com/spf13/cobra"
+	cmdutils "github.com/trustbloc/edge-core/pkg/utils/cmd"
 	tlsutils "github.com/trustbloc/edge-core/pkg/utils/tls"
+	awssvc "github.com/trustbloc/kms/pkg/aws"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/protobuf/types/known/durationpb"
 
 	"github.com/trustbloc/vct/cmd/internal/serverutil"
@@ -63,6 +67,31 @@ import (
 	"github.com/trustbloc/vct/pkg/controller/rest"
 	"github.com/trustbloc/vct/pkg/storage/memory"
 	"github.com/trustbloc/vct/pkg/storage/postgres"
+)
+
+// kmsMode kms mode.
+type kmsMode string
+
+// kms params.
+const (
+	kmsLocal kmsMode = "local"
+	kmsWeb   kmsMode = "web"
+	kmsAWS   kmsMode = "aws"
+
+	kmsTypeFlagName  = "kms-type"
+	kmsTypeEnvKey    = envPrefix + "KMS_TYPE"
+	kmsTypeFlagUsage = "KMS type (local,web,aws)." +
+		" Alternatively, this can be set with the following environment variable: " + kmsTypeEnvKey
+
+	kmsEndpointFlagName  = "kms-endpoint"
+	kmsEndpointEnvKey    = envPrefix + "KMS_ENDPOINT"
+	kmsEndpointFlagUsage = "KMS URL." +
+		" Alternatively, this can be set with the following environment variable: " + kmsEndpointEnvKey
+
+	logSignActiveKeyIDFlagName  = "log-active-key-id"
+	logSignActiveKeyIDEnvKey    = envPrefix + "LOG_SIGN_ACTIVE_KEY_ID"
+	logSignActiveKeyIDFlagUsage = "Log Sign Active Key ID." +
+		" Alternatively, this can be set with the following environment variable: " + logSignActiveKeyIDEnvKey
 )
 
 const (
@@ -87,12 +116,6 @@ const (
 		" Format must be <alias>:<permission>@<endpoint>." +
 		" Examples: maple2021:rw@server.com,maple2020:r@server.com:9890" +
 		" Alternatively, this can be set with the following environment variable: " + logsEnvKey
-
-	kmsEndpointFlagName      = "kms-endpoint"
-	kmsEndpointEnvKey        = envPrefix + "KMS_ENDPOINT"
-	kmsEndpointFlagShorthand = "s"
-	kmsEndpointFlagUsage     = "Remote KMS URL." +
-		" Alternatively, this can be set with the following environment variable: " + kmsEndpointEnvKey
 
 	datasourceNameFlagName      = "dsn"
 	datasourceNameFlagShorthand = "d"
@@ -178,6 +201,8 @@ const (
 	defaultMasterKeyURI   = "local-lock://default/master/key/"
 	embeddedLogServerHost = "0.0.0.0:8090"
 	embeddedLogSignerHost = "0.0.0.0:8099"
+	defaultTimeout        = "0"
+	defaultSyncTimeout    = "3"
 )
 
 type (
@@ -186,6 +211,22 @@ type (
 	// TrillianAdminServer interface.
 	TrillianAdminServer trillian.TrillianAdminServer
 )
+
+type kmsParameters struct {
+	kmsType            kmsMode
+	kmsEndpoint        string
+	logSignActiveKeyID string
+}
+
+type keyManager interface {
+	Create(kt kms.KeyType) (string, interface{}, error)
+	Get(keyID string) (interface{}, error)
+	ExportPubKeyBytes(keyID string) ([]byte, kms.KeyType, error)
+}
+
+type crypto interface {
+	Sign(msg []byte, kh interface{}) ([]byte, error)
+}
 
 var logger = log.New("vct/startcmd")
 
@@ -242,11 +283,11 @@ type agentParameters struct {
 	timeout             uint64
 	syncTimeout         uint64
 	databasePrefix      string
-	kmsEndpoint         string
 	contextProviderURLs []string
 	tlsParams           *tlsParameters
 	server              server
 	devMode             bool
+	kmsParams           *kmsParameters
 }
 
 type tlsParameters struct {
@@ -328,18 +369,30 @@ func createStartCMD(server server) *cobra.Command { //nolint: funlen,gocognit,go
 		Short: "Starts vct service",
 		Long:  `Starts verifiable credentials transparency service`,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			host := getUserSetVarOptional(cmd, agentHostFlagName, agentHostEnvKey)
-			metricsHost := getUserSetVarOptional(cmd, agentMetricsHostFlagName, agentMetricsHostEnvKey)
-			kmsEndpoint := getUserSetVarOptional(cmd, kmsEndpointFlagName, kmsEndpointEnvKey)
-			datasourceName := getUserSetVarOptional(cmd, datasourceNameFlagName, datasourceNameEnvKey)
-			databasePrefix := getUserSetVarOptional(cmd, databasePrefixFlagName, databasePrefixEnvKey)
-			baseURL := getUserSetVarOptional(cmd, baseURLFlagName, baseURLEnvKey)
-			timeoutStr := getUserSetVarOptional(cmd, timeoutFlagName, timeoutEnvKey)
-			syncTimeoutStr := getUserSetVarOptional(cmd, syncTimeoutFlagName, syncTimeoutEnvKey)
-			issuersStr := getUserSetVarOptional(cmd, issuersFlagName, issuersEnvKey)
-			devModeStr := getUserSetVarOptional(cmd, devModeFlagName, devModeFlagEnvKey)
-			contextProviderURLsStr := getUserSetVarOptional(cmd, contextProviderFlagName, contextProviderEnvKey)
-			trillianDBConnStr := getUserSetVarOptional(cmd, trillianDBConnFlagName, trillianDBConnEnvKey)
+			host := cmdutils.GetUserSetOptionalVarFromString(cmd, agentHostFlagName, agentHostEnvKey)
+			metricsHost := cmdutils.GetUserSetOptionalVarFromString(cmd, agentMetricsHostFlagName,
+				agentMetricsHostEnvKey)
+			datasourceName := cmdutils.GetUserSetOptionalVarFromString(cmd, datasourceNameFlagName,
+				datasourceNameEnvKey)
+			databasePrefix := cmdutils.GetUserSetOptionalVarFromString(cmd, databasePrefixFlagName,
+				databasePrefixEnvKey)
+			baseURL := cmdutils.GetUserSetOptionalVarFromString(cmd, baseURLFlagName, baseURLEnvKey)
+			timeoutStr := cmdutils.GetUserSetOptionalVarFromString(cmd, timeoutFlagName, timeoutEnvKey)
+			syncTimeoutStr := cmdutils.GetUserSetOptionalVarFromString(cmd, syncTimeoutFlagName, syncTimeoutEnvKey)
+			issuersStr := cmdutils.GetUserSetOptionalVarFromString(cmd, issuersFlagName, issuersEnvKey)
+			devModeStr := cmdutils.GetUserSetOptionalVarFromString(cmd, devModeFlagName, devModeFlagEnvKey)
+			contextProviderURLsStr := cmdutils.GetUserSetOptionalVarFromString(cmd, contextProviderFlagName,
+				contextProviderEnvKey)
+			trillianDBConnStr := cmdutils.GetUserSetOptionalVarFromString(cmd, trillianDBConnFlagName,
+				trillianDBConnEnvKey)
+			kmsParams, err := getKmsParameters(cmd)
+			if err != nil {
+				return err
+			}
+
+			if datasourceName == "" {
+				datasourceName = "mem://test"
+			}
 
 			var issuers []string
 			if issuersStr != "" {
@@ -351,9 +404,17 @@ func createStartCMD(server server) *cobra.Command { //nolint: funlen,gocognit,go
 				contextProviderURLs = strings.Split(contextProviderURLsStr, ",")
 			}
 
+			if timeoutStr == "" {
+				timeoutStr = defaultTimeout
+			}
+
 			timeout, err := strconv.ParseUint(timeoutStr, 10, 64)
 			if err != nil {
 				return fmt.Errorf("timeout is not a number(positive): %w", err)
+			}
+
+			if syncTimeoutStr == "" {
+				syncTimeoutStr = defaultSyncTimeout
 			}
 
 			syncTimeout, err := strconv.ParseUint(syncTimeoutStr, 10, 64)
@@ -366,7 +427,7 @@ func createStartCMD(server server) *cobra.Command { //nolint: funlen,gocognit,go
 				return fmt.Errorf("get TLS: %w", err)
 			}
 
-			logsVal, err := getUserSetVar(cmd, logsFlagName, logsEnvKey, false)
+			logsVal, err := cmdutils.GetUserSetVarFromString(cmd, logsFlagName, logsEnvKey, false)
 			if err != nil {
 				return fmt.Errorf("get variable (%s or %s): %w", logsFlagName, logsEnvKey, err)
 			}
@@ -446,13 +507,13 @@ func createStartCMD(server server) *cobra.Command { //nolint: funlen,gocognit,go
 				logs:                logs,
 				timeout:             timeout,
 				syncTimeout:         syncTimeout,
-				kmsEndpoint:         kmsEndpoint,
 				datasourceName:      datasourceName,
 				databasePrefix:      databasePrefix,
 				tlsParams:           tlsParams,
 				baseURL:             baseURL,
 				devMode:             devMode,
 				contextProviderURLs: contextProviderURLs,
+				kmsParams:           kmsParams,
 			}
 
 			return startAgent(parameters)
@@ -460,46 +521,112 @@ func createStartCMD(server server) *cobra.Command { //nolint: funlen,gocognit,go
 	}
 }
 
-func getUserSetVarOptional(cmd *cobra.Command, flagName, envKey string) string {
-	// no need to check errors for optional flags
-	val, _ := getUserSetVar(cmd, flagName, envKey, true) // nolint: errcheck
-
-	return val
-}
-
 func createKMSAndCrypto(parameters *agentParameters, client *http.Client,
-	store storage.Provider, cfg storage.Store, syncTimeout uint64) (kms.KeyManager, crypto.Crypto, error) {
-	if parameters.kmsEndpoint != "" {
+	store storage.Provider, cfg storage.Store) (keyManager, crypto, error) {
+	switch parameters.kmsParams.kmsType {
+	case kmsLocal:
+		km, err := localkms.New(defaultMasterKeyURI, &kmsProvider{
+			storageProvider: store,
+			secretLock:      &noop.NoLock{},
+		})
+		if err != nil {
+			return nil, nil, fmt.Errorf("create kms: %w", err)
+		}
+
+		cr, err := tinkcrypto.New()
+		if err != nil {
+			return nil, nil, fmt.Errorf("create crypto: %w", err)
+		}
+
+		return km, cr, nil
+	case kmsWeb:
+		if strings.Contains(parameters.kmsParams.kmsEndpoint, "keystores") {
+			return webkms.New(parameters.kmsParams.kmsEndpoint, client),
+				webcrypto.New(parameters.kmsParams.kmsEndpoint, client), nil
+		}
+
 		var keystoreURL string
 
 		err := getOrInit(cfg, webKeyStoreKey, &keystoreURL, func() (interface{}, error) {
-			location, _, err := webkms.CreateKeyStore(client, parameters.kmsEndpoint, uuid.New().String(), "", nil)
+			location, _, err := webkms.CreateKeyStore(client, parameters.kmsParams.kmsEndpoint, uuid.New().String(), "", nil)
 
-			return location, err // nolint: wrapcheck
-		}, syncTimeout)
+			return location, err
+		}, parameters.syncTimeout)
 		if err != nil {
 			return nil, nil, fmt.Errorf("get or init: %w", err)
 		}
 
-		keystoreURL = BuildKMSURL(parameters.kmsEndpoint, keystoreURL)
+		keystoreURL = BuildKMSURL(parameters.kmsParams.kmsEndpoint, keystoreURL)
 
 		return webkms.New(keystoreURL, client), webcrypto.New(keystoreURL, client), nil
+	case kmsAWS:
+		region, err := getRegion(parameters.kmsParams.logSignActiveKeyID)
+		if err != nil {
+			return nil, nil, err
+		}
+
+		awsSession, err := session.NewSession(&aws.Config{
+			Endpoint:                      &parameters.kmsParams.kmsEndpoint,
+			Region:                        aws.String(region),
+			CredentialsChainVerboseErrors: aws.Bool(true),
+		})
+		if err != nil {
+			return nil, nil, err
+		}
+
+		awsSvc := awssvc.New(awsSession)
+
+		return awsSvc, awsSvc, nil
 	}
 
-	local, err := localkms.New(defaultMasterKeyURI, &kmsProvider{
-		storageProvider: store,
-		secretLock:      &noop.NoLock{},
-	})
+	return nil, nil, fmt.Errorf("unsupported kms type: %s", parameters.kmsParams.kmsType)
+}
+
+func getRegion(keyURI string) (string, error) {
+	// keyURI must have the following format: 'aws-kms://arn:<partition>:kms:<region>:[:path]'.
+	// See http://docs.aws.amazon.com/general/latest/gr/aws-arns-and-namespaces.html.
+	re1 := regexp.MustCompile(`aws-kms://arn:(aws[a-zA-Z0-9-_]*):kms:([a-z0-9-]+):`)
+
+	r := re1.FindStringSubmatch(keyURI)
+
+	const subStringCount = 3
+
+	if len(r) != subStringCount {
+		return "", fmt.Errorf("extracting region from URI failed")
+	}
+
+	return r[2], nil
+}
+
+func getKmsParameters(cmd *cobra.Command) (*kmsParameters, error) {
+	kmsTypeStr, err := cmdutils.GetUserSetVarFromString(cmd, kmsTypeFlagName, kmsTypeEnvKey, false)
 	if err != nil {
-		return nil, nil, fmt.Errorf("create kms: %w", err)
+		return nil, err
 	}
 
-	cr, err := tinkcrypto.New()
-	if err != nil {
-		return nil, nil, fmt.Errorf("create crypto: %w", err)
+	kmsType := kmsMode(kmsTypeStr)
+
+	if !supportedKmsType(kmsType) {
+		return nil, fmt.Errorf("unsupported kms type: %s", kmsType)
 	}
 
-	return local, cr, nil
+	kmsEndpoint := cmdutils.GetUserSetOptionalVarFromString(cmd, kmsEndpointFlagName, kmsEndpointEnvKey)
+	logSignActiveKeyID := cmdutils.GetUserSetOptionalVarFromString(cmd, logSignActiveKeyIDFlagName,
+		logSignActiveKeyIDEnvKey)
+
+	return &kmsParameters{
+		kmsType:            kmsType,
+		kmsEndpoint:        kmsEndpoint,
+		logSignActiveKeyID: logSignActiveKeyID,
+	}, nil
+}
+
+func supportedKmsType(kmsType kmsMode) bool {
+	if kmsType != kmsLocal && kmsType != kmsWeb && kmsType != kmsAWS {
+		return false
+	}
+
+	return true
 }
 
 // BuildKMSURL builds kms URL.
@@ -511,7 +638,7 @@ func BuildKMSURL(base, uri string) string {
 	return uri
 }
 
-func createKID(km kms.KeyManager, cfg storage.Store, syncTimeout uint64) (string, kms.KeyType, error) {
+func createKID(km keyManager, cfg storage.Store, syncTimeout uint64) (string, error) {
 	var (
 		keyID   string
 		keyType = kms.ECDSAP256TypeIEEEP1363
@@ -523,10 +650,10 @@ func createKID(km kms.KeyManager, cfg storage.Store, syncTimeout uint64) (string
 		return kid, err // nolint: wrapcheck
 	}, syncTimeout)
 
-	return keyID, keyType, err
+	return keyID, err
 }
 
-func startAgent(parameters *agentParameters) error { //nolint:funlen,gocyclo,cyclop
+func startAgent(parameters *agentParameters) error { //nolint:funlen,gocyclo,cyclop,gocognit
 	store, err := createStoreProvider(
 		parameters.datasourceName,
 		parameters.databasePrefix,
@@ -563,14 +690,18 @@ func startAgent(parameters *agentParameters) error { //nolint:funlen,gocyclo,cyc
 		},
 	}
 
-	km, cr, err := createKMSAndCrypto(parameters, httpClient, store, configStore, parameters.syncTimeout)
+	km, cr, err := createKMSAndCrypto(parameters, httpClient, store, configStore)
 	if err != nil {
 		return fmt.Errorf("create kms and crypto: %w", err)
 	}
 
-	keyID, keyType, err := createKID(km, configStore, parameters.syncTimeout)
-	if err != nil {
-		return fmt.Errorf("create kid: %w", err)
+	keyID := parameters.kmsParams.logSignActiveKeyID
+
+	if keyID == "" {
+		keyID, err = createKID(km, configStore, parameters.syncTimeout)
+		if err != nil {
+			return fmt.Errorf("create kid: %w", err)
+		}
 	}
 
 	var aliases []string
@@ -582,7 +713,7 @@ func startAgent(parameters *agentParameters) error { //nolint:funlen,gocyclo,cyc
 
 		conn, ok := conns[parameters.logs[i].Endpoint]
 		if !ok {
-			conn, err = grpc.Dial(parameters.logs[i].Endpoint, grpc.WithInsecure())
+			conn, err = grpc.Dial(parameters.logs[i].Endpoint, grpc.WithTransportCredentials(insecure.NewCredentials()))
 			if err != nil {
 				return fmt.Errorf("grpc dial: %w", err)
 			}
@@ -642,8 +773,7 @@ func startAgent(parameters *agentParameters) error { //nolint:funlen,gocyclo,cyc
 		),
 		Logs: parameters.logs,
 		Key: command.Key{
-			ID:   keyID,
-			Type: keyType,
+			ID: keyID,
 		},
 		BaseURL:         parameters.baseURL,
 		DocumentLoaders: loaders,
@@ -793,30 +923,10 @@ func getOrInit(cfg storage.Store, key string, v interface{}, initFn func() (inte
 	return getOrInit(cfg, key, v, initFn, timeout)
 }
 
-func getUserSetVar(cmd *cobra.Command, flagName, envKey string, isOptional bool) (string, error) {
-	defaultOrFlagVal, err := cmd.Flags().GetString(flagName)
-	if cmd.Flags().Changed(flagName) {
-		return defaultOrFlagVal, err // nolint: wrapcheck
-	}
-
-	value, isSet := os.LookupEnv(envKey)
-	if isSet {
-		return value, nil
-	}
-
-	if isOptional || defaultOrFlagVal != "" {
-		return defaultOrFlagVal, nil
-	}
-
-	return "", fmt.Errorf("neither %s (command line flag) nor %s (environment variable) have been set",
-		flagName, envKey)
-}
-
 func createFlags(startCmd *cobra.Command) {
 	startCmd.Flags().StringP(agentHostFlagName, agentHostFlagShorthand, ":5678", agentHostFlagUsage)
 	startCmd.Flags().StringP(agentMetricsHostFlagName, agentMetricsHostFlagShorthand, ":9099", agentMetricsHostFlagUsage)
 	startCmd.Flags().StringP(logsFlagName, logsFlagShorthand, "", logsFlagUsage)
-	startCmd.Flags().StringP(kmsEndpointFlagName, kmsEndpointFlagShorthand, "", kmsEndpointFlagUsage)
 	startCmd.Flags().StringP(datasourceNameFlagName, datasourceNameFlagShorthand, "mem://test", datasourceNameFlagUsage)
 	startCmd.Flags().String(databasePrefixFlagName, "", databasePrefixFlagUsage)
 	startCmd.Flags().String(baseURLFlagName, "", baseURLFlagUsage)
@@ -830,17 +940,27 @@ func createFlags(startCmd *cobra.Command) {
 	startCmd.Flags().String(devModeFlagName, "", devModeFlagUsage)
 	startCmd.Flags().String(contextProviderFlagName, "", contextProviderFlagUsage)
 	startCmd.Flags().String(trillianDBConnFlagName, "", trillianDBConnFlagUsage)
+	startCmd.Flags().String(kmsTypeFlagName, "", kmsTypeFlagUsage)
+	startCmd.Flags().String(kmsEndpointFlagName, "", kmsEndpointFlagUsage)
+	startCmd.Flags().String(logSignActiveKeyIDFlagName, "", logSignActiveKeyIDFlagUsage)
 }
 
 func getTLS(cmd *cobra.Command) (*tlsParameters, error) {
-	tlsSystemCertPoolString := getUserSetVarOptional(cmd, tlsSystemCertPoolFlagName, tlsSystemCertPoolEnvKey)
-	tlsCACerts := getUserSetVarOptional(cmd, tlsCACertsFlagName, tlsCACertsEnvKey)
-	tlsServeCertPath := getUserSetVarOptional(cmd, tlsServeCertPathFlagName, tlsServeCertPathEnvKey)
-	tlsServeKeyPath := getUserSetVarOptional(cmd, tlsServeKeyPathFlagName, tlsServeKeyPathFlagEnvKey)
+	tlsSystemCertPoolString := cmdutils.GetUserSetOptionalVarFromString(cmd, tlsSystemCertPoolFlagName,
+		tlsSystemCertPoolEnvKey)
+	tlsCACerts := cmdutils.GetUserSetOptionalVarFromString(cmd, tlsCACertsFlagName, tlsCACertsEnvKey)
+	tlsServeCertPath := cmdutils.GetUserSetOptionalVarFromString(cmd, tlsServeCertPathFlagName, tlsServeCertPathEnvKey)
+	tlsServeKeyPath := cmdutils.GetUserSetOptionalVarFromString(cmd, tlsServeKeyPathFlagName, tlsServeKeyPathFlagEnvKey)
 
-	tlsSystemCertPool, err := strconv.ParseBool(tlsSystemCertPoolString)
-	if err != nil {
-		return nil, fmt.Errorf("parse cert pool: %w", err)
+	tlsSystemCertPool := false
+
+	if tlsSystemCertPoolString != "" {
+		var err error
+
+		tlsSystemCertPool, err = strconv.ParseBool(tlsSystemCertPoolString)
+		if err != nil {
+			return nil, fmt.Errorf("parse cert pool: %w", err)
+		}
 	}
 
 	var caCerts []string

@@ -22,20 +22,13 @@ const (
 	V1 Version = 0
 )
 
-// HashAlgorithm type definition.
-type HashAlgorithm string
-
-// HashAlgorithm constants.
-const (
-	SHA256Hash HashAlgorithm = "SHA256"
-)
-
 // SignatureAlgorithm type definition.
 type SignatureAlgorithm string
 
 // SignatureAlgorithm constants.
 const (
 	ECDSASignature SignatureAlgorithm = "ECDSA"
+	EDDSASignature SignatureAlgorithm = "EDDSA"
 )
 
 // SignatureType differentiates signatures.
@@ -211,7 +204,6 @@ type TreeHeadSignature struct {
 
 // SignatureAndHashAlgorithm provides information about the algorithm used for the signature.
 type SignatureAndHashAlgorithm struct {
-	Hash      HashAlgorithm      `json:"hash"`
 	Signature SignatureAlgorithm `json:"signature"`
 	Type      kms.KeyType        `json:"type"`
 }
