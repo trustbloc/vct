@@ -31,7 +31,7 @@ require (
 	github.com/spf13/cobra v1.3.0
 	github.com/stretchr/testify v1.7.0
 	github.com/trustbloc/edge-core v0.1.8-0.20220113141450-e19ffd091d98
-	github.com/trustbloc/kms v0.1.8-0.20220321210202-3d48c5db2955
+	github.com/trustbloc/kms v0.1.8-0.20220323192214-3f3ef0548eba
 	go.etcd.io/etcd/client/v3 v3.5.0
 	google.golang.org/grpc v1.44.0
 	google.golang.org/protobuf v1.27.1

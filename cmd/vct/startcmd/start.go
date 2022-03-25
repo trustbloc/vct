@@ -23,6 +23,7 @@ import (
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/cenkalti/backoff/v4"
 	"github.com/google/trillian"
+	"github.com/google/trillian/monitoring"
 	"github.com/google/trillian/monitoring/prometheus"
 	trillianstorage "github.com/google/trillian/storage"
 	"github.com/google/uuid"
@@ -522,7 +523,7 @@ func createStartCMD(server server) *cobra.Command { //nolint: funlen,gocognit,go
 }
 
 func createKMSAndCrypto(parameters *agentParameters, client *http.Client,
-	store storage.Provider, cfg storage.Store) (keyManager, crypto, error) {
+	store storage.Provider, cfg storage.Store, mf monitoring.MetricFactory) (keyManager, crypto, error) {
 	switch parameters.kmsParams.kmsType {
 	case kmsLocal:
 		km, err := localkms.New(defaultMasterKeyURI, &kmsProvider{
@@ -574,7 +575,7 @@ func createKMSAndCrypto(parameters *agentParameters, client *http.Client,
 			return nil, nil, err
 		}
 
-		awsSvc := awssvc.New(awsSession)
+		awsSvc := awssvc.New(awsSession, NewAWSMetricsProvider(mf))
 
 		return awsSvc, awsSvc, nil
 	}
@@ -689,8 +690,9 @@ func startAgent(parameters *agentParameters) error { //nolint:funlen,gocyclo,cyc
 			},
 		},
 	}
+	mf := prometheus.MetricFactory{}
 
-	km, cr, err := createKMSAndCrypto(parameters, httpClient, store, configStore)
+	km, cr, err := createKMSAndCrypto(parameters, httpClient, store, configStore, mf)
 	if err != nil {
 		return fmt.Errorf("create kms and crypto: %w", err)
 	}
@@ -761,8 +763,6 @@ func startAgent(parameters *agentParameters) error { //nolint:funlen,gocyclo,cyc
 		loaders[alias] = loader
 		ldStoreProviders[alias] = ldStore
 	}
-
-	mf := prometheus.MetricFactory{}
 
 	cmd, err := command.New(&command.Config{
 		KMS:    km,
@@ -1088,3 +1088,56 @@ func createJSONLDDocumentLoader(ldStore *ldStoreProvider, httpClient *http.Clien
 
 	return loader, nil
 }
+
+// AWSMetricsProvider aws metrics provider.
+type AWSMetricsProvider struct {
+	signCount            monitoring.Counter
+	signTime             monitoring.Histogram
+	exportPublicKeyCount monitoring.Counter
+	exportPublicKeyTime  monitoring.Histogram
+}
+
+// NewAWSMetricsProvider return new instance.
+func NewAWSMetricsProvider(mf monitoring.MetricFactory) *AWSMetricsProvider {
+	if mf == nil {
+		mf = monitoring.InertMetricFactory{}
+	}
+
+	signCount := mf.NewCounter("aws_sign_count", "AWS sign count")
+	signTime := mf.NewHistogram("aws_sign_seconds", "AWS sign time")
+	exportPublicKeyCount := mf.NewCounter("aws_export_publickey_count", "AWS export public key count")
+	exportPublicKeyTime := mf.NewHistogram("aws_export_publickey_seconds", "AWS export public key time")
+
+	return &AWSMetricsProvider{
+		signCount:            signCount,
+		signTime:             signTime,
+		exportPublicKeyCount: exportPublicKeyCount,
+		exportPublicKeyTime:  exportPublicKeyTime,
+	}
+}
+
+// SignCount increments the number of sign hits.
+func (a *AWSMetricsProvider) SignCount() {
+	a.signCount.Inc()
+}
+
+// SignTime records the time for sign.
+func (a *AWSMetricsProvider) SignTime(value time.Duration) {
+	a.signTime.Observe(value.Seconds())
+}
+
+// ExportPublicKeyCount increments the number of export public key hits.
+func (a *AWSMetricsProvider) ExportPublicKeyCount() {
+	a.exportPublicKeyCount.Inc()
+}
+
+// ExportPublicKeyTime records the time for export public key.
+func (a *AWSMetricsProvider) ExportPublicKeyTime(value time.Duration) {
+	a.exportPublicKeyTime.Observe(value.Seconds())
+}
+
+// VerifyCount increments the number of verify hits.
+func (a *AWSMetricsProvider) VerifyCount() {}
+
+// VerifyTime records the time for verify.
+func (a *AWSMetricsProvider) VerifyTime(value time.Duration) {}
