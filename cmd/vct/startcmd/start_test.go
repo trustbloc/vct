@@ -14,6 +14,7 @@ import (
 	"net/http"
 	"os"
 	"testing"
+	"time"
 
 	"github.com/golang/mock/gomock"
 	"github.com/google/trillian"
@@ -387,4 +388,15 @@ func TestCmd(t *testing.T) {
 		require.Error(t, err)
 		require.Contains(t, err.Error(), "no valid providers in chain")
 	})
+}
+
+func TestAwsMetricsProvider(t *testing.T) {
+	a := startcmd.NewAWSMetricsProvider(nil)
+
+	require.NotPanics(t, func() { a.SignCount() })
+	require.NotPanics(t, func() { a.SignTime(time.Second) })
+	require.NotPanics(t, func() { a.ExportPublicKeyCount() })
+	require.NotPanics(t, func() { a.ExportPublicKeyTime(time.Second) })
+	require.NotPanics(t, func() { a.VerifyCount() })
+	require.NotPanics(t, func() { a.VerifyTime(time.Second) })
 }
