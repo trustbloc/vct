@@ -20,9 +20,9 @@ require (
 	github.com/hyperledger/aries-framework-go v0.1.8-0.20220322085443-50e8f9bd208b
 	github.com/hyperledger/aries-framework-go-ext/component/storage/couchdb v0.0.0-20220310013829-55b4443130f8
 	github.com/hyperledger/aries-framework-go-ext/component/storage/mongodb v0.0.0-20220310013829-55b4443130f8
-	github.com/hyperledger/aries-framework-go-ext/component/storage/postgresql v0.0.0-20220318063402-17308bff816f
+	github.com/hyperledger/aries-framework-go-ext/component/storage/postgresql v0.0.0-20220329165107-ef1bd5584faa
 	github.com/hyperledger/aries-framework-go/component/storageutil v0.0.0-20220310104637-62fd90482e21
-	github.com/hyperledger/aries-framework-go/spi v0.0.0-20220310104637-62fd90482e21
+	github.com/hyperledger/aries-framework-go/spi v0.0.0-20220324201531-18c87667df19
 	github.com/lib/pq v1.10.0
 	github.com/ory/dockertest/v3 v3.8.1
 	github.com/piprate/json-gold v0.4.1

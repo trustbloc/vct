@@ -746,7 +746,7 @@ func startAgent(parameters *agentParameters) error { //nolint:funlen,gocyclo,cyc
 
 	for _, alias := range aliases {
 		storageProvider := &customizedStorageProvider{
-			alias:           alias,
+			alias:           strings.ReplaceAll(alias, "-", "_"),
 			StorageProvider: store,
 		}
 
