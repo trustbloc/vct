@@ -111,7 +111,8 @@ func (s *Steps) issuerIsNotSupported(issuer string) error {
 }
 
 func (s *Steps) setVCTClient(endpoint string) error {
-	s.vct = vct.New(endpoint, vct.WithHTTPClient(s.client))
+	s.vct = vct.New(endpoint, vct.WithHTTPClient(s.client), vct.WithAuthReadToken("tk1"),
+		vct.WithAuthWriteToken("tk2"))
 
 	return backoff.Retry(func() error { // nolint: wrapcheck
 		resp, err := s.vct.GetSTH(context.Background())

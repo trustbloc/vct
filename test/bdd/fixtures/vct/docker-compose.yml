@@ -106,6 +106,8 @@ services:
       - AWS_ACCESS_KEY_ID=mock
       - AWS_SECRET_ACCESS_KEY=mock
       - VCT_TIMEOUT=60
+      - VCT_API_READ_TOKEN=tk1
+      - VCT_API_WRITE_TOKEN=tk2
       - VCT_DSN=postgres://postgres:password@vct.postgres:5432
       - VCT_DATABASE_PREFIX=vctdb_
       - VCT_ISSUERS=maple2021@did:key:zUC724vuGvHpnCGFG1qqpXb81SiBLu3KLSqVzenwEZNPoY35i2Bscb8DLaVwHvRFs6F2NkNNXRcPWvqnPDUd9ukdjLkjZd3u9zzL4wDZDUpkPAatLDGLEYVo8kkAzuAKJQMr7N2,maple2020@did:key:zUC724vuGvHpnCGFG1qqpXb81SiBLu3KLSqVzenwEZNPoY35i2Bscb8DLaVwHvRFs6F2NkNNXRcPWvqnPDUd9ukdjLkjZd3u9zzL4wDZDUpkPAatLDGLEYVo8kkAzuAKJQMr7N7
@@ -137,6 +139,8 @@ services:
       - AWS_ACCESS_KEY_ID=mock
       - AWS_SECRET_ACCESS_KEY=mock
       - VCT_TIMEOUT=60
+      - VCT_API_READ_TOKEN=tk1
+      - VCT_API_WRITE_TOKEN=tk2
       - VCT_DSN=postgres://postgres:password@vct.postgres:5432
       - VCT_DATABASE_PREFIX=vctdb_
       - VCT_ISSUERS=maple2021@did:key:zUC724vuGvHpnCGFG1qqpXb81SiBLu3KLSqVzenwEZNPoY35i2Bscb8DLaVwHvRFs6F2NkNNXRcPWvqnPDUd9ukdjLkjZd3u9zzL4wDZDUpkPAatLDGLEYVo8kkAzuAKJQMr7N2,maple2020@did:key:zUC724vuGvHpnCGFG1qqpXb81SiBLu3KLSqVzenwEZNPoY35i2Bscb8DLaVwHvRFs6F2NkNNXRcPWvqnPDUd9ukdjLkjZd3u9zzL4wDZDUpkPAatLDGLEYVo8kkAzuAKJQMr7N7

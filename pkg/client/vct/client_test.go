@@ -66,7 +66,8 @@ func TestClient_AddVC(t *testing.T) {
 			StatusCode: http.StatusOK,
 		}, nil)
 
-		client := vct.New(endpoint, vct.WithHTTPClient(httpClient))
+		client := vct.New(endpoint, vct.WithHTTPClient(httpClient), vct.WithAuthReadToken("tk1"),
+			vct.WithAuthWriteToken("tk2"))
 		resp, err := client.AddVC(context.Background(), expectedCredential)
 		require.NoError(t, err)
 

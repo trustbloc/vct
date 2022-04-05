@@ -8,6 +8,7 @@ package startcmd
 
 import (
 	"context"
+	"crypto/subtle"
 	"crypto/tls"
 	"encoding/json"
 	"errors"
@@ -186,8 +187,18 @@ const (
 
 	trillianDBConnFlagName  = "trillian-db-conn"
 	trillianDBConnFlagUsage = "Trillian db conn" +
-		" Alternatively, this can be set with the following environment variable: " + contextProviderEnvKey
+		" Alternatively, this can be set with the following environment variable: " + trillianDBConnEnvKey
 	trillianDBConnEnvKey = envPrefix + "TRILLIAN_DB_CONN"
+
+	readTokenFlagName  = "api-read-token"
+	readTokenFlagUsage = "Check for bearer token in the authorization header (optional). " +
+		" Alternatively, this can be set with the following environment variable: " + readTokenEnvKey
+	readTokenEnvKey = envPrefix + "API_READ_TOKEN"
+
+	writeTokenFlagName  = "api-write-token"
+	writeTokenFlagUsage = "Check for bearer token in the authorization header (optional). " +
+		" Alternatively, this can be set with the following environment variable: " + writeTokenEnvKey
+	writeTokenEnvKey = envPrefix + "API_WRITE_TOKEN"
 )
 
 const (
@@ -204,6 +215,8 @@ const (
 	embeddedLogSignerHost = "0.0.0.0:8099"
 	defaultTimeout        = "0"
 	defaultSyncTimeout    = "3"
+	healthCheckEndpoint   = "/healthcheck"
+	addVCEndpoint         = "/add-vc"
 )
 
 type (
@@ -289,6 +302,8 @@ type agentParameters struct {
 	server              server
 	devMode             bool
 	kmsParams           *kmsParameters
+	readToken           string
+	writeToken          string
 }
 
 type tlsParameters struct {
@@ -390,6 +405,9 @@ func createStartCMD(server server) *cobra.Command { //nolint: funlen,gocognit,go
 			if err != nil {
 				return err
 			}
+
+			readToken := cmdutils.GetUserSetOptionalVarFromString(cmd, readTokenFlagName, readTokenEnvKey)
+			writeToken := cmdutils.GetUserSetOptionalVarFromString(cmd, writeTokenFlagName, writeTokenEnvKey)
 
 			if datasourceName == "" {
 				datasourceName = "mem://test"
@@ -515,6 +533,8 @@ func createStartCMD(server server) *cobra.Command { //nolint: funlen,gocognit,go
 				devMode:             devMode,
 				contextProviderURLs: contextProviderURLs,
 				kmsParams:           kmsParams,
+				readToken:           readToken,
+				writeToken:          writeToken,
 			}
 
 			return startAgent(parameters)
@@ -804,6 +824,10 @@ func startAgent(parameters *agentParameters) error { //nolint:funlen,gocyclo,cyc
 		}
 	}
 
+	if parameters.readToken != "" || parameters.writeToken != "" {
+		router.Use(authorizationMiddleware(parameters.readToken, parameters.writeToken))
+	}
+
 	go startMetrics(parameters, metricsRouter)
 
 	logger.Infof("Starting vct on host [%s]", parameters.host)
@@ -943,6 +967,8 @@ func createFlags(startCmd *cobra.Command) {
 	startCmd.Flags().String(kmsTypeFlagName, "", kmsTypeFlagUsage)
 	startCmd.Flags().String(kmsEndpointFlagName, "", kmsEndpointFlagUsage)
 	startCmd.Flags().String(logSignActiveKeyIDFlagName, "", logSignActiveKeyIDFlagUsage)
+	startCmd.Flags().String(readTokenFlagName, "", readTokenFlagUsage)
+	startCmd.Flags().String(writeTokenFlagName, "", writeTokenFlagUsage)
 }
 
 func getTLS(cmd *cobra.Command) (*tlsParameters, error) {
@@ -1087,6 +1113,48 @@ func createJSONLDDocumentLoader(ldStore *ldStoreProvider, httpClient *http.Clien
 	}
 
 	return loader, nil
+}
+
+func validateAuthorizationBearerToken(w http.ResponseWriter, r *http.Request, readToken, writeToken string) bool {
+	if r.RequestURI == healthCheckEndpoint {
+		return true
+	}
+
+	token := readToken
+
+	if strings.Contains(r.RequestURI, addVCEndpoint) {
+		if writeToken == "" {
+			return true
+		}
+
+		token = writeToken
+	}
+
+	if token != "" {
+		actHdr := r.Header.Get("Authorization")
+		expHdr := "Bearer " + token
+
+		if subtle.ConstantTimeCompare([]byte(actHdr), []byte(expHdr)) != 1 {
+			w.WriteHeader(http.StatusUnauthorized)
+			w.Write([]byte("Unauthorised.\n")) // nolint:gosec,errcheck
+
+			return false
+		}
+	}
+
+	return true
+}
+
+func authorizationMiddleware(readToken, writeToken string) mux.MiddlewareFunc {
+	middleware := func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if validateAuthorizationBearerToken(w, r, readToken, writeToken) {
+				next.ServeHTTP(w, r)
+			}
+		})
+	}
+
+	return middleware
 }
 
 // AWSMetricsProvider aws metrics provider.
