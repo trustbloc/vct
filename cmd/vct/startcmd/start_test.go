@@ -37,6 +37,7 @@ const (
 	tlsCACertsFlagName        = "tls-cacerts"
 	timeoutFlagName           = "timeout"
 	syncTimeoutFlagName       = "sync-timeout"
+	readTokenFlagName         = "api-read-token"
 )
 
 type mockServer struct{}
@@ -89,6 +90,7 @@ func TestCmd(t *testing.T) {
 			"--" + agentHostFlagName, "",
 			"--" + logsFlagName, "maple2021:rw@localhost:50051",
 			"--" + kmsTypeFlagName, "local",
+			"--" + readTokenFlagName, "tk1",
 		}
 		startCmd.SetArgs(args)
 		require.NoError(t, startCmd.Execute())
@@ -331,6 +333,24 @@ func TestCmd(t *testing.T) {
 		err = startCmd.Execute()
 		require.Error(t, err)
 		require.Contains(t, err.Error(), "unsupported kms type")
+	})
+
+	t.Run("kms type empty", func(t *testing.T) {
+		startCmd, err := startcmd.Cmd(&mockServer{})
+		require.NoError(t, err)
+
+		args := []string{
+			"--" + agentHostFlagName, ":98989",
+			"--" + logsFlagName, "11111:rw@https://vct.example.com",
+			"--" + datasourceNameFlagName, "mem://test",
+			"--" + tlsCACertsFlagName, "invalid",
+		}
+		startCmd.SetArgs(args)
+
+		err = startCmd.Execute()
+		require.Error(t, err)
+		require.Contains(t, err.Error(),
+			"Neither kms-type (command line flag) nor VCT_KMS_TYPE (environment variable) have been set.")
 	})
 
 	t.Run("failed to get region", func(t *testing.T) {
