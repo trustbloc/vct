@@ -217,6 +217,7 @@ const (
 	defaultSyncTimeout    = "3"
 	healthCheckEndpoint   = "/healthcheck"
 	addVCEndpoint         = "/add-vc"
+	webFingerEndpoint     = "/.well-known/webfinger"
 )
 
 type (
@@ -1116,7 +1117,7 @@ func createJSONLDDocumentLoader(ldStore *ldStoreProvider, httpClient *http.Clien
 }
 
 func validateAuthorizationBearerToken(w http.ResponseWriter, r *http.Request, readToken, writeToken string) bool {
-	if r.RequestURI == healthCheckEndpoint {
+	if r.RequestURI == healthCheckEndpoint || strings.Contains(r.RequestURI, webFingerEndpoint) {
 		return true
 	}
 
