@@ -12,6 +12,7 @@ package startcmd_test
 import (
 	"net"
 	"net/http"
+	"net/http/httptest"
 	"os"
 	"testing"
 	"time"
@@ -408,6 +409,20 @@ func TestCmd(t *testing.T) {
 		require.Error(t, err)
 		require.Contains(t, err.Error(), "no valid providers in chain")
 	})
+}
+
+func TestValidateAuthorizationBearerToken(t *testing.T) {
+	require.True(t, startcmd.ValidateAuthorizationBearerToken(&httptest.ResponseRecorder{},
+		&http.Request{RequestURI: "/healthcheck"}, "read", "write"))
+
+	require.False(t, startcmd.ValidateAuthorizationBearerToken(&httptest.ResponseRecorder{},
+		&http.Request{
+			RequestURI: "/add-vc",
+			Header:     map[string][]string{"Authorization": {"Bearer 123"}},
+		}, "read", "write"))
+
+	require.True(t, startcmd.ValidateAuthorizationBearerToken(&httptest.ResponseRecorder{},
+		&http.Request{RequestURI: "/add-vc"}, "read", ""))
 }
 
 func TestAwsMetricsProvider(t *testing.T) {

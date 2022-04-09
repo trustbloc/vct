@@ -13,6 +13,18 @@ services:
     restart: always
     environment:
       - POSTGRES_PASSWORD=password
+      - POSTGRES_DB=vctdb_config
+    ports:
+      - 5435:5432
+    networks:
+      - witness_ledger_net
+
+  trillian.postgres:
+    container_name: trillian.postgres
+    image: postgres:13
+    restart: always
+    environment:
+      - POSTGRES_PASSWORD=password
       - POSTGRES_DB=test
     ports:
       - 5432:5432
@@ -26,11 +38,11 @@ services:
     command:
       - --quota_system=noop
       - --storage_system=postgres
-      - --pg_conn_str=user=postgres host=vct.postgres password=password dbname=test port=5432 sslmode=disable
+      - --pg_conn_str=user=postgres host=trillian.postgres password=password dbname=test port=5432 sslmode=disable
       - --rpc_endpoint=0.0.0.0:8090
       - --logtostderr
     depends_on:
-      - vct.postgres
+      - trillian.postgres
       - vct.trillian.log.signer
     networks:
       - witness_ledger_net
@@ -44,12 +56,12 @@ services:
     command:
       - --quota_system=noop
       - --storage_system=postgres
-      - --pg_conn_str=user=postgres host=vct.postgres password=password dbname=test port=5432 sslmode=disable
+      - --pg_conn_str=user=postgres host=trillian.postgres password=password dbname=test port=5432 sslmode=disable
       - --http_endpoint=0.0.0.0:8091
       - --force_master=true
       - --logtostderr
     depends_on:
-      - vct.postgres
+      - trillian.postgres
     networks:
       - witness_ledger_net
     ports:
@@ -108,12 +120,12 @@ services:
       - VCT_TIMEOUT=60
       - VCT_API_READ_TOKEN=tk1
       - VCT_API_WRITE_TOKEN=tk2
-      - VCT_DSN=postgres://postgres:password@vct.postgres:5432
+      - VCT_DSN=postgres://postgres:password@vct.postgres:5432/vctdb_config
       - VCT_DATABASE_PREFIX=vctdb_
       - VCT_ISSUERS=maple2021@did:key:zUC724vuGvHpnCGFG1qqpXb81SiBLu3KLSqVzenwEZNPoY35i2Bscb8DLaVwHvRFs6F2NkNNXRcPWvqnPDUd9ukdjLkjZd3u9zzL4wDZDUpkPAatLDGLEYVo8kkAzuAKJQMr7N2,maple2020@did:key:zUC724vuGvHpnCGFG1qqpXb81SiBLu3KLSqVzenwEZNPoY35i2Bscb8DLaVwHvRFs6F2NkNNXRcPWvqnPDUd9ukdjLkjZd3u9zzL4wDZDUpkPAatLDGLEYVo8kkAzuAKJQMr7N7
       - VCT_TLS_CACERTS=/etc/tls/vct.local.crt
       - VCT_CONTEXT_PROVIDER_URL=https://web.vct.local:443/ld-contexts.json
-      - VCT_TRILLIAN_DB_CONN=user=postgres host=vct.postgres password=password dbname=test port=5432 sslmode=disable
+      - VCT_TRILLIAN_DB_CONN=user=postgres host=trillian.postgres password=password dbname=test port=5432 sslmode=disable
     volumes:
       - ./keys/tls:/etc/tls
     command: start
@@ -141,12 +153,12 @@ services:
       - VCT_TIMEOUT=60
       - VCT_API_READ_TOKEN=tk1
       - VCT_API_WRITE_TOKEN=tk2
-      - VCT_DSN=postgres://postgres:password@vct.postgres:5432
+      - VCT_DSN=postgres://postgres:password@vct.postgres:5432/vctdb_config
       - VCT_DATABASE_PREFIX=vctdb_
       - VCT_ISSUERS=maple2021@did:key:zUC724vuGvHpnCGFG1qqpXb81SiBLu3KLSqVzenwEZNPoY35i2Bscb8DLaVwHvRFs6F2NkNNXRcPWvqnPDUd9ukdjLkjZd3u9zzL4wDZDUpkPAatLDGLEYVo8kkAzuAKJQMr7N2,maple2020@did:key:zUC724vuGvHpnCGFG1qqpXb81SiBLu3KLSqVzenwEZNPoY35i2Bscb8DLaVwHvRFs6F2NkNNXRcPWvqnPDUd9ukdjLkjZd3u9zzL4wDZDUpkPAatLDGLEYVo8kkAzuAKJQMr7N7
       - VCT_TLS_CACERTS=/etc/tls/vct.local.crt
       - VCT_CONTEXT_PROVIDER_URL=https://web.vct.local:443/ld-contexts.json
-      - VCT_TRILLIAN_DB_CONN=user=postgres host=vct.postgres password=password dbname=test port=5432 sslmode=disable
+      - VCT_TRILLIAN_DB_CONN=user=postgres host=trillian.postgres password=password dbname=test port=5432 sslmode=disable
     volumes:
       - ./keys/tls:/etc/tls
     command: start
