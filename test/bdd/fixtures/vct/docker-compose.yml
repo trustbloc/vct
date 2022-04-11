@@ -13,6 +13,7 @@ services:
     restart: always
     environment:
       - POSTGRES_PASSWORD=password
+      - POSTGRES_USER=vct
       - POSTGRES_DB=vctdb_config
     ports:
       - 5435:5432
@@ -120,7 +121,7 @@ services:
       - VCT_TIMEOUT=60
       - VCT_API_READ_TOKEN=tk1
       - VCT_API_WRITE_TOKEN=tk2
-      - VCT_DSN=postgres://postgres:password@vct.postgres:5432/vctdb_config
+      - VCT_DSN=postgres://vct:password@vct.postgres:5432/vctdb_config
       - VCT_DATABASE_PREFIX=vctdb_
       - VCT_ISSUERS=maple2021@did:key:zUC724vuGvHpnCGFG1qqpXb81SiBLu3KLSqVzenwEZNPoY35i2Bscb8DLaVwHvRFs6F2NkNNXRcPWvqnPDUd9ukdjLkjZd3u9zzL4wDZDUpkPAatLDGLEYVo8kkAzuAKJQMr7N2,maple2020@did:key:zUC724vuGvHpnCGFG1qqpXb81SiBLu3KLSqVzenwEZNPoY35i2Bscb8DLaVwHvRFs6F2NkNNXRcPWvqnPDUd9ukdjLkjZd3u9zzL4wDZDUpkPAatLDGLEYVo8kkAzuAKJQMr7N7
       - VCT_TLS_CACERTS=/etc/tls/vct.local.crt
@@ -153,7 +154,7 @@ services:
       - VCT_TIMEOUT=60
       - VCT_API_READ_TOKEN=tk1
       - VCT_API_WRITE_TOKEN=tk2
-      - VCT_DSN=postgres://postgres:password@vct.postgres:5432/vctdb_config
+      - VCT_DSN=postgres://vct:password@vct.postgres:5432/vctdb_config
       - VCT_DATABASE_PREFIX=vctdb_
       - VCT_ISSUERS=maple2021@did:key:zUC724vuGvHpnCGFG1qqpXb81SiBLu3KLSqVzenwEZNPoY35i2Bscb8DLaVwHvRFs6F2NkNNXRcPWvqnPDUd9ukdjLkjZd3u9zzL4wDZDUpkPAatLDGLEYVo8kkAzuAKJQMr7N2,maple2020@did:key:zUC724vuGvHpnCGFG1qqpXb81SiBLu3KLSqVzenwEZNPoY35i2Bscb8DLaVwHvRFs6F2NkNNXRcPWvqnPDUd9ukdjLkjZd3u9zzL4wDZDUpkPAatLDGLEYVo8kkAzuAKJQMr7N7
       - VCT_TLS_CACERTS=/etc/tls/vct.local.crt
