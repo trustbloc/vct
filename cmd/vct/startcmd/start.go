@@ -52,6 +52,7 @@ import (
 	vdrkey "github.com/hyperledger/aries-framework-go/pkg/vdr/key"
 	vdrweb "github.com/hyperledger/aries-framework-go/pkg/vdr/web"
 	"github.com/hyperledger/aries-framework-go/spi/storage"
+	"github.com/jackc/pgconn"
 	jsonld "github.com/piprate/json-gold/ld"
 	"github.com/rs/cors"
 	"github.com/spf13/cobra"
@@ -254,7 +255,21 @@ var supportedStorageProviders = map[string]func(string, string) (storage.Provide
 		return mongodb.NewProvider("mongodb://"+dsn, mongodb.WithDBPrefix(prefix)) // nolint: wrapcheck
 	},
 	databaseTypePostgresSQLOption: func(dsn, prefix string) (storage.Provider, error) {
-		return postgresql.NewProvider("postgres://"+dsn, postgresql.WithDBPrefix(prefix)) // nolint: wrapcheck
+		c, err := pgconn.ParseConfig("postgres://" + dsn)
+		if err != nil {
+			return nil, err
+		}
+
+		if c.Database != "" {
+			dsn = strings.ReplaceAll(dsn, "/"+c.Database, "")
+		}
+
+		p, err := postgresql.NewProvider("postgres://"+dsn, postgresql.WithDBPrefix(prefix))
+		if err != nil {
+			return nil, err
+		}
+
+		return p, nil
 	},
 	databaseTypeMemOption: func(_, _ string) (storage.Provider, error) { // nolint: unparam
 		return mem.NewProvider(), nil
@@ -1116,7 +1131,8 @@ func createJSONLDDocumentLoader(ldStore *ldStoreProvider, httpClient *http.Clien
 	return loader, nil
 }
 
-func validateAuthorizationBearerToken(w http.ResponseWriter, r *http.Request, readToken, writeToken string) bool {
+// ValidateAuthorizationBearerToken validate token.
+func ValidateAuthorizationBearerToken(w http.ResponseWriter, r *http.Request, readToken, writeToken string) bool {
 	if r.RequestURI == healthCheckEndpoint || strings.Contains(r.RequestURI, webFingerEndpoint) {
 		return true
 	}
@@ -1149,7 +1165,7 @@ func validateAuthorizationBearerToken(w http.ResponseWriter, r *http.Request, re
 func authorizationMiddleware(readToken, writeToken string) mux.MiddlewareFunc {
 	middleware := func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			if validateAuthorizationBearerToken(w, r, readToken, writeToken) {
+			if ValidateAuthorizationBearerToken(w, r, readToken, writeToken) {
 				next.ServeHTTP(w, r)
 			}
 		})
