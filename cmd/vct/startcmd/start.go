@@ -52,7 +52,6 @@ import (
 	vdrkey "github.com/hyperledger/aries-framework-go/pkg/vdr/key"
 	vdrweb "github.com/hyperledger/aries-framework-go/pkg/vdr/web"
 	"github.com/hyperledger/aries-framework-go/spi/storage"
-	"github.com/jackc/pgconn"
 	jsonld "github.com/piprate/json-gold/ld"
 	"github.com/rs/cors"
 	"github.com/spf13/cobra"
@@ -255,15 +254,6 @@ var supportedStorageProviders = map[string]func(string, string) (storage.Provide
 		return mongodb.NewProvider("mongodb://"+dsn, mongodb.WithDBPrefix(prefix)) // nolint: wrapcheck
 	},
 	databaseTypePostgresSQLOption: func(dsn, prefix string) (storage.Provider, error) {
-		c, err := pgconn.ParseConfig("postgres://" + dsn)
-		if err != nil {
-			return nil, err
-		}
-
-		if c.Database != "" {
-			dsn = strings.ReplaceAll(dsn, "/"+c.Database, "")
-		}
-
 		p, err := postgresql.NewProvider("postgres://"+dsn, postgresql.WithDBPrefix(prefix))
 		if err != nil {
 			return nil, err
