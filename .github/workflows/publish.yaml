@@ -12,6 +12,7 @@ on:
 jobs:
   publish:
     name: Publish image
+    permissions: read-all|write-all
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
