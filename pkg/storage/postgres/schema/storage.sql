@@ -151,7 +151,7 @@ CREATE TABLE IF NOT EXISTS unsequenced(
   PRIMARY KEY (tree_id, bucket, queue_timestamp_nanos, leaf_identity_hash)
 );--end
 
-CREATE OR REPLACE FUNCTION public.insert_leaf_data_ignore_duplicates(tree_id bigint, leaf_identity_hash bytea, leaf_value bytea, extra_data bytea, queue_timestamp_nanos bigint)
+CREATE OR REPLACE FUNCTION insert_leaf_data_ignore_duplicates(tree_id bigint, leaf_identity_hash bytea, leaf_value bytea, extra_data bytea, queue_timestamp_nanos bigint)
  RETURNS boolean
  LANGUAGE plpgsql
 AS $function$
@@ -166,7 +166,7 @@ AS $function$
     end;
 $function$;--end
 
-CREATE OR REPLACE FUNCTION public.insert_leaf_data_ignore_duplicates(tree_id bigint, leaf_identity_hash bytea, merkle_leaf_hash bytea, queue_timestamp_nanos bigint)
+CREATE OR REPLACE FUNCTION insert_leaf_data_ignore_duplicates(tree_id bigint, leaf_identity_hash bytea, merkle_leaf_hash bytea, queue_timestamp_nanos bigint)
  RETURNS boolean
  LANGUAGE plpgsql
 AS $function$
@@ -181,7 +181,7 @@ AS $function$
     end;
 $function$;--end
 
-CREATE OR REPLACE FUNCTION public.insert_sequenced_leaf_data_ignore_duplicates(tree_id bigint, sequence_number bigint, leaf_identity_hash bytea, merkle_leaf_hash bytea, integrate_timestamp_nanos bigint)
+CREATE OR REPLACE FUNCTION insert_sequenced_leaf_data_ignore_duplicates(tree_id bigint, sequence_number bigint, leaf_identity_hash bytea, merkle_leaf_hash bytea, integrate_timestamp_nanos bigint)
  RETURNS boolean
  LANGUAGE plpgsql
 AS $function$
