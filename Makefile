@@ -153,7 +153,7 @@ mocks:
 .PHONY: open-api-spec
 open-api-spec:
 	@GOBIN=$(GOBIN_PATH) go install github.com/go-swagger/go-swagger/cmd/swagger@$(SWAGGER_VERSION)
-	@echo "Generating Open API spec"
+	@echo "Generating Open API spec."
 	@mkdir $(SWAGGER_DIR)
 	@$(GOBIN_PATH)/swagger generate spec -w ./cmd/vct -o $(SWAGGER_OUTPUT)
 	@echo "Validating generated spec"
