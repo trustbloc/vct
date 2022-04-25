@@ -98,6 +98,40 @@ func TestClient_AddVC(t *testing.T) {
 	})
 }
 
+func TestClient_HealthCheck(t *testing.T) {
+	t.Run("Success", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		defer ctrl.Finish()
+
+		httpClient := NewMockHTTPClient(ctrl)
+		httpClient.EXPECT().Do(gomock.Any()).Do(func(req *http.Request) {
+		}).Return(&http.Response{
+			Body:       ioutil.NopCloser(bytes.NewBuffer([]byte("{}"))),
+			StatusCode: http.StatusOK,
+		}, nil)
+
+		client := vct.New(endpoint, vct.WithHTTPClient(httpClient), vct.WithAuthReadToken("tk1"))
+		err := client.HealthCheck(context.Background())
+		require.NoError(t, err)
+	})
+
+	t.Run("Error", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		defer ctrl.Finish()
+
+		httpClient := NewMockHTTPClient(ctrl)
+		httpClient.EXPECT().Do(gomock.Any()).Do(func(req *http.Request) {
+		}).Return(&http.Response{
+			Body:       ioutil.NopCloser(bytes.NewBuffer([]byte("{}"))),
+			StatusCode: http.StatusInternalServerError,
+		}, nil)
+
+		client := vct.New(endpoint, vct.WithHTTPClient(httpClient), vct.WithAuthReadToken("tk1"))
+		err := client.HealthCheck(context.Background())
+		require.Error(t, err)
+	})
+}
+
 func TestClient_GetIssuers(t *testing.T) {
 	t.Run("Success", func(t *testing.T) {
 		ctrl := gomock.NewController(t)

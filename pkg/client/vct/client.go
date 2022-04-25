@@ -101,6 +101,12 @@ func (c *Client) AddVC(ctx context.Context, credential []byte) (*command.AddVCRe
 	return result, nil
 }
 
+// HealthCheck check health.
+func (c *Client) HealthCheck(ctx context.Context) error {
+	return c.do(ctx, rest.HealthCheckPath, &map[string]interface{}{}, withMethod(http.MethodGet),
+		withToken(c.authReadToken))
+}
+
 // Webfinger returns discovery info.
 func (c *Client) Webfinger(ctx context.Context) (*command.WebFingerResponse, error) {
 	var result *command.WebFingerResponse
