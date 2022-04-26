@@ -108,7 +108,8 @@ func (c *Client) HealthCheck(ctx context.Context) error {
 		return err
 	}
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, parseURL.Scheme+"://"+parseURL.Host, nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet,
+		parseURL.Scheme+"://"+parseURL.Host+rest.HealthCheckPath, nil)
 	if err != nil {
 		return fmt.Errorf("new request with context: %w", err)
 	}
