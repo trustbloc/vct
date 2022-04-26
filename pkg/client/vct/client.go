@@ -103,8 +103,28 @@ func (c *Client) AddVC(ctx context.Context, credential []byte) (*command.AddVCRe
 
 // HealthCheck check health.
 func (c *Client) HealthCheck(ctx context.Context) error {
-	return c.do(ctx, rest.HealthCheckPath, &map[string]interface{}{}, withMethod(http.MethodGet),
-		withToken(c.authReadToken))
+	parseURL, err := url.Parse(c.endpoint)
+	if err != nil {
+		return err
+	}
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, parseURL.Scheme+"://"+parseURL.Host, nil)
+	if err != nil {
+		return fmt.Errorf("new request with context: %w", err)
+	}
+
+	resp, err := c.http.Do(req)
+	if err != nil {
+		return fmt.Errorf("http do: %w", err)
+	}
+
+	defer resp.Body.Close() // nolint: errcheck
+
+	if resp.StatusCode != http.StatusOK {
+		return getError(resp.Body)
+	}
+
+	return nil
 }
 
 // Webfinger returns discovery info.
