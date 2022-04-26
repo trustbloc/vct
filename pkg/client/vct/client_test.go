@@ -110,7 +110,7 @@ func TestClient_HealthCheck(t *testing.T) {
 			StatusCode: http.StatusOK,
 		}, nil)
 
-		client := vct.New(endpoint, vct.WithHTTPClient(httpClient), vct.WithAuthReadToken("tk1"))
+		client := vct.New("https://vct:22/maple2020", vct.WithHTTPClient(httpClient), vct.WithAuthReadToken("tk1"))
 		err := client.HealthCheck(context.Background())
 		require.NoError(t, err)
 	})
