@@ -26,7 +26,12 @@ import (
 	"github.com/trustbloc/vct/pkg/controller/errors"
 )
 
-var logger = log.New("controller/rest")
+var (
+	logger = log.New("controller/rest")
+	// BuildVersion contains the version of the VCT build.
+	//nolint:gochecknoglobals
+	BuildVersion string
+)
 
 // API endpoints.
 const (
@@ -46,9 +51,25 @@ const (
 )
 
 const (
+	success         = "success"
 	contentType     = "Content-Type"
 	applicationJSON = "application/json"
 )
+
+type db interface {
+	Ping() error
+}
+
+type keyManager interface {
+	HealthCheck() error
+}
+
+type healthCheckResp struct {
+	DBStatus    string    `json:"dbStatus,omitempty"`
+	KMSStatus   string    `json:"kmsStatus,omitempty"`
+	CurrentTime time.Time `json:"currentTime,omitempty"`
+	Version     string    `json:"version,omitempty"`
+}
 
 // nolint: gochecknoglobals
 var (
@@ -112,19 +133,21 @@ type Cmd interface {
 
 // Operation represents REST API controller.
 type Operation struct {
-	cmd Cmd
-	mf  monitoring.MetricFactory
+	cmd        Cmd
+	mf         monitoring.MetricFactory
+	db         db
+	keyManager keyManager
 }
 
 // New returns REST API controller.
-func New(cmd Cmd, mf monitoring.MetricFactory) *Operation {
+func New(cmd Cmd, db db, keyManager keyManager, mf monitoring.MetricFactory) *Operation {
 	if mf == nil {
 		mf = monitoring.InertMetricFactory{}
 	}
 
 	once.Do(func() { createMetrics(mf) })
 
-	return &Operation{cmd: cmd, mf: mf}
+	return &Operation{cmd: cmd, mf: mf, db: db, keyManager: keyManager}
 }
 
 // GetRESTHandlers returns list of all handlers supported by this controller.
@@ -250,13 +273,41 @@ func (c *Operation) GetIssuers(w http.ResponseWriter, r *http.Request) {
 // Responses:
 //    default: genericError
 //        200: healthCheckResponse
-func (c *Operation) HealthCheck(w http.ResponseWriter, _ *http.Request) {
-	execute(func(rw io.Writer, req io.Reader) error {
-		return json.NewEncoder(rw).Encode(map[string]interface{}{ // nolint: wrapcheck
-			"status":       "success",
-			"current_time": time.Now(),
-		})
-	}, w, nil)
+func (c *Operation) HealthCheck(rw http.ResponseWriter, _ *http.Request) {
+	dbStatus := ""
+	kmsStatus := ""
+
+	if c.db != nil {
+		dbStatus = success
+
+		if err := c.db.Ping(); err != nil {
+			dbStatus = err.Error()
+		}
+	}
+
+	if c.keyManager != nil {
+		kmsStatus = success
+
+		if err := c.keyManager.HealthCheck(); err != nil {
+			kmsStatus = err.Error()
+		}
+	}
+
+	if dbStatus != success || kmsStatus != success {
+		rw.WriteHeader(http.StatusServiceUnavailable)
+	} else {
+		rw.WriteHeader(http.StatusOK)
+	}
+
+	err := json.NewEncoder(rw).Encode(&healthCheckResp{
+		DBStatus:    dbStatus,
+		KMSStatus:   kmsStatus,
+		CurrentTime: time.Now(),
+		Version:     BuildVersion,
+	})
+	if err != nil {
+		logger.Errorf("healthcheck response failure, %s", err)
+	}
 }
 
 // Webfinger swagger:route GET /{alias}/.well-known/webfinger vct webfingerRequest
