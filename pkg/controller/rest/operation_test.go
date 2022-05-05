@@ -46,7 +46,7 @@ func TestOperation_AddVC(t *testing.T) {
 			require.Equal(t, `{"alias":"maple2021","vc_entry":"e2NyZWRlbnRpYWxzfQ=="}`, string(payload))
 		}).Return(nil)
 
-		operation := New(cmd, nil)
+		operation := New(cmd, &mockService{}, &mockService{}, nil)
 
 		_, code := sendRequestToHandler(t,
 			handlerLookup(t, operation, AddVCPath),
@@ -57,7 +57,7 @@ func TestOperation_AddVC(t *testing.T) {
 	})
 
 	t.Run("Bad request", func(t *testing.T) {
-		operation := New(nil, nil)
+		operation := New(nil, &mockService{}, &mockService{}, nil)
 
 		_, code := sendRequestToHandler(t,
 			handlerLookup(t, operation, AddVCPath),
@@ -76,7 +76,7 @@ func TestOperation_AddVC(t *testing.T) {
 		cmd := NewMockCmd(ctrl)
 		cmd.EXPECT().AddVC(gomock.Any(), gomock.Any()).Return(errors.ErrBadRequest)
 
-		operation := New(cmd, nil)
+		operation := New(cmd, &mockService{}, &mockService{}, nil)
 
 		_, code := sendRequestToHandler(t,
 			handlerLookup(t, operation, AddVCPath),
@@ -100,7 +100,7 @@ func TestOperation_GetSTH(t *testing.T) {
 			require.Equal(t, fmt.Sprintf("%q", alias), string(payload))
 		}).Return(nil)
 
-		operation := New(cmd, nil)
+		operation := New(cmd, &mockService{}, &mockService{}, nil)
 
 		_, code := sendRequestToHandler(t, handlerLookup(t, operation, GetSTHPath), nil,
 			strings.Replace(GetSTHPath, "{alias}", alias, 1),
@@ -115,7 +115,7 @@ func TestOperation_Metrics(t *testing.T) {
 		ctrl := gomock.NewController(t)
 		defer ctrl.Finish()
 
-		operation := New(NewMockCmd(ctrl), nil)
+		operation := New(NewMockCmd(ctrl), &mockService{}, &mockService{}, nil)
 
 		_, code := sendRequestToHandler(t, handlerLookup(t, operation, MetricsPath), nil, MetricsPath)
 
@@ -136,7 +136,7 @@ func TestOperation_GetIssuers(t *testing.T) {
 			require.Equal(t, fmt.Sprintf("%q", alias), string(payload))
 		}).Return(nil)
 
-		operation := New(cmd, nil)
+		operation := New(cmd, &mockService{}, &mockService{}, nil)
 
 		_, code := sendRequestToHandler(t, handlerLookup(t, operation, GetIssuersPath), nil,
 			strings.Replace(GetIssuersPath, "{alias}", alias, 1),
@@ -148,11 +148,27 @@ func TestOperation_GetIssuers(t *testing.T) {
 
 func TestOperation_HealthCheck(t *testing.T) {
 	t.Run("Success", func(t *testing.T) {
-		operation := New(nil, nil)
+		operation := New(nil, &mockService{}, &mockService{}, nil)
 
 		_, code := sendRequestToHandler(t, handlerLookup(t, operation, HealthCheckPath), nil, HealthCheckPath)
 
 		require.Equal(t, http.StatusOK, code)
+	})
+
+	t.Run("failed to db check", func(t *testing.T) {
+		operation := New(nil, &mockService{pingErr: fmt.Errorf("failed to ping")}, &mockService{}, nil)
+
+		_, code := sendRequestToHandler(t, handlerLookup(t, operation, HealthCheckPath), nil, HealthCheckPath)
+
+		require.Equal(t, http.StatusServiceUnavailable, code)
+	})
+
+	t.Run("failed to key manager check", func(t *testing.T) {
+		operation := New(nil, &mockService{}, &mockService{healthCheckErr: fmt.Errorf("failed")}, nil)
+
+		_, code := sendRequestToHandler(t, handlerLookup(t, operation, HealthCheckPath), nil, HealthCheckPath)
+
+		require.Equal(t, http.StatusServiceUnavailable, code)
 	})
 }
 
@@ -169,7 +185,7 @@ func TestOperation_Webfinger(t *testing.T) {
 			require.Equal(t, fmt.Sprintf("%q", alias), string(payload))
 		}).Return(nil)
 
-		operation := New(cmd, nil)
+		operation := New(cmd, &mockService{}, &mockService{}, nil)
 
 		_, code := sendRequestToHandler(t,
 			handlerLookup(t, operation, WebfingerPath), nil,
@@ -194,7 +210,7 @@ func TestOperation_GetSTHConsistency(t *testing.T) {
 			require.Equal(t, alias, req.Alias)
 		}).Return(nil)
 
-		operation := New(cmd, nil)
+		operation := New(cmd, &mockService{}, &mockService{}, nil)
 
 		_, code := sendRequestToHandler(t,
 			handlerLookup(t, operation, GetSTHConsistencyPath), nil,
@@ -208,7 +224,7 @@ func TestOperation_GetSTHConsistency(t *testing.T) {
 		ctrl := gomock.NewController(t)
 		defer ctrl.Finish()
 
-		operation := New(nil, nil)
+		operation := New(nil, &mockService{}, &mockService{}, nil)
 
 		buf, code := sendRequestToHandler(t,
 			handlerLookup(t, operation, GetSTHConsistencyPath), nil,
@@ -223,7 +239,7 @@ func TestOperation_GetSTHConsistency(t *testing.T) {
 		ctrl := gomock.NewController(t)
 		defer ctrl.Finish()
 
-		operation := New(nil, nil)
+		operation := New(nil, &mockService{}, &mockService{}, nil)
 
 		buf, code := sendRequestToHandler(t,
 			handlerLookup(t, operation, GetSTHConsistencyPath), nil,
@@ -249,7 +265,7 @@ func TestOperation_GetEntries(t *testing.T) {
 			require.Equal(t, alias, req.Alias)
 		}).Return(nil)
 
-		operation := New(cmd, nil)
+		operation := New(cmd, &mockService{}, &mockService{}, nil)
 
 		_, code := sendRequestToHandler(t,
 			handlerLookup(t, operation, GetEntriesPath), nil,
@@ -263,7 +279,7 @@ func TestOperation_GetEntries(t *testing.T) {
 		ctrl := gomock.NewController(t)
 		defer ctrl.Finish()
 
-		operation := New(nil, nil)
+		operation := New(nil, &mockService{}, &mockService{}, nil)
 
 		buf, code := sendRequestToHandler(t,
 			handlerLookup(t, operation, GetEntriesPath), nil,
@@ -278,7 +294,7 @@ func TestOperation_GetEntries(t *testing.T) {
 		ctrl := gomock.NewController(t)
 		defer ctrl.Finish()
 
-		operation := New(nil, nil)
+		operation := New(nil, &mockService{}, &mockService{}, nil)
 
 		buf, code := sendRequestToHandler(t,
 			handlerLookup(t, operation, GetEntriesPath), nil,
@@ -304,7 +320,7 @@ func TestOperation_GetProofByHash(t *testing.T) {
 			require.Equal(t, alias, req.Alias)
 		}).Return(nil)
 
-		operation := New(cmd, nil)
+		operation := New(cmd, &mockService{}, &mockService{}, nil)
 
 		_, code := sendRequestToHandler(t,
 			handlerLookup(t, operation, GetProofByHashPath), nil,
@@ -318,7 +334,7 @@ func TestOperation_GetProofByHash(t *testing.T) {
 		ctrl := gomock.NewController(t)
 		defer ctrl.Finish()
 
-		operation := New(nil, nil)
+		operation := New(nil, &mockService{}, &mockService{}, nil)
 
 		buf, code := sendRequestToHandler(t,
 			handlerLookup(t, operation, GetProofByHashPath), nil,
@@ -344,7 +360,7 @@ func TestOperation_GetEntryAndProof(t *testing.T) {
 			require.Equal(t, alias, req.Alias)
 		}).Return(nil)
 
-		operation := New(cmd, nil)
+		operation := New(cmd, &mockService{}, &mockService{}, nil)
 
 		_, code := sendRequestToHandler(t,
 			handlerLookup(t, operation, GetEntryAndProofPath), nil,
@@ -358,7 +374,7 @@ func TestOperation_GetEntryAndProof(t *testing.T) {
 		ctrl := gomock.NewController(t)
 		defer ctrl.Finish()
 
-		operation := New(nil, nil)
+		operation := New(nil, &mockService{}, &mockService{}, nil)
 
 		buf, code := sendRequestToHandler(t,
 			handlerLookup(t, operation, GetEntryAndProofPath), nil,
@@ -373,7 +389,7 @@ func TestOperation_GetEntryAndProof(t *testing.T) {
 		ctrl := gomock.NewController(t)
 		defer ctrl.Finish()
 
-		operation := New(nil, nil)
+		operation := New(nil, &mockService{}, &mockService{}, nil)
 
 		buf, code := sendRequestToHandler(t,
 			handlerLookup(t, operation, GetEntryAndProofPath), nil,
@@ -428,4 +444,17 @@ type readerMock struct{ err error }
 
 func (r *readerMock) Read(p []byte) (n int, err error) {
 	return 0, r.err
+}
+
+type mockService struct {
+	healthCheckErr error
+	pingErr        error
+}
+
+func (m *mockService) HealthCheck() error {
+	return m.healthCheckErr
+}
+
+func (m *mockService) Ping() error {
+	return m.pingErr
 }

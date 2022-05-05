@@ -237,6 +237,7 @@ type keyManager interface {
 	Create(kt kms.KeyType) (string, interface{}, error)
 	Get(keyID string) (interface{}, error)
 	ExportPubKeyBytes(keyID string) ([]byte, kms.KeyType, error)
+	HealthCheck() error
 }
 
 type crypto interface {
@@ -246,14 +247,14 @@ type crypto interface {
 var logger = log.New("vct/startcmd")
 
 // nolint:gochecknoglobals
-var supportedStorageProviders = map[string]func(string, string) (storage.Provider, error){
-	databaseTypeCouchDBOption: func(dsn, prefix string) (storage.Provider, error) {
+var supportedStorageProviders = map[string]func(string, string) (storeProvider, error){
+	databaseTypeCouchDBOption: func(dsn, prefix string) (storeProvider, error) {
 		return couchdb.NewProvider(dsn, couchdb.WithDBPrefix(prefix)) // nolint: wrapcheck
 	},
-	databaseTypeMongoDBOption: func(dsn, prefix string) (storage.Provider, error) {
+	databaseTypeMongoDBOption: func(dsn, prefix string) (storeProvider, error) {
 		return mongodb.NewProvider("mongodb://"+dsn, mongodb.WithDBPrefix(prefix)) // nolint: wrapcheck
 	},
-	databaseTypePostgresSQLOption: func(dsn, prefix string) (storage.Provider, error) {
+	databaseTypePostgresSQLOption: func(dsn, prefix string) (storeProvider, error) {
 		p, err := postgresql.NewProvider("postgres://"+dsn, postgresql.WithDBPrefix(prefix))
 		if err != nil {
 			return nil, err
@@ -261,7 +262,7 @@ var supportedStorageProviders = map[string]func(string, string) (storage.Provide
 
 		return p, nil
 	},
-	databaseTypeMemOption: func(_, _ string) (storage.Provider, error) { // nolint: unparam
+	databaseTypeMemOption: func(_, _ string) (storeProvider, error) { // nolint: unparam
 		return mem.NewProvider(), nil
 	},
 }
@@ -813,7 +814,7 @@ func startAgent(parameters *agentParameters) error { //nolint:funlen,gocyclo,cyc
 		metricsRouter = mux.NewRouter()
 	)
 
-	for _, handler := range rest.New(cmd, mf).GetRESTHandlers() {
+	for _, handler := range rest.New(cmd, store, km, mf).GetRESTHandlers() {
 		if handler.Path() == rest.MetricsPath {
 			metricsRouter.HandleFunc(handler.Path(), handler.Handle()).Methods(handler.Method())
 		} else {
@@ -1008,7 +1009,16 @@ func getTLS(cmd *cobra.Command) (*tlsParameters, error) {
 	}, nil
 }
 
-func createStoreProvider(dbURL, prefix string, timeout uint64) (storage.Provider, error) {
+type storeProvider interface {
+	OpenStore(name string) (storage.Store, error)
+	SetStoreConfig(name string, config storage.StoreConfiguration) error
+	GetStoreConfig(name string) (storage.StoreConfiguration, error)
+	GetOpenStores() []storage.Store
+	Close() error
+	Ping() error
+}
+
+func createStoreProvider(dbURL, prefix string, timeout uint64) (storeProvider, error) {
 	driver, dsn, err := getDBParams(dbURL)
 	if err != nil {
 		return nil, err
@@ -1019,7 +1029,7 @@ func createStoreProvider(dbURL, prefix string, timeout uint64) (storage.Provider
 		return nil, fmt.Errorf("unsupported storage driver: %s", driver)
 	}
 
-	var store storage.Provider
+	var store storeProvider
 
 	return store, backoff.RetryNotify(func() error { // nolint: wrapcheck
 		store, err = providerFunc(dsn, prefix)
