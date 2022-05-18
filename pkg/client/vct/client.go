@@ -14,6 +14,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"net/http"
 	"net/url"
 	"strconv"
@@ -348,10 +349,16 @@ func (c *Client) do(ctx context.Context, path string, v interface{}, opts ...opt
 }
 
 func getError(reader io.Reader) error {
+	msgBytes, err := ioutil.ReadAll(reader)
+	if err != nil {
+		return fmt.Errorf("read message body: %w", err)
+	}
+
 	var errMsg *rest.ErrorResponse
 
-	if err := json.NewDecoder(reader).Decode(&errMsg); err != nil {
-		return fmt.Errorf("json decode ErrorResponse: %w", err)
+	err = json.Unmarshal(msgBytes, &errMsg)
+	if err != nil {
+		return fmt.Errorf("%s", msgBytes)
 	}
 
 	return errors.New(errMsg.Message)
