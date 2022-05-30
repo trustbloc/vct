@@ -602,7 +602,7 @@ func createKMSAndCrypto(parameters *agentParameters, client *http.Client,
 			return nil, nil, err
 		}
 
-		awsSvc := awssvc.New(awsSession, NewAWSMetricsProvider(mf))
+		awsSvc := awssvc.New(awsSession, NewAWSMetricsProvider(mf), parameters.kmsParams.logSignActiveKeyID)
 
 		return awsSvc, awsSvc, nil
 	}
