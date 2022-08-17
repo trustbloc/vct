@@ -11,10 +11,11 @@ package command_test
 
 import (
 	"bytes"
-	_ "embed"
+	"embed"
 	"encoding/json"
 	"fmt"
 	"io"
+	"os"
 	"testing"
 
 	"github.com/golang/mock/gomock"
@@ -22,19 +23,23 @@ import (
 	"github.com/hyperledger/aries-framework-go/component/storageutil/mem"
 	"github.com/hyperledger/aries-framework-go/pkg/crypto"
 	"github.com/hyperledger/aries-framework-go/pkg/crypto/tinkcrypto"
+	"github.com/hyperledger/aries-framework-go/pkg/doc/ld"
+	"github.com/hyperledger/aries-framework-go/pkg/doc/ldcontext"
 	"github.com/hyperledger/aries-framework-go/pkg/doc/util"
 	"github.com/hyperledger/aries-framework-go/pkg/doc/verifiable"
 	"github.com/hyperledger/aries-framework-go/pkg/kms"
 	"github.com/hyperledger/aries-framework-go/pkg/kms/localkms"
+	mockldstore "github.com/hyperledger/aries-framework-go/pkg/mock/ld"
 	"github.com/hyperledger/aries-framework-go/pkg/secretlock"
 	"github.com/hyperledger/aries-framework-go/pkg/secretlock/noop"
+	ldstore "github.com/hyperledger/aries-framework-go/pkg/store/ld"
 	"github.com/hyperledger/aries-framework-go/pkg/vdr"
 	"github.com/hyperledger/aries-framework-go/pkg/vdr/key"
 	"github.com/hyperledger/aries-framework-go/spi/storage"
 	jsonld "github.com/piprate/json-gold/ld"
 	"github.com/stretchr/testify/require"
 
-	"github.com/trustbloc/vct/internal/pkg/ldcontext"
+	vctldcontext "github.com/trustbloc/vct/internal/pkg/ldcontext"
 	. "github.com/trustbloc/vct/pkg/controller/command"
 	"github.com/trustbloc/vct/pkg/controller/errors"
 )
@@ -1259,7 +1264,7 @@ func TestCmd_AddVC(t *testing.T) {
 		keyType = kms.ECDSAP256TypeIEEEP1363
 	)
 
-	documentLoader := ldcontext.DocumentLoader(t)
+	documentLoader := documentLoader(t)
 
 	t.Run("Success", func(t *testing.T) {
 		ctrl := gomock.NewController(t)
@@ -1700,4 +1705,84 @@ type readerMock struct{ err error }
 
 func (r *readerMock) Read(p []byte) (n int, err error) {
 	return 0, r.err
+}
+
+type mockLDStoreProvider struct {
+	ContextStore        ldstore.ContextStore
+	RemoteProviderStore ldstore.RemoteProviderStore
+}
+
+func (p *mockLDStoreProvider) JSONLDContextStore() ldstore.ContextStore {
+	return p.ContextStore
+}
+
+func (p *mockLDStoreProvider) JSONLDRemoteProviderStore() ldstore.RemoteProviderStore {
+	return p.RemoteProviderStore
+}
+
+// documentLoader returns a document loader with preloaded test contexts.
+func documentLoader(t *testing.T) *ld.DocumentLoader {
+	t.Helper()
+
+	ldStore := &mockLDStoreProvider{
+		ContextStore:        mockldstore.NewMockContextStore(),
+		RemoteProviderStore: mockldstore.NewMockRemoteProviderStore(),
+	}
+
+	ctx := vctldcontext.MustGetAll()
+
+	ctx = append(ctx, getAll()...)
+
+	loader, err := ld.NewDocumentLoader(ldStore, ld.WithExtraContexts(ctx...))
+	require.NoError(t, err)
+
+	return loader
+}
+
+const contextsDir = "testdata"
+
+// nolint: gochecknoglobals
+var (
+	//go:embed testdata/ld-*.json
+	fs embed.FS
+)
+
+// getAll returns all predefined contexts.
+func getAll() []ldcontext.Document {
+	var entries []os.DirEntry
+
+	var contexts []ldcontext.Document
+
+	entries, errOnce := fs.ReadDir(contextsDir)
+	if errOnce != nil {
+		panic(errOnce)
+	}
+
+	for _, entry := range entries {
+		var file os.FileInfo
+
+		file, errOnce = entry.Info()
+		if errOnce != nil {
+			panic(errOnce)
+		}
+
+		var content []byte
+		// Do not use os.PathSeparator here, we are using go:embed to load files.
+		// The path separator is a forward slash, even on Windows systems.
+		content, errOnce = fs.ReadFile(contextsDir + "/" + file.Name())
+		if errOnce != nil {
+			panic(errOnce)
+		}
+
+		var doc ldcontext.Document
+
+		errOnce = json.Unmarshal(content, &doc)
+		if errOnce != nil {
+			panic(errOnce)
+		}
+
+		contexts = append(contexts, doc)
+	}
+
+	return append(contexts[:0:0], contexts...)
 }
