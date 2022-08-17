@@ -65,6 +65,7 @@ import (
 	"github.com/trustbloc/vct/cmd/internal/serverutil"
 	"github.com/trustbloc/vct/cmd/log_server/startcmd"
 	logsignerstart "github.com/trustbloc/vct/cmd/log_signer/startcmd"
+	"github.com/trustbloc/vct/internal/pkg/ldcontext"
 	"github.com/trustbloc/vct/pkg/controller/command"
 	"github.com/trustbloc/vct/pkg/controller/rest"
 	"github.com/trustbloc/vct/pkg/storage/memory"
@@ -1113,7 +1114,7 @@ func createLDStoreProvider(provider storage.Provider) (*ldStoreProvider, error) 
 
 func createJSONLDDocumentLoader(ldStore *ldStoreProvider, httpClient *http.Client,
 	providerURLs []string) (jsonld.DocumentLoader, error) {
-	var loaderOpts []ld.DocumentLoaderOpts
+	loaderOpts := []ld.DocumentLoaderOpts{ld.WithExtraContexts(ldcontext.MustGetAll()...)}
 
 	for _, u := range providerURLs {
 		loaderOpts = append(loaderOpts,
