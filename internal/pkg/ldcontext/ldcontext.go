@@ -1,5 +1,6 @@
 /*
 Copyright SecureKey Technologies Inc. All Rights Reserved.
+
 SPDX-License-Identifier: Apache-2.0
 */
 
@@ -10,20 +11,15 @@ import (
 	"encoding/json"
 	"os"
 	"sync"
-	"testing"
 
-	"github.com/hyperledger/aries-framework-go/pkg/doc/ld"
 	"github.com/hyperledger/aries-framework-go/pkg/doc/ldcontext"
-	mockldstore "github.com/hyperledger/aries-framework-go/pkg/mock/ld"
-	ldstore "github.com/hyperledger/aries-framework-go/pkg/store/ld"
-	"github.com/stretchr/testify/require"
 )
 
-const testdataDir = "testdata"
+const payloadDir = "payload"
 
 // nolint: gochecknoglobals
 var (
-	//go:embed testdata/*.json
+	//go:embed payload/*.json
 	fs embed.FS
 
 	contexts []ldcontext.Document
@@ -36,7 +32,7 @@ func GetAll() ([]ldcontext.Document, error) {
 	once.Do(func() {
 		var entries []os.DirEntry
 
-		entries, errOnce = fs.ReadDir(testdataDir)
+		entries, errOnce = fs.ReadDir(payloadDir)
 		if errOnce != nil {
 			return
 		}
@@ -51,7 +47,7 @@ func GetAll() ([]ldcontext.Document, error) {
 			var content []byte
 			// Do not use os.PathSeparator here, we are using go:embed to load files.
 			// The path separator is a forward slash, even on Windows systems.
-			content, errOnce = fs.ReadFile(testdataDir + "/" + file.Name())
+			content, errOnce = fs.ReadFile(payloadDir + "/" + file.Name())
 			if errOnce != nil {
 				return
 			}
@@ -78,32 +74,4 @@ func MustGetAll() []ldcontext.Document {
 	}
 
 	return docs
-}
-
-type mockLDStoreProvider struct {
-	ContextStore        ldstore.ContextStore
-	RemoteProviderStore ldstore.RemoteProviderStore
-}
-
-func (p *mockLDStoreProvider) JSONLDContextStore() ldstore.ContextStore {
-	return p.ContextStore
-}
-
-func (p *mockLDStoreProvider) JSONLDRemoteProviderStore() ldstore.RemoteProviderStore {
-	return p.RemoteProviderStore
-}
-
-// DocumentLoader returns a document loader with preloaded test contexts.
-func DocumentLoader(t *testing.T) *ld.DocumentLoader {
-	t.Helper()
-
-	ldStore := &mockLDStoreProvider{
-		ContextStore:        mockldstore.NewMockContextStore(),
-		RemoteProviderStore: mockldstore.NewMockRemoteProviderStore(),
-	}
-
-	loader, err := ld.NewDocumentLoader(ldStore, ld.WithExtraContexts(MustGetAll()...))
-	require.NoError(t, err)
-
-	return loader
 }

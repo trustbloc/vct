@@ -11,14 +11,16 @@ package vct_test
 import (
 	"bytes"
 	"context"
-	_ "embed"
+	"embed"
 	"encoding/json"
 	"io/ioutil"
 	"net/http"
+	"os"
 	"testing"
 
 	"github.com/golang/mock/gomock"
 	"github.com/hyperledger/aries-framework-go/pkg/doc/ld"
+	"github.com/hyperledger/aries-framework-go/pkg/doc/ldcontext"
 	"github.com/hyperledger/aries-framework-go/pkg/doc/util"
 	"github.com/hyperledger/aries-framework-go/pkg/doc/verifiable"
 	mockldstore "github.com/hyperledger/aries-framework-go/pkg/mock/ld"
@@ -598,8 +600,60 @@ func getLoader(t *testing.T) *ld.DocumentLoader {
 		RemoteProviderStore: mockldstore.NewMockRemoteProviderStore(),
 	}
 
-	documentLoader, err := ld.NewDocumentLoader(p, ld.WithExtraContexts(vctldcontext.MustGetAll()...))
+	ctx := vctldcontext.MustGetAll()
+
+	ctx = append(ctx, getAll()...)
+
+	documentLoader, err := ld.NewDocumentLoader(p, ld.WithExtraContexts(ctx...))
 	require.NoError(t, err)
 
 	return documentLoader
+}
+
+const contextsDir = "testdata"
+
+// nolint: gochecknoglobals
+var (
+	//go:embed testdata/ld-*.json
+	fs embed.FS
+)
+
+// getAll returns all predefined contexts.
+func getAll() []ldcontext.Document {
+	var entries []os.DirEntry
+
+	var contexts []ldcontext.Document
+
+	entries, errOnce := fs.ReadDir(contextsDir)
+	if errOnce != nil {
+		panic(errOnce)
+	}
+
+	for _, entry := range entries {
+		var file os.FileInfo
+
+		file, errOnce = entry.Info()
+		if errOnce != nil {
+			panic(errOnce)
+		}
+
+		var content []byte
+		// Do not use os.PathSeparator here, we are using go:embed to load files.
+		// The path separator is a forward slash, even on Windows systems.
+		content, errOnce = fs.ReadFile(contextsDir + "/" + file.Name())
+		if errOnce != nil {
+			panic(errOnce)
+		}
+
+		var doc ldcontext.Document
+
+		errOnce = json.Unmarshal(content, &doc)
+		if errOnce != nil {
+			panic(errOnce)
+		}
+
+		contexts = append(contexts, doc)
+	}
+
+	return append(contexts[:0:0], contexts...)
 }

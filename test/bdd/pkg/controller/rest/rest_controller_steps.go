@@ -10,8 +10,10 @@ import (
 	"context"
 	"embed"
 	"encoding/base64"
+	"encoding/json"
 	"fmt"
 	"net/http"
+	"os"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -21,16 +23,25 @@ import (
 	"github.com/cucumber/godog"
 	"github.com/hyperledger/aries-framework-go/component/storageutil/mem"
 	"github.com/hyperledger/aries-framework-go/pkg/doc/ld"
+	"github.com/hyperledger/aries-framework-go/pkg/doc/ldcontext"
 	"github.com/hyperledger/aries-framework-go/pkg/doc/verifiable"
 	ldstore "github.com/hyperledger/aries-framework-go/pkg/store/ld"
 
-	"github.com/trustbloc/vct/internal/pkg/ldcontext"
+	vcldcontext "github.com/trustbloc/vct/internal/pkg/ldcontext"
 	"github.com/trustbloc/vct/pkg/client/vct"
 	"github.com/trustbloc/vct/pkg/controller/command"
 )
 
-//go:embed testdata/**/*.json
-var fs embed.FS // nolint: gochecknoglobals
+const contextsDir = "testdata"
+
+// nolint: gochecknoglobals
+var (
+	//go:embed testdata/ld-*.json
+	fsContext embed.FS
+
+	//go:embed testdata/**/*.json
+	fs embed.FS
+)
 
 // Steps represents BDD test steps.
 type Steps struct {
@@ -385,12 +396,56 @@ func getLoader() *ld.DocumentLoader {
 		RemoteProviderStore: remoteProviderStore,
 	}
 
+	ctx := vcldcontext.MustGetAll()
+
+	ctx = append(ctx, getAll()...)
+
 	documentLoader, err := ld.NewDocumentLoader(p,
-		ld.WithExtraContexts(ldcontext.MustGetAll()...),
+		ld.WithExtraContexts(ctx...),
 	)
 	if err != nil {
 		panic(err)
 	}
 
 	return documentLoader
+}
+
+// getAll returns all predefined contexts.
+func getAll() []ldcontext.Document {
+	var entries []os.DirEntry
+
+	var contexts []ldcontext.Document
+
+	entries, errOnce := fsContext.ReadDir(contextsDir)
+	if errOnce != nil {
+		panic(errOnce)
+	}
+
+	for _, entry := range entries {
+		var file os.FileInfo
+
+		file, errOnce = entry.Info()
+		if errOnce != nil {
+			panic(errOnce)
+		}
+
+		var content []byte
+		// Do not use os.PathSeparator here, we are using go:embed to load files.
+		// The path separator is a forward slash, even on Windows systems.
+		content, errOnce = fsContext.ReadFile(contextsDir + "/" + file.Name())
+		if errOnce != nil {
+			panic(errOnce)
+		}
+
+		var doc ldcontext.Document
+
+		errOnce = json.Unmarshal(content, &doc)
+		if errOnce != nil {
+			panic(errOnce)
+		}
+
+		contexts = append(contexts, doc)
+	}
+
+	return append(contexts[:0:0], contexts...)
 }
