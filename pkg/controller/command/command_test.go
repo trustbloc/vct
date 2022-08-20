@@ -35,7 +35,6 @@ import (
 	ldstore "github.com/hyperledger/aries-framework-go/pkg/store/ld"
 	"github.com/hyperledger/aries-framework-go/pkg/vdr"
 	"github.com/hyperledger/aries-framework-go/pkg/vdr/key"
-	"github.com/hyperledger/aries-framework-go/spi/storage"
 	jsonld "github.com/piprate/json-gold/ld"
 	"github.com/stretchr/testify/require"
 
@@ -1676,8 +1675,11 @@ func createKMSAndCrypto(t *testing.T) (kms.KeyManager, crypto.Crypto) {
 
 	const defaultMasterKeyURI = "local-lock://default/master/key/"
 
+	kmsStore, err := kms.NewAriesProviderWrapper(mem.NewProvider())
+	require.NoError(t, err)
+
 	local, err := localkms.New(defaultMasterKeyURI, &kmsProvider{
-		storageProvider: mem.NewProvider(),
+		storageProvider: kmsStore,
 		secretLock:      &noop.NoLock{},
 	})
 	require.NoError(t, err)
@@ -1689,11 +1691,11 @@ func createKMSAndCrypto(t *testing.T) (kms.KeyManager, crypto.Crypto) {
 }
 
 type kmsProvider struct {
-	storageProvider storage.Provider
+	storageProvider kms.Store
 	secretLock      secretlock.Service
 }
 
-func (k kmsProvider) StorageProvider() storage.Provider {
+func (k kmsProvider) StorageProvider() kms.Store {
 	return k.storageProvider
 }
 

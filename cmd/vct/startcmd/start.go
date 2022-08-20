@@ -235,7 +235,7 @@ type kmsParameters struct {
 }
 
 type keyManager interface {
-	Create(kt kms.KeyType) (string, interface{}, error)
+	Create(kt kms.KeyType, opts ...kms.KeyOpts) (string, interface{}, error)
 	Get(keyID string) (interface{}, error)
 	ExportPubKeyBytes(keyID string) ([]byte, kms.KeyType, error)
 	HealthCheck() error
@@ -554,20 +554,7 @@ func createKMSAndCrypto(parameters *agentParameters, client *http.Client,
 	store storage.Provider, cfg storage.Store, mf monitoring.MetricFactory) (keyManager, crypto, error) {
 	switch parameters.kmsParams.kmsType {
 	case kmsLocal:
-		km, err := localkms.New(defaultMasterKeyURI, &kmsProvider{
-			storageProvider: store,
-			secretLock:      &noop.NoLock{},
-		})
-		if err != nil {
-			return nil, nil, fmt.Errorf("create kms: %w", err)
-		}
-
-		cr, err := tinkcrypto.New()
-		if err != nil {
-			return nil, nil, fmt.Errorf("create crypto: %w", err)
-		}
-
-		return km, cr, nil
+		return createLocalKMS(store, defaultMasterKeyURI)
 	case kmsWeb:
 		if strings.Contains(parameters.kmsParams.kmsEndpoint, "keystores") {
 			return webkms.New(parameters.kmsParams.kmsEndpoint, client),
@@ -605,10 +592,54 @@ func createKMSAndCrypto(parameters *agentParameters, client *http.Client,
 
 		awsSvc := awssvc.New(awsSession, NewAWSMetricsProvider(mf), parameters.kmsParams.logSignActiveKeyID)
 
-		return awsSvc, awsSvc, nil
+		return &awsKMSWrapper{service: awsSvc}, awsSvc, nil
 	}
 
 	return nil, nil, fmt.Errorf("unsupported kms type: %s", parameters.kmsParams.kmsType)
+}
+
+func createLocalKMS(store storage.Provider, masterKeyURI string) (keyManager, crypto, error) {
+	kmsStore, err := kms.NewAriesProviderWrapper(store)
+	if err != nil {
+		return nil, nil, fmt.Errorf("create Aries provider wrapper: %w", err)
+	}
+
+	km, err := localkms.New(masterKeyURI, &kmsProvider{
+		storageProvider: kmsStore,
+		secretLock:      &noop.NoLock{},
+	})
+	if err != nil {
+		return nil, nil, fmt.Errorf("create kms: %w", err)
+	}
+
+	cr, err := tinkcrypto.New()
+	if err != nil {
+		return nil, nil, fmt.Errorf("create crypto: %w", err)
+	}
+
+	return km, cr, nil
+}
+
+// awsKMSWrapper acts as an adapter that allows the AWS KMS service implementation to be used to implement the
+// keyManager and Aries KMS interfaces.
+type awsKMSWrapper struct {
+	service *awssvc.Service
+}
+
+func (a *awsKMSWrapper) Create(kt kms.KeyType, _ ...kms.KeyOpts) (string, interface{}, error) {
+	return a.service.Create(kt)
+}
+
+func (a *awsKMSWrapper) Get(keyID string) (interface{}, error) {
+	return a.service.Get(keyID)
+}
+
+func (a *awsKMSWrapper) ExportPubKeyBytes(keyID string) ([]byte, kms.KeyType, error) {
+	return a.service.ExportPubKeyBytes(keyID)
+}
+
+func (a awsKMSWrapper) HealthCheck() error {
+	return a.service.HealthCheck()
 }
 
 func getRegion(keyURI string) (string, error) {
@@ -1057,11 +1088,11 @@ func getDBParams(dbURL string) (driver, dsn string, err error) {
 }
 
 type kmsProvider struct {
-	storageProvider storage.Provider
+	storageProvider kms.Store
 	secretLock      secretlock.Service
 }
 
-func (k kmsProvider) StorageProvider() storage.Provider {
+func (k kmsProvider) StorageProvider() kms.Store {
 	return k.storageProvider
 }
 

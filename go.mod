@@ -17,19 +17,19 @@ require (
 	github.com/google/uuid v1.3.0
 	github.com/gorilla/mux v1.8.0
 	github.com/grpc-ecosystem/go-grpc-middleware v1.3.0
-	github.com/hyperledger/aries-framework-go v0.1.9-0.20220812134322-e05b76b09fcb
+	github.com/hyperledger/aries-framework-go v0.1.9-0.20220819134023-730ac301c3c0
 	github.com/hyperledger/aries-framework-go-ext/component/storage/couchdb v0.0.0-20220428163625-96d8261511e1
 	github.com/hyperledger/aries-framework-go-ext/component/storage/mongodb v0.0.0-20220428163625-96d8261511e1
 	github.com/hyperledger/aries-framework-go-ext/component/storage/postgresql v0.0.0-20220428163625-96d8261511e1
-	github.com/hyperledger/aries-framework-go/component/storageutil v0.0.0-20220428211718-66cc046674a1
-	github.com/hyperledger/aries-framework-go/spi v0.0.0-20220606124520-53422361c38c
+	github.com/hyperledger/aries-framework-go/component/storageutil v0.0.0-20220610133818-119077b0ec85
+	github.com/hyperledger/aries-framework-go/spi v0.0.0-20220610133818-119077b0ec85
 	github.com/lib/pq v1.10.0
 	github.com/ory/dockertest/v3 v3.8.1
 	github.com/piprate/json-gold v0.4.1
 	github.com/prometheus/client_golang v1.11.0
 	github.com/rs/cors v1.7.0
 	github.com/spf13/cobra v1.3.0
-	github.com/stretchr/testify v1.7.2
+	github.com/stretchr/testify v1.7.5
 	github.com/trustbloc/edge-core v0.1.8
 	github.com/trustbloc/kms v0.1.9-0.20220526151939-d46e46e8f7e1
 	go.etcd.io/etcd/client/v3 v3.5.0
@@ -51,7 +51,7 @@ require (
 	github.com/VictoriaMetrics/fastcache v1.5.7 // indirect
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/bluele/gcache v0.0.2 // indirect
-	github.com/btcsuite/btcd v0.22.0-beta // indirect
+	github.com/btcsuite/btcd v0.22.1 // indirect
 	github.com/btcsuite/btcutil v1.0.3-0.20201208143702-a53e38424cce // indirect
 	github.com/cenkalti/backoff v2.2.1+incompatible // indirect
 	github.com/census-instrumentation/opencensus-proto v0.3.0 // indirect
@@ -136,7 +136,7 @@ require (
 	go.uber.org/atomic v1.7.0 // indirect
 	go.uber.org/multierr v1.6.0 // indirect
 	go.uber.org/zap v1.17.0 // indirect
-	golang.org/x/crypto v0.0.0-20220112180741-5e0467b6c7ce // indirect
+	golang.org/x/crypto v0.0.0-20220525230936-793ad666bf5e // indirect
 	golang.org/x/net v0.0.0-20220127200216-cd36cc0744dd // indirect
 	golang.org/x/oauth2 v0.0.0-20211104180415-d3ed0bb246c8 // indirect
 	golang.org/x/sync v0.0.0-20210220032951-036812b2e83c // indirect

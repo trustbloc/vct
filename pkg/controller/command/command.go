@@ -95,7 +95,7 @@ type Config struct {
 
 // KeyManager key manager.
 type KeyManager interface {
-	Create(kt kms.KeyType) (string, interface{}, error)
+	Create(kt kms.KeyType, opts ...kms.KeyOpts) (string, interface{}, error)
 	Get(keyID string) (interface{}, error)
 	ExportPubKeyBytes(keyID string) ([]byte, kms.KeyType, error)
 }
