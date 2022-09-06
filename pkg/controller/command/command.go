@@ -19,11 +19,13 @@ import (
 	"github.com/google/trillian"
 	"github.com/google/trillian/monitoring"
 	"github.com/google/trillian/types"
+	ariesjsonld "github.com/hyperledger/aries-framework-go/pkg/doc/signature/jsonld"
 	"github.com/hyperledger/aries-framework-go/pkg/doc/verifiable"
 	"github.com/hyperledger/aries-framework-go/pkg/framework/aries/api/vdr"
 	"github.com/hyperledger/aries-framework-go/pkg/kms"
 	jsonld "github.com/piprate/json-gold/ld"
 
+	"github.com/trustbloc/vct/pkg/canonicalizer"
 	"github.com/trustbloc/vct/pkg/controller/errors"
 )
 
@@ -37,9 +39,15 @@ const (
 	GetIssuers        = "getIssuers"
 	Webfinger         = "webfinger"
 	AddVC             = "addVC"
+)
 
+const (
+	// PublicKeyType is the public key property in the Webfinger document.
 	PublicKeyType = "https://trustbloc.dev/ns/public-key"
-	LedgerType    = "https://trustbloc.dev/ns/ledger-type"
+	// LedgerType is the ledger type property in the Webfinger document.
+	LedgerType = "https://trustbloc.dev/ns/ledger-type"
+
+	ldProofField = "proof"
 )
 
 // TrillianLogClient is the API client for TrillianLog service.
@@ -214,15 +222,20 @@ func (c *Cmd) Webfinger(w io.Writer, r io.Reader) error {
 }
 
 // CreateLeaf creates MerkleTreeLeaf.
-func CreateLeaf(timestamp uint64, vc *verifiable.Credential) (*MerkleTreeLeaf, error) {
-	proofs := vc.Proofs
-	vc.Proofs = nil
+func CreateLeaf(timestamp uint64, vcBytes []byte, loader jsonld.DocumentLoader) (*MerkleTreeLeaf, error) {
+	var vcDoc map[string]interface{}
 
-	defer func() { vc.Proofs = proofs }()
-
-	credentialWithoutProofs, err := json.Marshal(vc)
+	err := json.Unmarshal(vcBytes, &vcDoc)
 	if err != nil {
-		return nil, fmt.Errorf("marshal credential: %w", err)
+		return nil, fmt.Errorf("unmarshal VC to document: %w", err)
+	}
+
+	vcDoc[ldProofField] = nil
+
+	canonicalBytes, err := ariesjsonld.NewProcessor("").GetCanonicalDocument(vcDoc,
+		ariesjsonld.WithDocumentLoader(loader))
+	if err != nil {
+		return nil, fmt.Errorf("marshal canonical: %w", err)
 	}
 
 	return &MerkleTreeLeaf{
@@ -231,7 +244,7 @@ func CreateLeaf(timestamp uint64, vc *verifiable.Credential) (*MerkleTreeLeaf, e
 		TimestampedEntry: &TimestampedEntry{
 			EntryType: VCLogEntryType,
 			Timestamp: timestamp,
-			VCEntry:   credentialWithoutProofs,
+			VCEntry:   canonicalBytes,
 		},
 	}, nil
 }
@@ -251,7 +264,7 @@ func (c *Cmd) hasPermissions(alias string, perm permission) error {
 }
 
 // AddVC adds verifiable credential to log.
-func (c *Cmd) AddVC(w io.Writer, r io.Reader) error { // nolint: funlen
+func (c *Cmd) AddVC(w io.Writer, r io.Reader) error { // nolint: funlen,gocyclo,cyclop
 	var req AddVCRequest
 
 	if err := json.NewDecoder(r).Decode(&req); err != nil {
@@ -269,9 +282,12 @@ func (c *Cmd) AddVC(w io.Writer, r io.Reader) error { // nolint: funlen
 
 	parseCredentialTime := time.Now()
 
-	vc, err := verifiable.ParseCredential(req.VCEntry, verifiable.WithPublicKeyFetcher(
-		verifiable.NewVDRKeyResolver(c.vdr).PublicKeyFetcher(),
-	), verifiable.WithJSONLDDocumentLoader(loader))
+	vc, err := verifiable.ParseCredential(req.VCEntry,
+		verifiable.WithPublicKeyFetcher(
+			verifiable.NewVDRKeyResolver(c.vdr).PublicKeyFetcher(),
+		),
+		verifiable.WithJSONLDDocumentLoader(loader),
+	)
 	if err != nil {
 		return errors.NewBadRequestError(fmt.Errorf("parse credential: %w", err))
 	}
@@ -282,19 +298,23 @@ func (c *Cmd) AddVC(w io.Writer, r io.Reader) error { // nolint: funlen
 		return fmt.Errorf("%w: issuer %s is not in a list", errors.ErrBadRequest, vc.Issuer.ID)
 	}
 
-	leaf, err := CreateLeaf(uint64(time.Now().UnixNano()/int64(time.Millisecond)), vc)
+	leaf, err := CreateLeaf(uint64(time.Now().UnixNano()/int64(time.Millisecond)), req.VCEntry, loader)
 	if err != nil {
 		return fmt.Errorf("create leaf: %w", err)
 	}
 
-	leafData, err := json.Marshal(leaf)
+	leafData, err := canonicalizer.MarshalCanonical(leaf)
 	if err != nil {
 		return errors.NewStatusInternalServerError(fmt.Errorf("marshal MerkleTreeLeaf: %w", err))
 	}
 
-	extraData, err := json.Marshal(vc.Proofs)
-	if err != nil {
-		return errors.NewStatusInternalServerError(fmt.Errorf("marshal credential proofs: %w", err))
+	var extraData []byte
+
+	if len(vc.Proofs) > 0 {
+		extraData, err = canonicalizer.MarshalCanonical(vc.Proofs)
+		if err != nil {
+			return errors.NewStatusInternalServerError(fmt.Errorf("marshal credential proofs: %w", err))
+		}
 	}
 
 	leafIDHash := sha256.Sum256(leaf.TimestampedEntry.VCEntry)
@@ -625,7 +645,7 @@ func CreateVCTimestampSignature(leaf *MerkleTreeLeaf) *VCTimestampSignature {
 }
 
 func (c *Cmd) signV1VCTS(leaf *MerkleTreeLeaf) (DigitallySigned, error) {
-	data, err := json.Marshal(CreateVCTimestampSignature(leaf))
+	data, err := canonicalizer.MarshalCanonical(CreateVCTimestampSignature(leaf))
 	if err != nil {
 		return DigitallySigned{}, fmt.Errorf("marshal VCTimestampSignature: %w", err)
 	}
@@ -642,7 +662,7 @@ func (c *Cmd) signV1VCTS(leaf *MerkleTreeLeaf) (DigitallySigned, error) {
 }
 
 func (c *Cmd) signV1TreeHead(root types.LogRootV1) (DigitallySigned, error) {
-	sthBytes, err := json.Marshal(TreeHeadSignature{
+	sthBytes, err := canonicalizer.MarshalCanonical(TreeHeadSignature{
 		Version:        V1,
 		SignatureType:  TreeHeadSignatureType,
 		Timestamp:      root.TimestampNanos / uint64(time.Millisecond),

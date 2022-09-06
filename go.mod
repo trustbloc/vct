@@ -35,7 +35,6 @@ require (
 	go.etcd.io/etcd/client/v3 v3.5.0
 	google.golang.org/grpc v1.44.0
 	google.golang.org/protobuf v1.28.0
-
 )
 
 require (
