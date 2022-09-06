@@ -10,6 +10,8 @@ run:
   issues-exit-code: 1
   tests: true
   build-tags: [""]
+  skip-dirs:
+    - internal/pkg/jsoncanonicalizer
 
 output:
   format: colored-line-number

@@ -24,13 +24,15 @@ import (
 	"github.com/hyperledger/aries-framework-go/component/storageutil/mem"
 	"github.com/hyperledger/aries-framework-go/pkg/doc/ld"
 	"github.com/hyperledger/aries-framework-go/pkg/doc/ldcontext"
-	"github.com/hyperledger/aries-framework-go/pkg/doc/verifiable"
 	ldstore "github.com/hyperledger/aries-framework-go/pkg/store/ld"
+	"github.com/trustbloc/edge-core/pkg/log"
 
 	vcldcontext "github.com/trustbloc/vct/internal/pkg/ldcontext"
 	"github.com/trustbloc/vct/pkg/client/vct"
 	"github.com/trustbloc/vct/pkg/controller/command"
 )
+
+var logger = log.New("vct/bdd")
 
 const contextsDir = "testdata"
 
@@ -230,21 +232,15 @@ func (s *Steps) addVC(file string) error {
 		return fmt.Errorf("decode public key: %w", err)
 	}
 
-	vc, err := verifiable.ParseCredential(src,
-		verifiable.WithDisabledProofCheck(),
-		verifiable.WithNoCustomSchemaCheck(),
-		verifiable.WithJSONLDDocumentLoader(getLoader()),
-	)
-	if err != nil {
-		return fmt.Errorf("parse credential: %w", err)
-	}
-
-	err = vct.VerifyVCTimestampSignature(resp.Signature, pubKey, resp.Timestamp, vc)
+	err = vct.VerifyVCTimestampSignature(resp.Signature, pubKey, resp.Timestamp, src, getLoader())
 	if err != nil {
 		return fmt.Errorf("verify VC Timestamp signature: %w", err)
 	}
 
 	s.state.AddedCredentials[file] = resp
+
+	logger.Infof("Successfully verified VC timestamp signature for VC %s - Signature: %s, Timestamp: %d, Public Key: %s",
+		src, resp.Signature, resp.Timestamp, webResp.Properties[command.PublicKeyType])
 
 	return nil
 }
@@ -261,16 +257,7 @@ func (s *Steps) getProofByHash(file string) error {
 		return err
 	}
 
-	vc, err := verifiable.ParseCredential(src,
-		verifiable.WithDisabledProofCheck(),
-		verifiable.WithNoCustomSchemaCheck(),
-		verifiable.WithJSONLDDocumentLoader(getLoader()),
-	)
-	if err != nil {
-		return fmt.Errorf("parse credential: %w", err)
-	}
-
-	hash, err := vct.CalculateLeafHash(s.state.AddedCredentials[file].Timestamp, vc)
+	hash, err := vct.CalculateLeafHash(s.state.AddedCredentials[file].Timestamp, src, getLoader())
 	if err != nil {
 		return fmt.Errorf("calculate leaf hash from bytes: %w", err)
 	}

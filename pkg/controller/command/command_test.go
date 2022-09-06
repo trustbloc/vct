@@ -41,6 +41,7 @@ import (
 	vctldcontext "github.com/trustbloc/vct/internal/pkg/ldcontext"
 	. "github.com/trustbloc/vct/pkg/controller/command"
 	"github.com/trustbloc/vct/pkg/controller/errors"
+	"github.com/trustbloc/vct/pkg/testutil"
 )
 
 // nolint: gochecknoglobals
@@ -1251,7 +1252,10 @@ func TestCreateLeaf(t *testing.T) {
 		Proofs:  []verifiable.Proof{{}, {}},
 	}
 
-	_, err := CreateLeaf(1, simpleVC)
+	vcBytes, err := json.Marshal(simpleVC)
+	require.NoError(t, err)
+
+	_, err = CreateLeaf(1, vcBytes, testutil.GetLoader(t))
 	require.NoError(t, err)
 
 	require.Len(t, simpleVC.Proofs, 2)

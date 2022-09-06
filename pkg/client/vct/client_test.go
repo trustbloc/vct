@@ -11,26 +11,23 @@ package vct_test
 import (
 	"bytes"
 	"context"
-	"embed"
+	_ "embed"
+	"encoding/base64"
 	"encoding/json"
 	"io/ioutil"
 	"net/http"
-	"os"
 	"testing"
 
 	"github.com/golang/mock/gomock"
-	"github.com/hyperledger/aries-framework-go/pkg/doc/ld"
-	"github.com/hyperledger/aries-framework-go/pkg/doc/ldcontext"
 	"github.com/hyperledger/aries-framework-go/pkg/doc/util"
 	"github.com/hyperledger/aries-framework-go/pkg/doc/verifiable"
-	mockldstore "github.com/hyperledger/aries-framework-go/pkg/mock/ld"
-	ldstore "github.com/hyperledger/aries-framework-go/pkg/store/ld"
 	"github.com/stretchr/testify/require"
 
-	vctldcontext "github.com/trustbloc/vct/internal/pkg/ldcontext"
+	"github.com/trustbloc/vct/pkg/canonicalizer"
 	"github.com/trustbloc/vct/pkg/client/vct"
 	"github.com/trustbloc/vct/pkg/controller/command"
 	"github.com/trustbloc/vct/pkg/controller/rest"
+	"github.com/trustbloc/vct/pkg/testutil"
 )
 
 const endpoint = "https://example.com"
@@ -515,145 +512,69 @@ var simpleVC = &verifiable.Credential{ // nolint: gochecknoglobals // global vc
 	Proofs: []verifiable.Proof{{}, {}},
 }
 
+var simpleVC2 = &verifiable.Credential{ // nolint: gochecknoglobals // global vc
+	Context: []string{"https://www.w3.org/2018/credentials/v1", "https://w3id.org/security/suites/ed25519-2020/v1"},
+	Subject: "did:key:123",
+	Issuer:  verifiable.Issuer{ID: "did:key:123"},
+	Issued: func() *util.TimeWrapper {
+		res := &util.TimeWrapper{}
+
+		json.Unmarshal([]byte("\"2020-03-10T04:24:12.164Z\""), &res) // nolint: errcheck, gosec
+
+		return res
+	}(),
+	Types:  []string{"VerifiableCredential"},
+	Proofs: []verifiable.Proof{{"xxx": "yyy"}},
+}
+
 func TestCalculateLeafHash(t *testing.T) {
 	t.Run("Success", func(t *testing.T) {
-		hash, err := vct.CalculateLeafHash(12345, simpleVC)
+		vcBytes1, err := json.Marshal(simpleVC)
 		require.NoError(t, err)
-		require.Equal(t, "IamzE8Fm5W3ToLgZWlqVHPqgBLiBompVIyGLWDo0SP8=", hash)
-	})
 
-	t.Run("Marshal credential", func(t *testing.T) {
-		_, err := vct.CalculateLeafHash(12345, &verifiable.Credential{
-			Subject: make(chan int),
-		})
-		require.Error(t, err)
-		require.Contains(t, err.Error(), "marshal credential: json: error calling MarshalJSON")
+		hash1, err := vct.CalculateLeafHash(12345, vcBytes1, testutil.GetLoader(t))
+		require.NoError(t, err)
+		require.NotEmpty(t, hash1)
+
+		// Should be the same hash even if the VC has additional contexts, different prroofs, and
+		// is marshalled in a different way.
+		vcBytes2, err := canonicalizer.MarshalCanonical(simpleVC2)
+		require.NoError(t, err)
+
+		hash2, err := vct.CalculateLeafHash(12345, vcBytes2, testutil.GetLoader(t))
+		require.NoError(t, err)
+		require.Equal(t, hash1, hash2)
 	})
 }
 
 func TestVerifyVCTimestampSignature(t *testing.T) {
-	bachelorDegree, err := verifiable.ParseCredential(vcBachelorDegree,
-		verifiable.WithDisabledProofCheck(),
-		verifiable.WithNoCustomSchemaCheck(),
-		verifiable.WithJSONLDDocumentLoader(getLoader(t)),
-	)
-	require.NoError(t, err)
-
 	t.Run("Success", func(t *testing.T) {
 		const signature = `{
-		   "algorithm":{
-			  "hash":"SHA256",
-			  "signature":"ECDSA",
-			  "type":"ECDSAP256IEEEP1363"
-		   },
-		   "signature":"l8NfxVChPH7fG4cId6iNIbgpbRzxov+rwozdL4r5lRNXGiOTy7iAn2+Zg84VwkJoeJWvLGyO2a3WZnQKtNu/Lg=="
-		}`
+  "algorithm": {
+    "signature": "ECDSA",
+    "type": "ECDSAP256DER"
+  },
+  "signature": "MEUCIQCBCoNVefPQCbfp/v7XBbd8bW1FeE4tRXnY2m2HRECyMAIgWoaG8Bz9pLIewVRLlzym5svZ+YKp2i9yv+2uk/CRBjo="
+}`
 
-		pubKey := []byte{
-			4, 185, 70, 232, 62, 166, 17, 233, 172, 19, 143, 227, 170, 181, 184, 202, 177, 242, 247, 199, 73, 209,
-			108, 207, 87, 26, 199, 162, 21, 140, 117, 0, 143, 48, 20, 118, 255, 221, 200, 185, 227, 42, 213, 124,
-			156, 109, 160, 211, 29, 245, 44, 128, 46, 88, 117, 88, 240, 223, 241, 24, 209, 87, 214, 115, 101,
-		}
+		pubKey, err := base64.StdEncoding.DecodeString(
+			"MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEYH7+MO+X0YPnGkvK1Nmy/4/r9HpgPPku9gjw3k3zOl+PTbu7iEL2gsiH/KHaFbeMoMcj5Tv0OkA/EKfuzd0imQ==") //nolint:lll
+		require.NoError(t, err)
 
 		require.NoError(t, vct.VerifyVCTimestampSignature(
-			[]byte(signature), pubKey, 1619006293939, bachelorDegree,
+			[]byte(signature), pubKey, 1662067083140, vcBachelorDegree, testutil.GetLoader(t),
 		))
 	})
 
 	t.Run("Unmarshal signature error", func(t *testing.T) {
 		require.Contains(t, vct.VerifyVCTimestampSignature(
-			[]byte(`[]`), []byte(`[]`), 1617977793917, bachelorDegree,
+			[]byte(`[]`), []byte(`[]`), 1617977793917, vcBachelorDegree, testutil.GetLoader(t),
 		).Error(), "unmarshal signature")
 	})
 
 	t.Run("Wrong public key", func(t *testing.T) {
 		require.Contains(t, vct.VerifyVCTimestampSignature(
-			[]byte(`{}`), []byte(`[]`), 1617977793917, bachelorDegree,
+			[]byte(`{}`), []byte(`[]`), 1617977793917, vcBachelorDegree, testutil.GetLoader(t),
 		).Error(), "pub key to handle: error")
 	})
-
-	t.Run("Marshal credential", func(t *testing.T) {
-		require.Contains(t, vct.VerifyVCTimestampSignature(
-			[]byte(`{}`), []byte(`[]`), 1617977793917, &verifiable.Credential{Subject: make(chan int)},
-		).Error(), "marshal credential")
-	})
-}
-
-type mockProvider struct {
-	ContextStore        ldstore.ContextStore
-	RemoteProviderStore ldstore.RemoteProviderStore
-}
-
-func (m *mockProvider) JSONLDContextStore() ldstore.ContextStore {
-	return m.ContextStore
-}
-
-func (m *mockProvider) JSONLDRemoteProviderStore() ldstore.RemoteProviderStore {
-	return m.RemoteProviderStore
-}
-
-func getLoader(t *testing.T) *ld.DocumentLoader {
-	t.Helper()
-
-	p := &mockProvider{
-		ContextStore:        mockldstore.NewMockContextStore(),
-		RemoteProviderStore: mockldstore.NewMockRemoteProviderStore(),
-	}
-
-	ctx := vctldcontext.MustGetAll()
-
-	ctx = append(ctx, getAll()...)
-
-	documentLoader, err := ld.NewDocumentLoader(p, ld.WithExtraContexts(ctx...))
-	require.NoError(t, err)
-
-	return documentLoader
-}
-
-const contextsDir = "testdata"
-
-// nolint: gochecknoglobals
-var (
-	//go:embed testdata/ld-*.json
-	fs embed.FS
-)
-
-// getAll returns all predefined contexts.
-func getAll() []ldcontext.Document {
-	var entries []os.DirEntry
-
-	var contexts []ldcontext.Document
-
-	entries, errOnce := fs.ReadDir(contextsDir)
-	if errOnce != nil {
-		panic(errOnce)
-	}
-
-	for _, entry := range entries {
-		var file os.FileInfo
-
-		file, errOnce = entry.Info()
-		if errOnce != nil {
-			panic(errOnce)
-		}
-
-		var content []byte
-		// Do not use os.PathSeparator here, we are using go:embed to load files.
-		// The path separator is a forward slash, even on Windows systems.
-		content, errOnce = fs.ReadFile(contextsDir + "/" + file.Name())
-		if errOnce != nil {
-			panic(errOnce)
-		}
-
-		var doc ldcontext.Document
-
-		errOnce = json.Unmarshal(content, &doc)
-		if errOnce != nil {
-			panic(errOnce)
-		}
-
-		contexts = append(contexts, doc)
-	}
-
-	return append(contexts[:0:0], contexts...)
 }
