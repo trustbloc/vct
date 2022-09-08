@@ -58,6 +58,11 @@ func NewNotFoundError(err error) *StatusErr {
 	return &StatusErr{error: err, status: http.StatusNotFound}
 }
 
+// NewUnauthorizedError represents UnauthorizedError.
+func NewUnauthorizedError(err error) *StatusErr {
+	return &StatusErr{error: err, status: http.StatusUnauthorized}
+}
+
 // StatusCodeFromError returns status code if an error implements an interface the func supports rpc errors as well.
 func StatusCodeFromError(e error) int {
 	if err, ok := e.(interface{ StatusCode() int }); ok { // nolint: errorlint

@@ -41,7 +41,7 @@ func (c *CmdHandler) Method() string {
 	return c.method
 }
 
-// Handle returns execute function of the this command handler.
+// Handle returns execute function of this command handler.
 func (c *CmdHandler) Handle() Exec {
 	return c.handle
 }

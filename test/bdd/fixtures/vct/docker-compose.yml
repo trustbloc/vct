@@ -76,8 +76,8 @@ services:
     networks:
       - witness_ledger_net
 
-  vct:
-    container_name: vct
+  vct.example.com:
+    container_name: vct.example.com
     image: nginx:latest
     restart: always
     ports:
@@ -101,7 +101,7 @@ services:
     volumes:
       - ./specs:/specs
     depends_on:
-      - vct
+      - vct.example.com
     networks:
       - witness_ledger_net
 
@@ -110,7 +110,7 @@ services:
     image: ghcr.io/trustbloc/vct:latest
     restart: always
     environment:
-      - VCT_BASE_URL=http://vct:5678
+      - VCT_BASE_URL=https://vct.example.com
       - VCT_API_HOST=0.0.0.0:56561
       - VCT_LOGS=${VCT_LOGS}
       - VCT_KMS_TYPE=aws
@@ -143,7 +143,7 @@ services:
     image: ghcr.io/trustbloc/vct:latest
     restart: always
     environment:
-      - VCT_BASE_URL=http://vct:5678
+      - VCT_BASE_URL=https://vct.example.com
       - VCT_API_HOST=0.0.0.0:56562
       - VCT_LOGS=${VCT_LOGS}
       - VCT_KMS_TYPE=aws

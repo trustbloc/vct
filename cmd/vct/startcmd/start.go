@@ -400,7 +400,12 @@ func createStartCMD(server server) *cobra.Command { //nolint: funlen,gocognit,go
 				datasourceNameEnvKey)
 			databasePrefix := cmdutils.GetUserSetOptionalVarFromString(cmd, databasePrefixFlagName,
 				databasePrefixEnvKey)
-			baseURL := cmdutils.GetUserSetOptionalVarFromString(cmd, baseURLFlagName, baseURLEnvKey)
+
+			baseURL, err := cmdutils.GetUserSetVarFromString(cmd, baseURLFlagName, baseURLEnvKey, false)
+			if err != nil {
+				return err
+			}
+
 			timeoutStr := cmdutils.GetUserSetOptionalVarFromString(cmd, timeoutFlagName, timeoutEnvKey)
 			syncTimeoutStr := cmdutils.GetUserSetOptionalVarFromString(cmd, syncTimeoutFlagName, syncTimeoutEnvKey)
 			issuersStr := cmdutils.GetUserSetOptionalVarFromString(cmd, issuersFlagName, issuersEnvKey)

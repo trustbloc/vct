@@ -39,6 +39,7 @@ const (
 	timeoutFlagName           = "timeout"
 	syncTimeoutFlagName       = "sync-timeout"
 	readTokenFlagName         = "api-read-token"
+	baseURLFlagName           = "base-url"
 )
 
 type mockServer struct{}
@@ -92,6 +93,7 @@ func TestCmd(t *testing.T) {
 			"--" + logsFlagName, "maple2021:rw@localhost:50051",
 			"--" + kmsTypeFlagName, "local",
 			"--" + readTokenFlagName, "tk1",
+			"--" + baseURLFlagName, "https://vct.com",
 		}
 		startCmd.SetArgs(args)
 		require.NoError(t, startCmd.Execute())
@@ -105,6 +107,7 @@ func TestCmd(t *testing.T) {
 			"--" + agentHostFlagName, "",
 			"--" + logsFlagName, "maple2021:rw",
 			"--" + kmsTypeFlagName, "local",
+			"--" + baseURLFlagName, "https://vct.com",
 		}
 		startCmd.SetArgs(args)
 		require.NoError(t, startCmd.Execute())
@@ -119,11 +122,28 @@ func TestCmd(t *testing.T) {
 			"--" + logsFlagName, "maple2021:rw@localhost:50051",
 			"--" + devModeFlagName, "wrong",
 			"--" + kmsTypeFlagName, "local",
+			"--" + baseURLFlagName, "https://vct.com",
 		}
 		startCmd.SetArgs(args)
 		err = startCmd.Execute()
 		require.Error(t, err)
 		require.Contains(t, err.Error(), "dev mode is not a bool")
+	})
+
+	t.Run("No base-url", func(t *testing.T) {
+		startCmd, err := startcmd.Cmd(&mockServer{})
+		require.NoError(t, err)
+
+		args := []string{
+			"--" + agentHostFlagName, "",
+			"--" + kmsTypeFlagName, "local",
+		}
+		startCmd.SetArgs(args)
+
+		err = startCmd.Execute()
+
+		require.Contains(t, err.Error(),
+			"Neither base-url (command line flag) nor VCT_BASE_URL (environment variable) have been set.")
 	})
 
 	t.Run("No logs", func(t *testing.T) {
@@ -133,6 +153,7 @@ func TestCmd(t *testing.T) {
 		args := []string{
 			"--" + agentHostFlagName, "",
 			"--" + kmsTypeFlagName, "local",
+			"--" + baseURLFlagName, "https://vct.com",
 		}
 		startCmd.SetArgs(args)
 
@@ -150,6 +171,7 @@ func TestCmd(t *testing.T) {
 			"--" + issuersFlagName, "maple2021@issuer",
 			"--" + logsFlagName, "maple2021:rw@https://vct.example.com",
 			"--" + kmsTypeFlagName, "local",
+			"--" + baseURLFlagName, "https://vct.com",
 		}
 		startCmd.SetArgs(args)
 
@@ -167,6 +189,7 @@ func TestCmd(t *testing.T) {
 			"--" + logsFlagName, "11111:rw@https://vct.example.com",
 			"--" + kmsEndpointFlagName, "https://vct.example.com",
 			"--" + kmsTypeFlagName, "web",
+			"--" + baseURLFlagName, "https://vct.com",
 		}
 		startCmd.SetArgs(args)
 
@@ -184,6 +207,7 @@ func TestCmd(t *testing.T) {
 			"--" + logsFlagName, "11111:rw@https://vct.example.com",
 			"--" + tlsSystemCertPoolFlagName, "invalid",
 			"--" + kmsTypeFlagName, "local",
+			"--" + baseURLFlagName, "https://vct.com",
 		}
 		startCmd.SetArgs(args)
 
@@ -201,6 +225,7 @@ func TestCmd(t *testing.T) {
 			"--" + logsFlagName, "11111:rw@https://vct.example.com",
 			"--" + datasourceNameFlagName, "mem1://test",
 			"--" + kmsTypeFlagName, "local",
+			"--" + baseURLFlagName, "https://vct.com",
 		}
 		startCmd.SetArgs(args)
 
@@ -218,6 +243,7 @@ func TestCmd(t *testing.T) {
 			"--" + logsFlagName, "11111:rw@https://vct.example.com",
 			"--" + datasourceNameFlagName, "mem",
 			"--" + kmsTypeFlagName, "local",
+			"--" + baseURLFlagName, "https://vct.com",
 		}
 		startCmd.SetArgs(args)
 
@@ -236,6 +262,7 @@ func TestCmd(t *testing.T) {
 			"--" + datasourceNameFlagName, "mem://test",
 			"--" + timeoutFlagName, "w1",
 			"--" + kmsTypeFlagName, "local",
+			"--" + baseURLFlagName, "https://vct.com",
 		}
 		startCmd.SetArgs(args)
 
@@ -254,6 +281,7 @@ func TestCmd(t *testing.T) {
 			"--" + datasourceNameFlagName, "mem://test",
 			"--" + syncTimeoutFlagName, "w1",
 			"--" + kmsTypeFlagName, "local",
+			"--" + baseURLFlagName, "https://vct.com",
 		}
 		startCmd.SetArgs(args)
 
@@ -273,6 +301,7 @@ func TestCmd(t *testing.T) {
 			"--" + logsFlagName, "11111:rw@https://vct.example.com",
 			"--" + datasourceNameFlagName, "mem://test",
 			"--" + kmsTypeFlagName, "local",
+			"--" + baseURLFlagName, "https://vct.com",
 		}
 		startCmd.SetArgs(args)
 
@@ -292,6 +321,7 @@ func TestCmd(t *testing.T) {
 			"--" + logsFlagName, "11111:rw@https://vct.example.com",
 			"--" + datasourceNameFlagName, "mem://test",
 			"--" + kmsTypeFlagName, "local",
+			"--" + baseURLFlagName, "https://vct.com",
 		}
 		startCmd.SetArgs(args)
 
@@ -310,6 +340,7 @@ func TestCmd(t *testing.T) {
 			"--" + datasourceNameFlagName, "mem://test",
 			"--" + tlsCACertsFlagName, "invalid",
 			"--" + kmsTypeFlagName, "local",
+			"--" + baseURLFlagName, "https://vct.com",
 		}
 		startCmd.SetArgs(args)
 
@@ -328,6 +359,7 @@ func TestCmd(t *testing.T) {
 			"--" + datasourceNameFlagName, "mem://test",
 			"--" + tlsCACertsFlagName, "invalid",
 			"--" + kmsTypeFlagName, "wrong",
+			"--" + baseURLFlagName, "https://vct.com",
 		}
 		startCmd.SetArgs(args)
 
@@ -345,6 +377,7 @@ func TestCmd(t *testing.T) {
 			"--" + logsFlagName, "11111:rw@https://vct.example.com",
 			"--" + datasourceNameFlagName, "mem://test",
 			"--" + tlsCACertsFlagName, "invalid",
+			"--" + baseURLFlagName, "https://vct.com",
 		}
 		startCmd.SetArgs(args)
 
@@ -363,6 +396,7 @@ func TestCmd(t *testing.T) {
 			"--" + logsFlagName, "11111:rw@https://vct.example.com",
 			"--" + datasourceNameFlagName, "mem://test",
 			"--" + kmsTypeFlagName, "aws",
+			"--" + baseURLFlagName, "https://vct.com",
 		}
 		startCmd.SetArgs(args)
 
@@ -402,6 +436,7 @@ func TestCmd(t *testing.T) {
 			"--" + kmsTypeFlagName, "aws",
 			"--" + kmsEndpointFlagName, "http://localhost:8072",
 			"--" + logKeyIDFlagName, "aws-kms://arn:aws:kms:ca-central-1:111122223333:alias/log-sign",
+			"--" + baseURLFlagName, "https://vct.com",
 		}
 		startCmd.SetArgs(args)
 

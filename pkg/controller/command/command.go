@@ -13,6 +13,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"net/url"
 	"sync"
 	"time"
 
@@ -48,6 +49,8 @@ const (
 	LedgerType = "https://trustbloc.dev/ns/ledger-type"
 
 	ldProofField = "proof"
+
+	vctV1 = "vct-v1"
 )
 
 // TrillianLogClient is the API client for TrillianLog service.
@@ -60,7 +63,7 @@ type Key struct {
 
 // Cmd is a controller for commands.
 type Cmd struct {
-	baseURL string
+	baseURL *url.URL
 	logs    map[string]Log
 	VCLogID [32]byte
 	kh      interface{}
@@ -151,6 +154,11 @@ func New(cfg *Config, mf monitoring.MetricFactory) (*Cmd, error) {
 		return nil, fmt.Errorf("kms get kh: %w", err)
 	}
 
+	baseURL, err := url.Parse(cfg.BaseURL)
+	if err != nil {
+		return nil, fmt.Errorf("invalid base URL: %w", err)
+	}
+
 	logs := make(map[string]Log)
 	for _, log := range cfg.Logs {
 		logs[log.Alias] = log
@@ -165,7 +173,7 @@ func New(cfg *Config, mf monitoring.MetricFactory) (*Cmd, error) {
 		kh:      kh,
 		crypto:  cfg.Crypto,
 		alg:     alg,
-		baseURL: cfg.BaseURL,
+		baseURL: baseURL,
 		loaders: cfg.DocumentLoaders,
 	}, nil
 }
@@ -201,22 +209,46 @@ func (c *Cmd) GetIssuers(w io.Writer, r io.Reader) error {
 
 // Webfinger returns discovery info.
 func (c *Cmd) Webfinger(w io.Writer, r io.Reader) error {
-	var alias string
+	var resourceID string
 
-	if err := json.NewDecoder(r).Decode(&alias); err != nil {
-		return fmt.Errorf("%w: decode alias failed", errors.ErrInternal)
+	if err := json.NewDecoder(r).Decode(&resourceID); err != nil {
+		return fmt.Errorf("%w: decode resource ID failed", errors.ErrInternal)
 	}
 
-	sub := c.baseURL + "/" + alias
+	if resourceID == "" {
+		return errors.NewBadRequestError(fmt.Errorf("resource is required"))
+	}
+
+	var ledgerID string
+
+	resourceURI, err := url.Parse(resourceID)
+	if err != nil {
+		return errors.NewBadRequestError(fmt.Errorf("invalid resource URI %q", resourceURI))
+	}
+
+	if resourceURI.Host != c.baseURL.Host {
+		return errors.NewNotFoundError(fmt.Errorf("resource not found %q", resourceURI))
+	}
+
+	if len(resourceURI.Path) <= 1 {
+		return errors.NewNotFoundError(fmt.Errorf("ledger ID is required"))
+	}
+
+	ledgerID = resourceURI.Path[1:]
+
+	if _, ok := c.logs[ledgerID]; !ok {
+		return errors.NewNotFoundError(fmt.Errorf("ledger ID not found %q", ledgerID))
+	}
+
 	// TODO: add alternate links
 	return json.NewEncoder(w).Encode(&WebFingerResponse{
-		Subject: sub,
+		Subject: resourceID,
 		Properties: map[string]interface{}{
 			PublicKeyType: c.PubKey,
-			LedgerType:    "vct-v1",
+			LedgerType:    vctV1,
 		},
 		Links: []WebFingerLink{
-			{Rel: "self", Href: sub},
+			{Rel: "self", Href: resourceID},
 		},
 	}) // nolint: wrapcheck
 }
@@ -260,7 +292,7 @@ func (c *Cmd) hasPermissions(alias string, perm permission) error {
 		}
 	}
 
-	return errors.NewBadRequestError(fmt.Errorf("action forbidden for %q", alias))
+	return errors.NewUnauthorizedError(fmt.Errorf("action forbidden for %q", alias))
 }
 
 // AddVC adds verifiable credential to log.

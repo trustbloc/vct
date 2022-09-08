@@ -31,33 +31,35 @@ import (
 	"github.com/trustbloc/vct/pkg/controller/rest"
 )
 
-type clientOptions struct {
-	http           HTTPClient
-	authReadToken  string
-	authWriteToken string
-}
-
 // ClientOpt represents client option func.
-type ClientOpt func(*clientOptions)
+type ClientOpt func(client *Client)
 
 // WithHTTPClient allows providing HTTP client.
 func WithHTTPClient(client HTTPClient) ClientOpt {
-	return func(o *clientOptions) {
+	return func(o *Client) {
 		o.http = client
 	}
 }
 
 // WithAuthReadToken add auth token.
 func WithAuthReadToken(authToken string) ClientOpt {
-	return func(o *clientOptions) {
+	return func(o *Client) {
 		o.authReadToken = authToken
 	}
 }
 
 // WithAuthWriteToken add auth token.
 func WithAuthWriteToken(authToken string) ClientOpt {
-	return func(o *clientOptions) {
+	return func(o *Client) {
 		o.authWriteToken = authToken
+	}
+}
+
+// WithLedgerURI sets the ledger URI. By default, the ledger URI is set to the
+// endpoint URL.
+func WithLedgerURI(ledgerURI string) ClientOpt {
+	return func(o *Client) {
+		o.ledgerURI = ledgerURI
 	}
 }
 
@@ -69,6 +71,7 @@ type HTTPClient interface {
 // Client represents VCT REST client.
 type Client struct {
 	endpoint       string
+	ledgerURI      string
 	http           HTTPClient
 	authReadToken  string
 	authWriteToken string
@@ -76,20 +79,19 @@ type Client struct {
 
 // New returns VCT REST client.
 func New(endpoint string, opts ...ClientOpt) *Client {
-	op := &clientOptions{http: &http.Client{
-		Timeout: time.Minute,
-	}}
+	c := &Client{
+		endpoint:  endpoint,
+		ledgerURI: endpoint,
+		http: &http.Client{
+			Timeout: time.Minute,
+		},
+	}
 
 	for _, fn := range opts {
-		fn(op)
+		fn(c)
 	}
 
-	return &Client{
-		endpoint:       endpoint,
-		http:           op.http,
-		authReadToken:  op.authReadToken,
-		authWriteToken: op.authWriteToken,
-	}
+	return c
 }
 
 // AddVC adds verifiable credential to log.
@@ -132,8 +134,10 @@ func (c *Client) HealthCheck(ctx context.Context) error {
 
 // Webfinger returns discovery info.
 func (c *Client) Webfinger(ctx context.Context) (*command.WebFingerResponse, error) {
+	const resourceParamName = "resource"
+
 	var result *command.WebFingerResponse
-	if err := c.do(ctx, rest.WebfingerPath, &result, withToken(c.authReadToken)); err != nil {
+	if err := c.do(ctx, rest.WebfingerPath, &result, withValueAdd(resourceParamName, c.ledgerURI)); err != nil {
 		return nil, fmt.Errorf("webfinger: %w", err)
 	}
 
@@ -325,9 +329,16 @@ func (c *Client) do(ctx context.Context, path string, v interface{}, opts ...opt
 		fn(op)
 	}
 
-	path = strings.Replace(path, rest.AliasPath, "", 1)
+	u, err := url.Parse(c.endpoint)
+	if err != nil {
+		return fmt.Errorf("parse URL: %w", err)
+	}
 
-	req, err := http.NewRequestWithContext(ctx, op.method, c.endpoint+path+"?"+op.values.Encode(), op.body)
+	p := fmt.Sprintf("%s://%s%s?%s", u.Scheme, u.Host,
+		strings.Replace(path, rest.AliasPath, u.Path, 1),
+		op.values.Encode())
+
+	req, err := http.NewRequestWithContext(ctx, op.method, p, op.body)
 	if err != nil {
 		return fmt.Errorf("new request with context: %w", err)
 	}
