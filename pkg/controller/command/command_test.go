@@ -259,17 +259,26 @@ func TestCmd_Webfinger(t *testing.T) {
 			ID: kid,
 		},
 		BaseURL: "https://vct.com",
+		Logs:    []Log{{Alias: "maple2021"}},
 	}, nil)
 	require.NoError(t, err)
 	require.NotNil(t, cmd)
 
 	var fr bytes.Buffer
 
-	require.NoError(t, cmd.Webfinger(&fr, bytes.NewBufferString(`"maple2021"`)))
+	require.EqualError(t, cmd.Webfinger(&fr, bytes.NewBufferString(`""`)),
+		`resource is required`)
+	require.EqualError(t, cmd.Webfinger(&fr, bytes.NewBufferString(`"https://domain.com/maple2021"`)),
+		`resource not found "https://domain.com/maple2021"`)
+	require.EqualError(t, cmd.Webfinger(&fr, bytes.NewBufferString(`"https://vct.com/"`)),
+		`ledger ID is required`)
+	require.EqualError(t, cmd.Webfinger(&fr, bytes.NewBufferString(`"https://vct.com/maple2099"`)),
+		`ledger ID not found "maple2099"`)
+	require.NoError(t, cmd.Webfinger(&fr, bytes.NewBufferString(`"https://vct.com/maple2021"`)))
 
 	var hr bytes.Buffer
 
-	require.NoError(t, lookupHandler(t, cmd, Webfinger)(&hr, bytes.NewBufferString(`"maple2021"`)))
+	require.NoError(t, lookupHandler(t, cmd, Webfinger)(&hr, bytes.NewBufferString(`"https://vct.com/maple2021"`)))
 
 	require.Equal(t, fr.String(), hr.String())
 

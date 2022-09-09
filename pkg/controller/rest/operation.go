@@ -45,9 +45,14 @@ const (
 	GetEntriesPath        = BasePath + "/get-entries"
 	GetIssuersPath        = BasePath + "/get-issuers"
 	GetEntryAndProofPath  = BasePath + "/get-entry-and-proof"
-	WebfingerPath         = AliasPath + "/.well-known/webfinger"
+	WebfingerPath         = "/.well-known/webfinger"
 	HealthCheckPath       = "/healthcheck"
 	MetricsPath           = "/metrics"
+)
+
+// Parameters.
+const (
+	resourceParam = "resource"
 )
 
 const (
@@ -310,7 +315,7 @@ func (c *Operation) HealthCheck(rw http.ResponseWriter, _ *http.Request) {
 	}
 }
 
-// Webfinger swagger:route GET /{alias}/.well-known/webfinger vct webfingerRequest
+// Webfinger swagger:route GET /.well-known/webfinger vct webfingerRequest
 //
 // Returns discovery info.
 //
@@ -320,16 +325,23 @@ func (c *Operation) HealthCheck(rw http.ResponseWriter, _ *http.Request) {
 func (c *Operation) Webfinger(w http.ResponseWriter, r *http.Request) {
 	start := time.Now()
 
+	var resourceID string
+
+	resourceIDs, ok := r.URL.Query()[resourceParam]
+	if ok {
+		resourceID = resourceIDs[0]
+	}
+
 	execute(func(rw io.Writer, req io.Reader) error {
 		if err := c.cmd.Webfinger(rw, req); err != nil {
 			return err
 		}
 
-		webfingerCounter.Add(1, mux.Vars(r)[aliasVarName])
-		webfingerLatency.Observe(time.Since(start).Seconds(), mux.Vars(r)[aliasVarName])
+		webfingerCounter.Add(1, resourceID)
+		webfingerLatency.Observe(time.Since(start).Seconds(), resourceID)
 
 		return nil
-	}, w, bytes.NewBufferString(fmt.Sprintf("%q", mux.Vars(r)[aliasVarName])))
+	}, w, bytes.NewBufferString(fmt.Sprintf("%q", resourceID)))
 }
 
 // GetSTHConsistency swagger:route GET /{alias}/v1/get-sth-consistency vct getSTHConsistencyRequest

@@ -68,7 +68,7 @@ func New() *Steps {
 
 // RegisterSteps registers the BDD steps on the suite.
 func (s *Steps) RegisterSteps(suite *godog.Suite) {
-	suite.Step(`VCT agent is running on "([^"]*)"$`, s.setVCTClient)
+	suite.Step(`VCT agent with ledger "([^"]*)" is running on "([^"]*)"$`, s.setVCTClient)
 	suite.Step(`Add verifiable credential "([^"]*)" to Log$`, s.addVC)
 	suite.Step(`No permissions to write$`, s.noWritePerm)
 	suite.Step(`No permissions to read$`, s.noReadPerm)
@@ -123,9 +123,13 @@ func (s *Steps) issuerIsNotSupported(issuer string) error {
 	}, backoff.WithMaxRetries(backoff.NewConstantBackOff(time.Second), 15))
 }
 
-func (s *Steps) setVCTClient(endpoint string) error {
-	s.vct = vct.New(endpoint, vct.WithHTTPClient(s.client), vct.WithAuthReadToken("tk1"),
-		vct.WithAuthWriteToken("tk2"))
+func (s *Steps) setVCTClient(ledgerURI, endpoint string) error {
+	s.vct = vct.New(endpoint,
+		vct.WithHTTPClient(s.client),
+		vct.WithLedgerURI(ledgerURI),
+		vct.WithAuthReadToken("tk1"),
+		vct.WithAuthWriteToken("tk2"),
+	)
 
 	return backoff.Retry(func() error { // nolint: wrapcheck
 		resp, err := s.vct.GetSTH(context.Background())

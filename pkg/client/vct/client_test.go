@@ -30,7 +30,7 @@ import (
 	"github.com/trustbloc/vct/pkg/testutil"
 )
 
-const endpoint = "https://example.com"
+const endpoint = "https://example.com/maple2020"
 
 //go:embed testdata/bachelor_degree.json
 var vcBachelorDegree []byte // nolint: gochecknoglobals
@@ -203,7 +203,10 @@ func TestClient_Webfinger(t *testing.T) {
 			StatusCode: http.StatusOK,
 		}, nil)
 
-		client := vct.New(endpoint, vct.WithHTTPClient(httpClient))
+		client := vct.New(endpoint,
+			vct.WithHTTPClient(httpClient),
+			vct.WithLedgerURI("https://vct.com/maple2021"),
+		)
 		resp, err := client.Webfinger(context.Background())
 		require.NoError(t, err)
 

@@ -118,17 +118,6 @@ type healthCheckResponse struct { // nolint: unused,deadcode
 	}
 }
 
-// Request message
-//
-// swagger:parameters webfingerRequest
-type webfingerRequest struct { // nolint: unused,deadcode
-	// Alias
-	//
-	// in: path
-	// required: true
-	Alias string `json:"alias"`
-}
-
 // Response message
 //
 // swagger:response webfingerResponse

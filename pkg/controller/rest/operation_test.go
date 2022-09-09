@@ -174,6 +174,8 @@ func TestOperation_HealthCheck(t *testing.T) {
 
 func TestOperation_Webfinger(t *testing.T) {
 	t.Run("Success", func(t *testing.T) {
+		const resourceID = "https://vct.example.com/" + alias
+
 		ctrl := gomock.NewController(t)
 		defer ctrl.Finish()
 
@@ -182,14 +184,14 @@ func TestOperation_Webfinger(t *testing.T) {
 			payload, err := io.ReadAll(r)
 			require.NoError(t, err)
 
-			require.Equal(t, fmt.Sprintf("%q", alias), string(payload))
+			require.Equal(t, fmt.Sprintf("%q", resourceID), string(payload))
 		}).Return(nil)
 
 		operation := New(cmd, &mockService{}, &mockService{}, nil)
 
 		_, code := sendRequestToHandler(t,
 			handlerLookup(t, operation, WebfingerPath), nil,
-			strings.Replace(WebfingerPath, "{alias}", alias, 1),
+			WebfingerPath+"?resource="+resourceID,
 		)
 
 		require.Equal(t, http.StatusOK, code)
