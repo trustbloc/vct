@@ -28,13 +28,14 @@ import (
 	"github.com/google/trillian/util"
 	"github.com/google/trillian/util/clock"
 	grpc_middleware "github.com/grpc-ecosystem/go-grpc-middleware"
-	"github.com/hyperledger/aries-framework-go/pkg/common/log"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	clientv3 "go.etcd.io/etcd/client/v3"
 	"go.etcd.io/etcd/client/v3/naming/endpoints"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/reflection"
+
+	"github.com/trustbloc/vct/internal/pkg/log"
 )
 
 var logger = log.New("internal/serverutil")

@@ -19,9 +19,9 @@ import (
 	"github.com/google/trillian/log"
 	"github.com/google/trillian/quota"
 	"github.com/google/trillian/storage"
-	arieslog "github.com/hyperledger/aries-framework-go/pkg/common/log"
 
 	"github.com/trustbloc/vct/cmd/log_signer/startcmd"
+	logging "github.com/trustbloc/vct/internal/pkg/log"
 	"github.com/trustbloc/vct/pkg/storage/memory"
 	"github.com/trustbloc/vct/pkg/storage/postgres"
 )
@@ -64,7 +64,7 @@ var (
 	pgConnStr  = flag.String("pg_conn_str", "user=postgres dbname=test sslmode=disable", "Connection string for Postgres database")
 )
 
-var logger = arieslog.New("log-signer")
+var logger = logging.New("log-signer")
 
 func main() {
 	flag.Parse()

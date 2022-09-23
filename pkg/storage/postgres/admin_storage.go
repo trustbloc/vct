@@ -20,11 +20,12 @@ import (
 
 	"github.com/google/trillian"
 	"github.com/google/trillian/storage"
-	"github.com/hyperledger/aries-framework-go/pkg/common/log"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/timestamppb"
+
+	"github.com/trustbloc/vct/internal/pkg/log"
 )
 
 var logger = log.New("storage/postgres")

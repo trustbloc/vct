@@ -23,7 +23,8 @@ import (
 	"time"
 
 	"github.com/google/trillian/testonly"
-	"github.com/hyperledger/aries-framework-go/pkg/common/log"
+
+	"github.com/trustbloc/vct/internal/pkg/log"
 )
 
 var logger = log.New("storage/testdb")
