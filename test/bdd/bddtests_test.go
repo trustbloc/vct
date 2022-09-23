@@ -15,8 +15,8 @@ import (
 	"time"
 
 	"github.com/cucumber/godog"
-	"github.com/hyperledger/aries-framework-go/pkg/common/log"
 
+	"github.com/trustbloc/vct/internal/pkg/log"
 	"github.com/trustbloc/vct/test/bdd/pkg/controller/rest"
 )
 

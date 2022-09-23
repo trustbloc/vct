@@ -25,10 +25,10 @@ SPDX-License-Identifier: Apache-2.0
 package main
 
 import (
-	"github.com/hyperledger/aries-framework-go/pkg/common/log"
 	"github.com/spf13/cobra"
 
 	"github.com/trustbloc/vct/cmd/vct/startcmd"
+	"github.com/trustbloc/vct/internal/pkg/log"
 )
 
 var logger = log.New("vct")

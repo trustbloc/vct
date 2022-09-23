@@ -30,9 +30,9 @@ require (
 	github.com/rs/cors v1.7.0
 	github.com/spf13/cobra v1.3.0
 	github.com/stretchr/testify v1.7.5
-	github.com/trustbloc/edge-core v0.1.8
 	github.com/trustbloc/kms v0.1.9-0.20220526151939-d46e46e8f7e1
 	go.etcd.io/etcd/client/v3 v3.5.0
+	go.uber.org/zap v1.17.0
 	google.golang.org/grpc v1.44.0
 	google.golang.org/protobuf v1.28.0
 )
@@ -134,7 +134,6 @@ require (
 	go.opencensus.io v0.23.0 // indirect
 	go.uber.org/atomic v1.7.0 // indirect
 	go.uber.org/multierr v1.6.0 // indirect
-	go.uber.org/zap v1.17.0 // indirect
 	golang.org/x/crypto v0.0.0-20220525230936-793ad666bf5e // indirect
 	golang.org/x/net v0.0.0-20220127200216-cd36cc0744dd // indirect
 	golang.org/x/oauth2 v0.0.0-20211104180415-d3ed0bb246c8 // indirect

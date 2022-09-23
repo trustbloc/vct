@@ -33,7 +33,6 @@ import (
 	"github.com/hyperledger/aries-framework-go-ext/component/storage/mongodb"
 	"github.com/hyperledger/aries-framework-go-ext/component/storage/postgresql"
 	"github.com/hyperledger/aries-framework-go/component/storageutil/mem"
-	"github.com/hyperledger/aries-framework-go/pkg/common/log"
 	ldrest "github.com/hyperledger/aries-framework-go/pkg/controller/rest/ld"
 	"github.com/hyperledger/aries-framework-go/pkg/crypto/tinkcrypto"
 	webcrypto "github.com/hyperledger/aries-framework-go/pkg/crypto/webkms"
@@ -55,8 +54,6 @@ import (
 	jsonld "github.com/piprate/json-gold/ld"
 	"github.com/rs/cors"
 	"github.com/spf13/cobra"
-	cmdutils "github.com/trustbloc/edge-core/pkg/utils/cmd"
-	tlsutils "github.com/trustbloc/edge-core/pkg/utils/tls"
 	awssvc "github.com/trustbloc/kms/pkg/aws"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
@@ -65,7 +62,10 @@ import (
 	"github.com/trustbloc/vct/cmd/internal/serverutil"
 	"github.com/trustbloc/vct/cmd/log_server/startcmd"
 	logsignerstart "github.com/trustbloc/vct/cmd/log_signer/startcmd"
+	"github.com/trustbloc/vct/internal/pkg/cmdutil"
 	"github.com/trustbloc/vct/internal/pkg/ldcontext"
+	"github.com/trustbloc/vct/internal/pkg/log"
+	"github.com/trustbloc/vct/internal/pkg/tlsutil"
 	"github.com/trustbloc/vct/pkg/controller/command"
 	"github.com/trustbloc/vct/pkg/controller/rest"
 	"github.com/trustbloc/vct/pkg/storage/memory"
@@ -393,34 +393,34 @@ func createStartCMD(server server) *cobra.Command { //nolint: funlen,gocognit,go
 		Short: "Starts vct service",
 		Long:  `Starts verifiable credentials transparency service`,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			host := cmdutils.GetUserSetOptionalVarFromString(cmd, agentHostFlagName, agentHostEnvKey)
-			metricsHost := cmdutils.GetUserSetOptionalVarFromString(cmd, agentMetricsHostFlagName,
+			host := cmdutil.GetUserSetOptionalVarFromString(cmd, agentHostFlagName, agentHostEnvKey)
+			metricsHost := cmdutil.GetUserSetOptionalVarFromString(cmd, agentMetricsHostFlagName,
 				agentMetricsHostEnvKey)
-			datasourceName := cmdutils.GetUserSetOptionalVarFromString(cmd, datasourceNameFlagName,
+			datasourceName := cmdutil.GetUserSetOptionalVarFromString(cmd, datasourceNameFlagName,
 				datasourceNameEnvKey)
-			databasePrefix := cmdutils.GetUserSetOptionalVarFromString(cmd, databasePrefixFlagName,
+			databasePrefix := cmdutil.GetUserSetOptionalVarFromString(cmd, databasePrefixFlagName,
 				databasePrefixEnvKey)
 
-			baseURL, err := cmdutils.GetUserSetVarFromString(cmd, baseURLFlagName, baseURLEnvKey, false)
+			baseURL, err := cmdutil.GetUserSetVarFromString(cmd, baseURLFlagName, baseURLEnvKey, false)
 			if err != nil {
 				return err
 			}
 
-			timeoutStr := cmdutils.GetUserSetOptionalVarFromString(cmd, timeoutFlagName, timeoutEnvKey)
-			syncTimeoutStr := cmdutils.GetUserSetOptionalVarFromString(cmd, syncTimeoutFlagName, syncTimeoutEnvKey)
-			issuersStr := cmdutils.GetUserSetOptionalVarFromString(cmd, issuersFlagName, issuersEnvKey)
-			devModeStr := cmdutils.GetUserSetOptionalVarFromString(cmd, devModeFlagName, devModeFlagEnvKey)
-			contextProviderURLsStr := cmdutils.GetUserSetOptionalVarFromString(cmd, contextProviderFlagName,
+			timeoutStr := cmdutil.GetUserSetOptionalVarFromString(cmd, timeoutFlagName, timeoutEnvKey)
+			syncTimeoutStr := cmdutil.GetUserSetOptionalVarFromString(cmd, syncTimeoutFlagName, syncTimeoutEnvKey)
+			issuersStr := cmdutil.GetUserSetOptionalVarFromString(cmd, issuersFlagName, issuersEnvKey)
+			devModeStr := cmdutil.GetUserSetOptionalVarFromString(cmd, devModeFlagName, devModeFlagEnvKey)
+			contextProviderURLsStr := cmdutil.GetUserSetOptionalVarFromString(cmd, contextProviderFlagName,
 				contextProviderEnvKey)
-			trillianDBConnStr := cmdutils.GetUserSetOptionalVarFromString(cmd, trillianDBConnFlagName,
+			trillianDBConnStr := cmdutil.GetUserSetOptionalVarFromString(cmd, trillianDBConnFlagName,
 				trillianDBConnEnvKey)
 			kmsParams, err := getKmsParameters(cmd)
 			if err != nil {
 				return err
 			}
 
-			readToken := cmdutils.GetUserSetOptionalVarFromString(cmd, readTokenFlagName, readTokenEnvKey)
-			writeToken := cmdutils.GetUserSetOptionalVarFromString(cmd, writeTokenFlagName, writeTokenEnvKey)
+			readToken := cmdutil.GetUserSetOptionalVarFromString(cmd, readTokenFlagName, readTokenEnvKey)
+			writeToken := cmdutil.GetUserSetOptionalVarFromString(cmd, writeTokenFlagName, writeTokenEnvKey)
 
 			if datasourceName == "" {
 				datasourceName = "mem://test"
@@ -459,7 +459,7 @@ func createStartCMD(server server) *cobra.Command { //nolint: funlen,gocognit,go
 				return fmt.Errorf("get TLS: %w", err)
 			}
 
-			logsVal, err := cmdutils.GetUserSetVarFromString(cmd, logsFlagName, logsEnvKey, false)
+			logsVal, err := cmdutil.GetUserSetVarFromString(cmd, logsFlagName, logsEnvKey, false)
 			if err != nil {
 				return fmt.Errorf("get variable (%s or %s): %w", logsFlagName, logsEnvKey, err)
 			}
@@ -664,7 +664,7 @@ func getRegion(keyURI string) (string, error) {
 }
 
 func getKmsParameters(cmd *cobra.Command) (*kmsParameters, error) {
-	kmsTypeStr, err := cmdutils.GetUserSetVarFromString(cmd, kmsTypeFlagName, kmsTypeEnvKey, false)
+	kmsTypeStr, err := cmdutil.GetUserSetVarFromString(cmd, kmsTypeFlagName, kmsTypeEnvKey, false)
 	if err != nil {
 		return nil, err
 	}
@@ -675,8 +675,8 @@ func getKmsParameters(cmd *cobra.Command) (*kmsParameters, error) {
 		return nil, fmt.Errorf("unsupported kms type: %s", kmsType)
 	}
 
-	kmsEndpoint := cmdutils.GetUserSetOptionalVarFromString(cmd, kmsEndpointFlagName, kmsEndpointEnvKey)
-	logSignActiveKeyID := cmdutils.GetUserSetOptionalVarFromString(cmd, logSignActiveKeyIDFlagName,
+	kmsEndpoint := cmdutil.GetUserSetOptionalVarFromString(cmd, kmsEndpointFlagName, kmsEndpointEnvKey)
+	logSignActiveKeyID := cmdutil.GetUserSetOptionalVarFromString(cmd, logSignActiveKeyIDFlagName,
 		logSignActiveKeyIDEnvKey)
 
 	return &kmsParameters{
@@ -739,7 +739,7 @@ func startAgent(parameters *agentParameters) error { //nolint:funlen,gocyclo,cyc
 		return fmt.Errorf("open store: %w", err)
 	}
 
-	rootCAs, err := tlsutils.GetCertPool(parameters.tlsParams.systemCertPool, parameters.tlsParams.caCerts)
+	rootCAs, err := tlsutil.GetCertPool(parameters.tlsParams.systemCertPool, parameters.tlsParams.caCerts)
 	if err != nil {
 		return fmt.Errorf("get cert pool: %w", err)
 	}
@@ -1016,11 +1016,11 @@ func createFlags(startCmd *cobra.Command) {
 }
 
 func getTLS(cmd *cobra.Command) (*tlsParameters, error) {
-	tlsSystemCertPoolString := cmdutils.GetUserSetOptionalVarFromString(cmd, tlsSystemCertPoolFlagName,
+	tlsSystemCertPoolString := cmdutil.GetUserSetOptionalVarFromString(cmd, tlsSystemCertPoolFlagName,
 		tlsSystemCertPoolEnvKey)
-	tlsCACerts := cmdutils.GetUserSetOptionalVarFromString(cmd, tlsCACertsFlagName, tlsCACertsEnvKey)
-	tlsServeCertPath := cmdutils.GetUserSetOptionalVarFromString(cmd, tlsServeCertPathFlagName, tlsServeCertPathEnvKey)
-	tlsServeKeyPath := cmdutils.GetUserSetOptionalVarFromString(cmd, tlsServeKeyPathFlagName, tlsServeKeyPathFlagEnvKey)
+	tlsCACerts := cmdutil.GetUserSetOptionalVarFromString(cmd, tlsCACertsFlagName, tlsCACertsEnvKey)
+	tlsServeCertPath := cmdutil.GetUserSetOptionalVarFromString(cmd, tlsServeCertPathFlagName, tlsServeCertPathEnvKey)
+	tlsServeKeyPath := cmdutil.GetUserSetOptionalVarFromString(cmd, tlsServeKeyPathFlagName, tlsServeKeyPathFlagEnvKey)
 
 	tlsSystemCertPool := false
 

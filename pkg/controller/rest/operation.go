@@ -18,10 +18,10 @@ import (
 
 	"github.com/google/trillian/monitoring"
 	"github.com/gorilla/mux"
-	"github.com/hyperledger/aries-framework-go/pkg/common/log"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 
+	"github.com/trustbloc/vct/internal/pkg/log"
 	"github.com/trustbloc/vct/pkg/controller/command"
 	"github.com/trustbloc/vct/pkg/controller/errors"
 )

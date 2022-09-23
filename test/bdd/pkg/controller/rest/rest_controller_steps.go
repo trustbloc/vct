@@ -25,9 +25,9 @@ import (
 	"github.com/hyperledger/aries-framework-go/pkg/doc/ld"
 	"github.com/hyperledger/aries-framework-go/pkg/doc/ldcontext"
 	ldstore "github.com/hyperledger/aries-framework-go/pkg/store/ld"
-	"github.com/trustbloc/edge-core/pkg/log"
 
 	vcldcontext "github.com/trustbloc/vct/internal/pkg/ldcontext"
+	"github.com/trustbloc/vct/internal/pkg/log"
 	"github.com/trustbloc/vct/pkg/client/vct"
 	"github.com/trustbloc/vct/pkg/controller/command"
 )
