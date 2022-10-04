@@ -44,14 +44,11 @@ func TestAWSKMSWrapper(t *testing.T) {
 	wrapper := awsKMSWrapper{service: &aws.Service{}}
 
 	keyID, handle, err := wrapper.Create("")
-	require.EqualError(t, err, "not implemented")
+	require.EqualError(t, err, "key not supported ")
 	require.Equal(t, "", keyID)
 	require.Nil(t, handle)
 
 	handle, err = wrapper.Get("")
 	require.NoError(t, err)
 	require.Equal(t, "", handle)
-
-	err = wrapper.HealthCheck()
-	require.EqualError(t, err, "extracting key id from URI failed")
 }

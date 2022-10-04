@@ -17,7 +17,7 @@ VCT was created for the [orb](https://github.com/trustbloc/orb#orb-did-method) p
 
 To build and test VCT you need:
 
-* Go 1.17 or later
+* Go 1.19 or later
 * GNU Make
 * Bash
 * Docker and Docker-Compose

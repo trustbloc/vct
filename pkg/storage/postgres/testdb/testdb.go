@@ -1,7 +1,8 @@
 /*
 Copyright and license information from original project:
 Licence: https://github.com/google/trillian/blob/6127136b153156fc6becb74edd21259fe4260ddc/LICENSE
-Source:  https://github.com/google/trillian/blob/09456fa3331789ba45a5edf1eedb8c1cdc98c3ff/storage/postgres/testdb/testdb.go
+Source:  https://github.com/google/trillian/blob/09456fa3331789ba45a5edf1eedb8c1cdc98c3ff/storage/postgres/
+testdb/testdb.go
 
 Copyright SecureKey Technologies Inc. All Rights Reserved.
 
@@ -32,8 +33,10 @@ var logger = log.New("storage/testdb")
 // nolint: gochecknoglobals
 var (
 	trillianSQL = testonly.RelativeToPackage("../schema/storage.sql")
-	pgOpts      = flag.String("pg_opts", "sslmode=disable", "Database options to be included when connecting to the db")
-	dbName      = flag.String("db_name", "test", "The database name to be used when checking for pg connectivity")
+	pgOpts      = flag.String("pg_opts", "sslmode=disable",
+		"Database options to be included when connecting to the db")
+	dbName = flag.String("db_name", "test",
+		"The database name to be used when checking for pg connectivity")
 )
 
 // PGAvailable indicates whether a default PG database is available.

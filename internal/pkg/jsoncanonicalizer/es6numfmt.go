@@ -44,7 +44,7 @@ func NumberToJSON(ieeeF64 float64) (res string, err error) {
 	}
 
 	// Deal with the sign separately
-	var sign string = ""
+	sign := ""
 	if ieeeF64 < 0 {
 		ieeeF64 = -ieeeF64
 		sign = "-"
@@ -63,7 +63,7 @@ func NumberToJSON(ieeeF64 float64) (res string, err error) {
 	// rounding for -1 precision which is dealt with below.
 	// https://github.com/golang/go/issues/29491
 	exponent := strings.IndexByte(es6Formatted, 'e')
-	if exponent > 0 {
+	if exponent > 0 { //nolint: nestif
 		gform := strconv.FormatFloat(ieeeF64, 'g', 17, 64)
 		if len(gform) == len(es6Formatted) {
 			// "g" occasionally produces another result which also is the correct one

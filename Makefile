@@ -3,7 +3,7 @@
 # SPDX-License-Identifier: Apache-2.0
 
 GOBIN_PATH 		=$(abspath .)/build/bin
-LINT_VERSION 	?=v1.39.0
+LINT_VERSION 	?=v1.49.0
 MOCK_VERSION 	?=v1.5.0
 SWAGGER_VERSION ?=v0.27.0
 SWAGGER_DIR		="./test/bdd/fixtures/vct/specs"
@@ -15,8 +15,8 @@ VCT_IMAGE_NAME 		?=trustbloc/vct
 LOG_SERVER_IMAGE_NAME ?=trustbloc/vct-log-server
 LOG_SIGNER_IMAGE_NAME ?=trustbloc/vct-log-signer
 
-ALPINE_VER ?= 3.15
-GO_VER ?= 1.17
+ALPINE_VER ?= 3.16
+GO_VER ?= 1.19
 
 OS := $(shell uname)
 ifeq  ($(OS),$(filter $(OS),Darwin Linux))

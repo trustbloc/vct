@@ -190,8 +190,9 @@ func (c *Operation) metrics() http.HandlerFunc {
 // Adds verifiable credential to log.
 //
 // Responses:
-//    default: genericError
-//        200: addVCResponse
+//
+//	default: genericError
+//	200: addVCResponse
 func (c *Operation) AddVC(w http.ResponseWriter, r *http.Request) {
 	var (
 		start   = time.Now()
@@ -232,8 +233,9 @@ func (c *Operation) AddVC(w http.ResponseWriter, r *http.Request) {
 // Retrieves the latest signed tree head.
 //
 // Responses:
-//    default: genericError
-//        200: getSTHResponse
+//
+//	default: genericError
+//	    200: getSTHResponse
 func (c *Operation) GetSTH(w http.ResponseWriter, r *http.Request) {
 	start := time.Now()
 
@@ -254,8 +256,9 @@ func (c *Operation) GetSTH(w http.ResponseWriter, r *http.Request) {
 // Returns issuers.
 //
 // Responses:
-//    default: genericError
-//        200: getIssuersResponse
+//
+//	default: genericError
+//	    200: getIssuersResponse
 func (c *Operation) GetIssuers(w http.ResponseWriter, r *http.Request) {
 	start := time.Now()
 
@@ -276,8 +279,9 @@ func (c *Operation) GetIssuers(w http.ResponseWriter, r *http.Request) {
 // Returns health check status.
 //
 // Responses:
-//    default: genericError
-//        200: healthCheckResponse
+//
+//	default: genericError
+//	    200: healthCheckResponse
 func (c *Operation) HealthCheck(rw http.ResponseWriter, _ *http.Request) {
 	dbStatus := ""
 	kmsStatus := ""
@@ -320,8 +324,9 @@ func (c *Operation) HealthCheck(rw http.ResponseWriter, _ *http.Request) {
 // Returns discovery info.
 //
 // Responses:
-//    default: genericError
-//        200: webfingerResponse
+//
+//	default: genericError
+//	    200: webfingerResponse
 func (c *Operation) Webfinger(w http.ResponseWriter, r *http.Request) {
 	start := time.Now()
 
@@ -349,8 +354,9 @@ func (c *Operation) Webfinger(w http.ResponseWriter, r *http.Request) {
 // Retrieves merkle consistency proofs between signed tree heads.
 //
 // Responses:
-//    default: genericError
-//        200: getSTHConsistencyResponse
+//
+//	default: genericError
+//	    200: getSTHConsistencyResponse
 func (c *Operation) GetSTHConsistency(w http.ResponseWriter, r *http.Request) {
 	const (
 		firstParamName  = "first"
@@ -401,8 +407,9 @@ func (c *Operation) GetSTHConsistency(w http.ResponseWriter, r *http.Request) {
 // Retrieves Merkle Audit proof from Log by leaf hash.
 //
 // Responses:
-//    default: genericError
-//        200: getProofByHashResponse
+//
+//	default: genericError
+//	    200: getProofByHashResponse
 func (c *Operation) GetProofByHash(w http.ResponseWriter, r *http.Request) {
 	const (
 		hashParamName     = "hash"
@@ -446,8 +453,9 @@ func (c *Operation) GetProofByHash(w http.ResponseWriter, r *http.Request) {
 // Retrieves entries from log.
 //
 // Responses:
-//    default: genericError
-//        200: getEntriesResponse
+//
+//	default: genericError
+//	    200: getEntriesResponse
 func (c *Operation) GetEntries(w http.ResponseWriter, r *http.Request) {
 	const (
 		startParamName = "start"
@@ -498,8 +506,9 @@ func (c *Operation) GetEntries(w http.ResponseWriter, r *http.Request) {
 // Retrieves entry and merkle audit proof from log.
 //
 // Responses:
-//    default: genericError
-//        200: getEntryAndProofResponse
+//
+//	default: genericError
+//	    200: getEntryAndProofResponse
 func (c *Operation) GetEntryAndProof(w http.ResponseWriter, r *http.Request) {
 	const (
 		leafIndexParamName = "leaf_index"

@@ -1,7 +1,8 @@
 /*
 Copyright and license information from original project:
 Licence: https://github.com/google/trillian/blob/6127136b153156fc6becb74edd21259fe4260ddc/LICENSE
-Source:  https://github.com/google/trillian/blob/ceda464a95a36e37e16fb361a5e426877c49d450/cmd/internal/serverutil/main.go
+Source:  https://github.com/google/trillian/blob/ceda464a95a36e37e16fb361a5e426877c49d450/cmd/internal/
+serverutil/main.go
 
 Copyright SecureKey Technologies Inc. All Rights Reserved.
 

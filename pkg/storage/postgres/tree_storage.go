@@ -1,7 +1,8 @@
 /*
 Copyright and license information from original project:
 Licence: https://github.com/google/trillian/blob/6127136b153156fc6becb74edd21259fe4260ddc/LICENSE
-Source:  https://github.com/google/trillian/blob/09456fa3331789ba45a5edf1eedb8c1cdc98c3ff/storage/postgres/tree_storage.go
+Source:  https://github.com/google/trillian/blob/09456fa3331789ba45a5edf1eedb8c1cdc98c3ff/storage/
+postgres/tree_storage.go
 
 Copyright SecureKey Technologies Inc. All Rights Reserved.
 
@@ -216,7 +217,7 @@ func (t *treeTX) getSubtree(ctx context.Context, treeRevision int64, id []byte) 
 
 	switch len(s) {
 	case 0:
-		return nil, nil
+		return nil, nil //nolint: nilnil
 	case 1:
 		return s[0], nil
 	default:

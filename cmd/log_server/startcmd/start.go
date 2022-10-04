@@ -1,7 +1,8 @@
 /*
 Copyright and license information from original project:
 Licence: https://github.com/google/trillian/blob/6127136b153156fc6becb74edd21259fe4260ddc/LICENSE
-Source:  https://github.com/google/trillian/blob/ceda464a95a36e37e16fb361a5e426877c49d450/cmd/trillian_log_server/main.go
+Source:  https://github.com/google/trillian/blob/ceda464a95a36e37e16fb361a5e426877c49d450/cmd/
+trillian_log_server/main.go
 
 Copyright SecureKey Technologies Inc. All Rights Reserved.
 
@@ -10,7 +11,7 @@ SPDX-License-Identifier: Apache-2.0
 
 // Package startcmd runs the Trillian log server, and also
 // provides an admin server.
-package startcmd
+package startcmd //nolint: cyclop
 
 import (
 	"context"

@@ -1,7 +1,8 @@
 /*
 Copyright and license information from original project:
 Licence: https://github.com/google/trillian/blob/6127136b153156fc6becb74edd21259fe4260ddc/LICENSE
-Source:  https://github.com/google/trillian/blob/09456fa3331789ba45a5edf1eedb8c1cdc98c3ff/storage/postgres/admin_storage_test.go
+Source:  https://github.com/google/trillian/blob/09456fa3331789ba45a5edf1eedb8c1cdc98c3ff/storage/
+postgres/admin_storage_test.go
 
 Copyright SecureKey Technologies Inc. All Rights Reserved.
 
@@ -277,7 +278,7 @@ func cleanTestDB(t *testing.T, db *sql.DB) {
 
 	for _, table := range allTables {
 		if _, err := db.ExecContext(context.TODO(), fmt.Sprintf("DELETE FROM %s", table)); err != nil {
-			t.Fatal(fmt.Sprintf("Failed to delete rows in %s: %v", table, err))
+			t.Fatalf("Failed to delete rows in %s: %v", table, err)
 		}
 	}
 }

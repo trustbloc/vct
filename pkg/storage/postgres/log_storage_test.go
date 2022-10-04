@@ -1,7 +1,8 @@
 /*
 Copyright and license information from original project:
 Licence: https://github.com/google/trillian/blob/6127136b153156fc6becb74edd21259fe4260ddc/LICENSE
-Source:  https://github.com/google/trillian/blob/09456fa3331789ba45a5edf1eedb8c1cdc98c3ff/storage/postgres/log_storage_test.go
+Source:  https://github.com/google/trillian/blob/09456fa3331789ba45a5edf1eedb8c1cdc98c3ff/storage/postgres/
+log_storage_test.go
 
 Copyright SecureKey Technologies Inc. All Rights Reserved.
 
@@ -266,7 +267,7 @@ func TestReadWriteTransaction(t *testing.T) {
 	}
 }
 
-func TestQueueDuplicateLeaf(t *testing.T) {
+func TestQueueDuplicateLeaf(t *testing.T) { //nolint: gocognit
 	ctx := context.Background()
 
 	cleanTestDB(t, db)
@@ -915,7 +916,7 @@ type getLeavesByRangeTest struct {
 	wantErr      bool
 }
 
-func testGetLeavesByRangeImpl(t *testing.T, create *trillian.Tree, tests []getLeavesByRangeTest) {
+func testGetLeavesByRangeImpl(t *testing.T, create *trillian.Tree, tests []getLeavesByRangeTest) { //nolint: gocognit
 	t.Helper()
 
 	cleanTestDB(t, db)
