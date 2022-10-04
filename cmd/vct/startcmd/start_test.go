@@ -30,6 +30,7 @@ const (
 	kmsEndpointFlagName       = "kms-endpoint"
 	logKeyIDFlagName          = "log-active-key-id"
 	kmsTypeFlagName           = "kms-type"
+	kmsRegionFlagName         = "kms-region"
 	logsFlagName              = "logs"
 	devModeFlagName           = "dev-mode"
 	issuersFlagName           = "issuers"
@@ -387,24 +388,6 @@ func TestCmd(t *testing.T) {
 			"Neither kms-type (command line flag) nor VCT_KMS_TYPE (environment variable) have been set.")
 	})
 
-	t.Run("failed to get region", func(t *testing.T) {
-		startCmd, err := startcmd.Cmd(&mockServer{})
-		require.NoError(t, err)
-
-		args := []string{
-			"--" + agentHostFlagName, ":98989",
-			"--" + logsFlagName, "11111:rw@https://vct.example.com",
-			"--" + datasourceNameFlagName, "mem://test",
-			"--" + kmsTypeFlagName, "aws",
-			"--" + baseURLFlagName, "https://vct.com",
-		}
-		startCmd.SetArgs(args)
-
-		err = startCmd.Execute()
-		require.Error(t, err)
-		require.Contains(t, err.Error(), "extracting region from URI failed")
-	})
-
 	t.Run("kms aws error", func(t *testing.T) {
 		startCmd, err := startcmd.Cmd(&mockServer{})
 		require.NoError(t, err)
@@ -434,8 +417,9 @@ func TestCmd(t *testing.T) {
 			"--" + agentHostFlagName, "",
 			"--" + logsFlagName, "maple2021:rw@localhost:50052",
 			"--" + kmsTypeFlagName, "aws",
+			"--" + kmsRegionFlagName, "ca-central-1",
 			"--" + kmsEndpointFlagName, "http://localhost:8072",
-			"--" + logKeyIDFlagName, "aws-kms://arn:aws:kms:ca-central-1:111122223333:alias/log-sign",
+			"--" + logKeyIDFlagName, "alias/log-sign",
 			"--" + baseURLFlagName, "https://vct.com",
 		}
 		startCmd.SetArgs(args)

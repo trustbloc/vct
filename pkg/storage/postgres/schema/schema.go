@@ -9,5 +9,6 @@ package schema
 import _ "embed" // loads SQL
 
 //go:embed storage.sql
+
 // SQL schema.
 var SQL []byte // nolint: gochecknoglobals

@@ -115,7 +115,8 @@ services:
       - VCT_LOGS=${VCT_LOGS}
       - VCT_KMS_TYPE=aws
       - VCT_KMS_ENDPOINT=http://aws-kms:8020
-      - VCT_LOG_SIGN_ACTIVE_KEY_ID=aws-kms://arn:aws:kms:ca-central-1:111122223333:alias/log-sign
+      - VCT_KMS_REGION=ca-central-1
+      - VCT_LOG_SIGN_ACTIVE_KEY_ID=alias/log-sign
       - AWS_ACCESS_KEY_ID=mock
       - AWS_SECRET_ACCESS_KEY=mock
       - VCT_TIMEOUT=60

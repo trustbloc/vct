@@ -15,7 +15,6 @@ import (
 	"fmt"
 	"net/http"
 	"reflect"
-	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -89,6 +88,11 @@ const (
 	kmsEndpointFlagName  = "kms-endpoint"
 	kmsEndpointEnvKey    = envPrefix + "KMS_ENDPOINT"
 	kmsEndpointFlagUsage = "KMS URL." +
+		" Alternatively, this can be set with the following environment variable: " + kmsEndpointEnvKey
+
+	kmsRegionFlagName  = "kms-region"
+	kmsRegionEnvKey    = envPrefix + "KMS_REGION"
+	kmsRegionFlagUsage = "KMS region." +
 		" Alternatively, this can be set with the following environment variable: " + kmsEndpointEnvKey
 
 	logSignActiveKeyIDFlagName  = "log-active-key-id"
@@ -231,6 +235,7 @@ type (
 type kmsParameters struct {
 	kmsType            kmsMode
 	kmsEndpoint        string
+	kmsRegion          string
 	logSignActiveKeyID string
 }
 
@@ -581,14 +586,9 @@ func createKMSAndCrypto(parameters *agentParameters, client *http.Client,
 
 		return webkms.New(keystoreURL, client), webcrypto.New(keystoreURL, client), nil
 	case kmsAWS:
-		region, err := getRegion(parameters.kmsParams.logSignActiveKeyID)
-		if err != nil {
-			return nil, nil, err
-		}
-
 		awsSession, err := session.NewSession(&aws.Config{
 			Endpoint:                      &parameters.kmsParams.kmsEndpoint,
-			Region:                        aws.String(region),
+			Region:                        aws.String(parameters.kmsParams.kmsRegion),
 			CredentialsChainVerboseErrors: aws.Bool(true),
 		})
 		if err != nil {
@@ -647,22 +647,6 @@ func (a awsKMSWrapper) HealthCheck() error {
 	return a.service.HealthCheck()
 }
 
-func getRegion(keyURI string) (string, error) {
-	// keyURI must have the following format: 'aws-kms://arn:<partition>:kms:<region>:[:path]'.
-	// See http://docs.aws.amazon.com/general/latest/gr/aws-arns-and-namespaces.html.
-	re1 := regexp.MustCompile(`aws-kms://arn:(aws[a-zA-Z0-9-_]*):kms:([a-z0-9-]+):`)
-
-	r := re1.FindStringSubmatch(keyURI)
-
-	const subStringCount = 3
-
-	if len(r) != subStringCount {
-		return "", fmt.Errorf("extracting region from URI failed")
-	}
-
-	return r[2], nil
-}
-
 func getKmsParameters(cmd *cobra.Command) (*kmsParameters, error) {
 	kmsTypeStr, err := cmdutil.GetUserSetVarFromString(cmd, kmsTypeFlagName, kmsTypeEnvKey, false)
 	if err != nil {
@@ -676,12 +660,15 @@ func getKmsParameters(cmd *cobra.Command) (*kmsParameters, error) {
 	}
 
 	kmsEndpoint := cmdutil.GetUserSetOptionalVarFromString(cmd, kmsEndpointFlagName, kmsEndpointEnvKey)
+	kmsRegion := cmdutil.GetUserSetOptionalVarFromString(cmd, kmsRegionFlagName, kmsRegionEnvKey)
+
 	logSignActiveKeyID := cmdutil.GetUserSetOptionalVarFromString(cmd, logSignActiveKeyIDFlagName,
 		logSignActiveKeyIDEnvKey)
 
 	return &kmsParameters{
 		kmsType:            kmsType,
 		kmsEndpoint:        kmsEndpoint,
+		kmsRegion:          kmsRegion,
 		logSignActiveKeyID: logSignActiveKeyID,
 	}, nil
 }
@@ -1013,6 +1000,7 @@ func createFlags(startCmd *cobra.Command) {
 	startCmd.Flags().String(logSignActiveKeyIDFlagName, "", logSignActiveKeyIDFlagUsage)
 	startCmd.Flags().String(readTokenFlagName, "", readTokenFlagUsage)
 	startCmd.Flags().String(writeTokenFlagName, "", writeTokenFlagUsage)
+	startCmd.Flags().String(kmsRegionFlagName, "", kmsRegionFlagUsage)
 }
 
 func getTLS(cmd *cobra.Command) (*tlsParameters, error) {

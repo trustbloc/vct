@@ -25,7 +25,7 @@ import (
 var (
 	PGConnStr         string
 	pgOnce            sync.Once
-	pgOnceErr         error
+	pgOnceErr         error //nolint: errname
 	pgStorageInstance *pgProvider
 )
 

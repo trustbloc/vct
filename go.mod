@@ -4,7 +4,7 @@
 
 module github.com/trustbloc/vct
 
-go 1.17
+go 1.19
 
 require (
 	github.com/aws/aws-sdk-go v1.42.33
@@ -17,7 +17,7 @@ require (
 	github.com/google/uuid v1.3.0
 	github.com/gorilla/mux v1.8.0
 	github.com/grpc-ecosystem/go-grpc-middleware v1.3.0
-	github.com/hyperledger/aries-framework-go v0.1.9-0.20220819134023-730ac301c3c0
+	github.com/hyperledger/aries-framework-go v0.1.9-0.20220822173318-77fbef728d02
 	github.com/hyperledger/aries-framework-go-ext/component/storage/couchdb v0.0.0-20220428163625-96d8261511e1
 	github.com/hyperledger/aries-framework-go-ext/component/storage/mongodb v0.0.0-20220428163625-96d8261511e1
 	github.com/hyperledger/aries-framework-go-ext/component/storage/postgresql v0.0.0-20220428163625-96d8261511e1
@@ -30,7 +30,7 @@ require (
 	github.com/rs/cors v1.7.0
 	github.com/spf13/cobra v1.3.0
 	github.com/stretchr/testify v1.7.5
-	github.com/trustbloc/kms v0.1.9-0.20220526151939-d46e46e8f7e1
+	github.com/trustbloc/kms v0.1.9-0.20220927102932-412f152996fa
 	go.etcd.io/etcd/client/v3 v3.5.0
 	go.uber.org/zap v1.17.0
 	google.golang.org/grpc v1.44.0
@@ -78,7 +78,6 @@ require (
 	github.com/google/shlex v0.0.0-20191202100458-e7afc7fbc510 // indirect
 	github.com/google/tink/go v1.6.1 // indirect
 	github.com/googleapis/gax-go/v2 v2.1.1 // indirect
-	github.com/hyperledger/aries-framework-go/test/component v0.0.0-20220428211718-66cc046674a1 // indirect
 	github.com/hyperledger/ursa-wrapper-go v0.3.1 // indirect
 	github.com/imdario/mergo v0.3.12 // indirect
 	github.com/inconshreveable/mousetrap v1.0.0 // indirect

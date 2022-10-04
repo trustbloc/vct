@@ -1,7 +1,8 @@
 /*
 Copyright and license information from original project:
 Licence: https://github.com/google/trillian/blob/6127136b153156fc6becb74edd21259fe4260ddc/LICENSE
-Source:  https://github.com/google/trillian/blob/09456fa3331789ba45a5edf1eedb8c1cdc98c3ff/storage/postgres/log_storage.go
+Source:  https://github.com/google/trillian/blob/09456fa3331789ba45a5edf1eedb8c1cdc98c3ff/storage/
+postgres/log_storage.go
 
 Copyright SecureKey Technologies Inc. All Rights Reserved.
 
@@ -600,7 +601,7 @@ func (t *logTreeTX) QueueLeaves(ctx context.Context, leaves []*trillian.LogLeaf,
 	return existingLeaves, nil
 }
 
-// nolint: funlen
+// nolint: funlen,gocognit
 func (t *logTreeTX) AddSequencedLeaves(ctx context.Context, leaves []*trillian.LogLeaf,
 	timestamp time.Time) ([]*trillian.QueuedLogLeaf, error) {
 	res := make([]*trillian.QueuedLogLeaf, len(leaves))

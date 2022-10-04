@@ -17,7 +17,7 @@
 // This package transforms JSON data in UTF-8 according to:
 // https://tools.ietf.org/html/draft-rundgren-json-canonicalization-scheme-02
 
-package jsoncanonicalizer
+package jsoncanonicalizer //nolint: cyclop
 
 import (
 	"container/list"
@@ -34,20 +34,19 @@ type nameValueType struct {
 	value   string
 }
 
-// JSON standard escapes (modulo \u)
+// JSON standard escapes (modulo \u).
 var asciiEscapes = []byte{'\\', '"', 'b', 'f', 'n', 'r', 't'}
 var binaryEscapes = []byte{'\\', '"', '\b', '\f', '\n', '\r', '\t'}
 
-// JSON literals
+// JSON literals.
 var literals = []string{"true", "false", "null"}
 
-func Transform(jsonData []byte) (result []byte, e error) {
-
+func Transform(jsonData []byte) (result []byte, e error) { //nolint: funlen,gocognit,gocyclo,cyclop
 	// JSON data MUST be UTF-8 encoded
-	var jsonDataLength int = len(jsonData)
+	jsonDataLength := len(jsonData)
 
 	// Current pointer in jsonData
-	var index int = 0
+	index := 0
 
 	// "Forward" declarations are needed for closures referring each other
 	var parseElement func() string
@@ -56,7 +55,7 @@ func Transform(jsonData []byte) (result []byte, e error) {
 	var parseObject func() string
 	var parseArray func() string
 
-	var globalError error = nil
+	var globalError error
 
 	checkError := func(e error) {
 		// We only honor the first reported error
@@ -163,12 +162,12 @@ func Transform(jsonData []byte) (result []byte, e error) {
 			if c == '"' {
 				break
 			}
-			if c < ' ' {
+			if c < ' ' { //nolint: gocritic,nestif
 				setError("Unterminated string literal")
 			} else if c == '\\' {
 				// Escape sequence
 				c = nextChar()
-				if c == 'u' {
+				if c == 'u' { //nolint: gocritic
 					// The \u escape
 					firstUTF16 := getUEscape()
 					if utf16.IsSurrogate(firstUTF16) {
@@ -257,7 +256,7 @@ func Transform(jsonData []byte) (result []byte, e error) {
 	parseArray = func() string {
 		var arrayData strings.Builder
 		arrayData.WriteByte('[')
-		var next bool = false
+		next := false
 		for globalError == nil && testNextNonWhiteSpaceChar() != ']' {
 			if next {
 				scanFor(',')
@@ -304,7 +303,7 @@ func Transform(jsonData []byte) (result []byte, e error) {
 
 	parseObject = func() string {
 		nameValueList := list.New()
-		var next bool = false
+		next := false
 	CoreLoop:
 		for globalError == nil && testNextNonWhiteSpaceChar() != '}' {
 			if next {
@@ -346,7 +345,7 @@ func Transform(jsonData []byte) (result []byte, e error) {
 				objectData.WriteByte(',')
 			}
 			next = true
-			nameValue := e.Value.(nameValueType)
+			nameValue := e.Value.(nameValueType) //nolint: errcheck
 			objectData.WriteString(decorateString(nameValue.name))
 			objectData.WriteByte(':')
 			objectData.WriteString(nameValue.value)

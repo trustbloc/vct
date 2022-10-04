@@ -5,21 +5,18 @@ SPDX-License-Identifier: Apache-2.0
 */
 
 // Package main Verifiable Credential Transparency Server.
-//
-//
 // Terms Of Service:
 //
+// Schemes: http
+// Version: 0.1.0
+// License: SPDX-License-Identifier: Apache-2.0
+// Host: localhost:5678
 //
-//     Schemes: http
-//     Version: 0.1.0
-//     License: SPDX-License-Identifier: Apache-2.0
-//     Host: localhost:5678
+// Consumes:
+//   - application/json
 //
-//     Consumes:
-//     - application/json
-//
-//     Produces:
-//     - application/json
+// Produces:
+//   - application/json
 //
 // swagger:meta
 package main
