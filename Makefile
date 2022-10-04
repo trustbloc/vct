@@ -128,10 +128,12 @@ build-log-signer-docker:
 	--build-arg APP_FOLDER=log_signer \
 	--build-arg ALPINE_VER=$(ALPINE_VER)  .
 
+# TODO (#125): frapsoft/openssl only has an amd64 version. While this does work under amd64 and arm64 Mac OS currently,
+#               we should add an arm64 version for systems that can only run arm64 code.
 .PHONY: generate-test-keys
 generate-test-keys:
 	@mkdir -p ./test/bdd/fixtures/vct/keys/tls
-	@docker run -i --rm \
+	@docker run -i --platform linux/amd64 --rm \
 		-v $(abspath .):/opt/workspace/vct \
 		--entrypoint "/opt/workspace/vct/scripts/generate_test_keys.sh" \
 		frapsoft/openssl
