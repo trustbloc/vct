@@ -41,12 +41,12 @@ func main() {
 
 	startCmd, err := startcmd.Cmd(&startcmd.HTTPServer{})
 	if err != nil {
-		logger.Fatalf(err.Error())
+		logger.Fatal("Cannot start server", log.WithError(err))
 	}
 
 	rootCmd.AddCommand(startCmd)
 
 	if err := rootCmd.Execute(); err != nil {
-		logger.Fatalf("failed to run vct: %v", err)
+		logger.Fatal("Failed to run VCT", log.WithError(err))
 	}
 }

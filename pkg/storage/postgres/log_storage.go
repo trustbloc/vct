@@ -31,6 +31,7 @@ import (
 	"github.com/google/trillian/storage/cache"
 	trilliantree "github.com/google/trillian/storage/tree"
 	"github.com/google/trillian/types"
+	"github.com/trustbloc/vct/internal/pkg/log"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/timestamppb"
@@ -517,7 +518,7 @@ func (t *logTreeTX) QueueLeaves(ctx context.Context, leaves []*trillian.LogLeaf,
 			existingCount++
 
 			queuedDupCounter.Inc(label)
-			logger.Warnf("Found duplicate %v %v", t.treeID, leaf)
+			logger.Warn("Found duplicate", log.WithTreeID(t.treeID), log.WithLeaf(leaf))
 
 			continue
 		}

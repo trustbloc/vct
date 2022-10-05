@@ -243,8 +243,9 @@ func (s *Steps) addVC(file string) error {
 
 	s.state.AddedCredentials[file] = resp
 
-	logger.Infof("Successfully verified VC timestamp signature for VC %s - Signature: %s, Timestamp: %d, Public Key: %s",
-		src, resp.Signature, resp.Timestamp, webResp.Properties[command.PublicKeyType])
+	logger.Info("Successfully verified VC timestamp signature", log.WithVerifiableCredential(src),
+		log.WithSignature(resp.Signature), log.WithTimestamp(resp.Timestamp),
+		log.WithPublicKey(webResp.Properties[command.PublicKeyType]))
 
 	return nil
 }

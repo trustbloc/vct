@@ -63,13 +63,13 @@ func main() {
 	flag.Parse()
 
 	if err := storage.RegisterProvider("mem", memory.NewMemoryStorageProvider); err != nil {
-		logger.Errorf(err.Error())
+		logger.Error("Error registering memory storage provider", log.WithError(err))
 	}
 
 	postgres.PGConnStr = *pgConnStr
 
 	if err := storage.RegisterProvider("postgres", postgres.NewPGProvider); err != nil {
-		logger.Errorf(err.Error())
+		logger.Error("Error registering PostGreSQL provider", log.WithError(err))
 	}
 
 	startCMD := startcmd.CMD{
@@ -94,6 +94,6 @@ func main() {
 	}
 
 	if err := startCMD.Start(); err != nil {
-		logger.Fatalf("failed to start log server: %v", err)
+		logger.Fatal("Failed to start log server", log.WithError(err))
 	}
 }

@@ -482,13 +482,13 @@ func createStartCMD(server server) *cobra.Command { //nolint: funlen,gocognit,go
 
 			if starTrillian { //nolint: nestif
 				if err := trillianstorage.RegisterProvider("mem", memory.NewMemoryStorageProvider); err != nil {
-					logger.Errorf(err.Error())
+					logger.Error("Error registering memory storage provider", log.WithError(err))
 				}
 
 				postgres.PGConnStr = trillianDBConnStr
 
 				if err := trillianstorage.RegisterProvider("postgres", postgres.NewPGProvider); err != nil {
-					logger.Errorf(err.Error())
+					logger.Error("Error registering PostGreSQL storage provider", log.WithError(err))
 				}
 
 				go func() {
@@ -717,7 +717,7 @@ func startAgent(parameters *agentParameters) error { //nolint:funlen,gocyclo,cyc
 
 	defer func() {
 		if err = store.Close(); err != nil {
-			logger.Errorf("store close: %v", err)
+			logger.Error("Close store error", log.WithError(err))
 		}
 	}()
 
@@ -861,7 +861,7 @@ func startAgent(parameters *agentParameters) error { //nolint:funlen,gocyclo,cyc
 
 	go startMetrics(parameters, metricsRouter)
 
-	logger.Infof("Starting vct on host [%s]", parameters.host)
+	logger.Info("Starting VCT", log.WithAddress(parameters.host))
 
 	return parameters.server.ListenAndServe( // nolint: wrapcheck
 		parameters.host,
@@ -874,7 +874,8 @@ func startAgent(parameters *agentParameters) error { //nolint:funlen,gocyclo,cyc
 func startMetrics(parameters *agentParameters, route *mux.Router) {
 	err := parameters.server.ListenAndServe(parameters.metricsHost, route, "", "")
 	if err != nil {
-		logger.Fatalf("%v", err)
+		logger.Fatal("Error starting metrics service",
+			log.WithAddress(parameters.metricsHost), log.WithError(err))
 	}
 }
 
@@ -914,7 +915,8 @@ func createTreeAndInit(conn *grpc.ClientConn, cfg storage.Store, alias string, t
 
 			return err // nolint: wrapcheck
 		}, backoff.WithMaxRetries(backoff.NewConstantBackOff(time.Second), timeout), func(err error, duration time.Duration) {
-			logger.Warnf("create tree failed, will sleep for %v before trying again: %v", duration, err)
+			logger.Warn("Create tree failed, will sleep a while before trying again",
+				log.WithBackoff(duration), log.WithError(err))
 		})
 
 		if err != nil {
@@ -1064,7 +1066,8 @@ func createStoreProvider(dbURL, prefix string, timeout uint64) (storeProvider, e
 		backoff.NewConstantBackOff(time.Second),
 		timeout,
 	), func(retryErr error, t time.Duration) {
-		logger.Warnf("failed to connect to storage, will sleep for %s before trying again : %v", t, retryErr)
+		logger.Warn("Failed to connect to storage, will sleep a while before trying again",
+			log.WithBackoff(t), log.WithError(retryErr))
 	})
 }
 

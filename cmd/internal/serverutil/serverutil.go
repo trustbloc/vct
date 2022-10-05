@@ -118,7 +118,7 @@ func (m *Main) Run(ctx context.Context) error { // nolint: funlen
 
 	srv, err := m.newGRPCServer()
 	if err != nil {
-		logger.Fatalf("Error creating gRPC server: %v", err)
+		logger.Fatal("Error creating gRPC server", log.WithError(err))
 	}
 
 	defer srv.GracefulStop()
@@ -138,7 +138,7 @@ func (m *Main) Run(ctx context.Context) error { // nolint: funlen
 		http.HandleFunc("/healthz", m.healthz)
 
 		go func() {
-			logger.Infof("HTTP server starting on %v", endpoint)
+			logger.Info("HTTP server starting", log.WithAddress(endpoint))
 
 			// Let http.ListenAndServeTLS handle the error case when only one of the flags is set.
 			if m.TLSCertFile != "" || m.TLSKeyFile != "" {
@@ -148,12 +148,12 @@ func (m *Main) Run(ctx context.Context) error { // nolint: funlen
 			}
 
 			if err != nil {
-				logger.Errorf("HTTP server stopped: %v", err)
+				logger.Error("HTTP server stopped", log.WithError(err))
 			}
 		}()
 	}
 
-	logger.Infof("RPC server starting on %v", m.RPCEndpoint)
+	logger.Info("RPC server starting", log.WithServiceEndpoint(m.RPCEndpoint))
 
 	lis, err := net.Listen("tcp", m.RPCEndpoint)
 	if err != nil {
@@ -164,7 +164,7 @@ func (m *Main) Run(ctx context.Context) error { // nolint: funlen
 
 	if m.TreeGCEnabled {
 		go func() {
-			logger.Infof("Deleted tree GC started")
+			logger.Info("Deleted tree GC started")
 
 			gc := admin.NewDeletedTreeGC(
 				m.Registry.AdminStorage,
@@ -176,10 +176,10 @@ func (m *Main) Run(ctx context.Context) error { // nolint: funlen
 	}
 
 	if err := srv.Serve(lis); err != nil {
-		logger.Errorf("RPC server terminated: %v", err)
+		logger.Error("RPC server terminated", log.WithError(err))
 	}
 
-	logger.Infof("Stopping server, about to exit")
+	logger.Info("Stopping server, about to exit")
 
 	// Give things a few seconds to tidy up
 	time.Sleep(time.Second * 5) // nolint: gomnd
@@ -227,23 +227,23 @@ func AnnounceSelf(ctx context.Context, client *clientv3.Client, etcdService, end
 	// Get a lease so our entry self-destructs.
 	leaseRsp, err := client.Grant(ctx, 30)
 	if err != nil {
-		logger.Fatalf("Failed to get lease from etcd: %v", err)
+		logger.Fatal("Failed to get lease from etcd", log.WithError(err))
 	}
 
 	client.KeepAlive(ctx, leaseRsp.ID) // nolint: errcheck, gosec
 
 	em, err := endpoints.NewManager(client, etcdService)
 	if err != nil {
-		logger.Fatalf("Failed to create etcd manager: %v", err)
+		logger.Fatal("Failed to create etcd manager", log.WithError(err))
 	}
 
 	fullEndpoint := fmt.Sprintf("%s/%s", etcdService, endpoint)
 	em.AddEndpoint(ctx, fullEndpoint, endpoints.Endpoint{Addr: endpoint}) // nolint: errcheck, gosec
-	logger.Infof("Announcing our presence in %v", etcdService)
+	logger.Info("Announcing our presence", log.WithServiceEndpoint(etcdService))
 
 	return func() {
 		// Use a background context because the original context may have been cancelled.
-		logger.Infof("Removing our presence in %v", etcdService)
+		logger.Info("Removing our presence", log.WithServiceEndpoint(etcdService))
 
 		ctx := context.Background()
 		em.DeleteEndpoint(ctx, fullEndpoint) // nolint: errcheck, gosec

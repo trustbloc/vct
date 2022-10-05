@@ -57,7 +57,7 @@ func NewPGProvider(mf monitoring.MetricFactory) (storage.Provider, error) {
 }
 
 func (s *pgProvider) LogStorage() storage.LogStorage {
-	logger.Warnf("Support for the PostgreSQL log is experimental.  Please use at your own risk!!!")
+	logger.Warn("Support for the PostgreSQL log is experimental.  Please use at your own risk!!!")
 
 	return NewLogStorage(s.db, s.mf)
 }
