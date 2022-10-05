@@ -157,7 +157,7 @@ func loadSystemCertPool(useSystemCertPool bool) (*x509.CertPool, error) {
 		return nil, err
 	}
 
-	logger.Debugf("Loaded system cert pool of size: %d", len(systemCertPool.Subjects()))
+	logger.Debug("Loaded system cert pool", log.WithSize(len(systemCertPool.Subjects())))
 
 	return systemCertPool, nil
 }

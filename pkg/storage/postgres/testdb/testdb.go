@@ -83,7 +83,7 @@ func newEmptyDB(ctx context.Context) (*sql.DB, func(context.Context), error) {
 
 		db, err = sql.Open("postgres", getConnStr("test"))
 		if _, err := db.ExecContext(ctx, fmt.Sprintf("DROP DATABASE %v  WITH (FORCE);", name)); err != nil {
-			logger.Warnf("Failed to drop test database %q: %v", name, err)
+			logger.Warn("Failed to drop test database", log.WithStore(name), log.WithError(err))
 		}
 
 		db.Close() // nolint: errcheck, gosec

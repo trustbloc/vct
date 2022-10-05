@@ -315,7 +315,7 @@ func (c *Operation) HealthCheck(rw http.ResponseWriter, _ *http.Request) {
 		Version:     BuildVersion,
 	})
 	if err != nil {
-		logger.Errorf("healthcheck response failure, %s", err)
+		logger.Error("Healthcheck response failure", log.WithError(err))
 	}
 }
 
@@ -571,6 +571,6 @@ func sendError(rw http.ResponseWriter, e error) {
 	rw.WriteHeader(errors.StatusCodeFromError(e))
 
 	if err := json.NewEncoder(rw).Encode(ErrorResponse{Message: e.Error()}); err != nil {
-		logger.Errorf("send error response: %v", e)
+		log.WriteResponseBodyError(logger, e)
 	}
 }

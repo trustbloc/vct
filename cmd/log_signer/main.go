@@ -22,7 +22,7 @@ import (
 	"github.com/google/trillian/storage"
 
 	"github.com/trustbloc/vct/cmd/log_signer/startcmd"
-	logging "github.com/trustbloc/vct/internal/pkg/log"
+	logs "github.com/trustbloc/vct/internal/pkg/log"
 	"github.com/trustbloc/vct/pkg/storage/memory"
 	"github.com/trustbloc/vct/pkg/storage/postgres"
 )
@@ -65,19 +65,19 @@ var (
 	pgConnStr  = flag.String("pg_conn_str", "user=postgres dbname=test sslmode=disable", "Connection string for Postgres database")
 )
 
-var logger = logging.New("log-signer")
+var logger = logs.New("log-signer")
 
 func main() {
 	flag.Parse()
 
 	if err := storage.RegisterProvider("mem", memory.NewMemoryStorageProvider); err != nil {
-		logger.Errorf(err.Error())
+		logger.Error("Error registering memory storage provider", logs.WithError(err))
 	}
 
 	postgres.PGConnStr = *pgConnStr
 
 	if err := storage.RegisterProvider("postgres", postgres.NewPGProvider); err != nil {
-		logger.Errorf(err.Error())
+		logger.Error("Error registering PostGreSQL storage provider", logs.WithError(err))
 	}
 
 	startCMD := startcmd.CMD{
@@ -104,6 +104,6 @@ func main() {
 	}
 
 	if err := startCMD.Start(); err != nil {
-		logger.Fatalf("failed to start log signer: %v", err)
+		logger.Fatal("failed to start log signer", logs.WithError(err))
 	}
 }
