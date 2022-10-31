@@ -15,6 +15,7 @@ import (
 	"fmt"
 	"net/http"
 	"reflect"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -586,9 +587,20 @@ func createKMSAndCrypto(parameters *agentParameters, client *http.Client,
 
 		return webkms.New(keystoreURL, client), webcrypto.New(keystoreURL, client), nil
 	case kmsAWS:
+		region := parameters.kmsParams.kmsRegion
+
+		if strings.Contains(parameters.kmsParams.logSignActiveKeyID, "arn") {
+			var err error
+
+			region, err = getRegion(parameters.kmsParams.logSignActiveKeyID)
+			if err != nil {
+				return nil, nil, err
+			}
+		}
+
 		awsSession, err := session.NewSession(&aws.Config{
 			Endpoint:                      &parameters.kmsParams.kmsEndpoint,
-			Region:                        aws.String(parameters.kmsParams.kmsRegion),
+			Region:                        aws.String(region),
 			CredentialsChainVerboseErrors: aws.Bool(true),
 		})
 		if err != nil {
@@ -1200,6 +1212,22 @@ func authorizationMiddleware(readToken, writeToken string) mux.MiddlewareFunc {
 	}
 
 	return middleware
+}
+
+func getRegion(keyURI string) (string, error) {
+	// keyURI must have the following format: 'aws-kms://arn:<partition>:kms:<region>:[:path]'.
+	// See http://docs.aws.amazon.com/general/latest/gr/aws-arns-and-namespaces.html.
+	re1 := regexp.MustCompile(`aws-kms://arn:(aws[a-zA-Z0-9-_]*):kms:([a-z0-9-]+):`)
+
+	r := re1.FindStringSubmatch(keyURI)
+
+	const subStringCount = 3
+
+	if len(r) != subStringCount {
+		return "", fmt.Errorf("extracting region from URI failed")
+	}
+
+	return r[2], nil
 }
 
 // AWSMetricsProvider aws metrics provider.
