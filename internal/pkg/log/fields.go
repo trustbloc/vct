@@ -17,7 +17,6 @@ import (
 const (
 	FieldServiceName          = "service"
 	FieldSize                 = "size"
-	FieldAddress              = "address"
 	FieldBackoff              = "backoff"
 	FieldServiceEndpoint      = "serviceEndpoint"
 	FieldTreeID               = "treeID"
@@ -30,11 +29,6 @@ const (
 	FieldPublicKey            = "publicKey"
 )
 
-// WithError sets the error field.
-func WithError(err error) zap.Field {
-	return zap.Error(err)
-}
-
 // WithServiceName sets the service field.
 func WithServiceName(value string) zap.Field {
 	return zap.String(FieldServiceName, value)
@@ -43,11 +37,6 @@ func WithServiceName(value string) zap.Field {
 // WithSize sets the size field.
 func WithSize(value int) zap.Field {
 	return zap.Int(FieldSize, value)
-}
-
-// WithAddress sets the address field.
-func WithAddress(value string) zap.Field {
-	return zap.String(FieldAddress, value)
 }
 
 // WithBackoff sets the backoff field.

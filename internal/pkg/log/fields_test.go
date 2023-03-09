@@ -7,13 +7,14 @@ SPDX-License-Identifier: Apache-2.0
 package log
 
 import (
+	"bytes"
 	"encoding/json"
-	"errors"
 	"net/url"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/require"
+	"github.com/trustbloc/logutil-go/pkg/log"
 )
 
 func TestStandardFields(t *testing.T) {
@@ -21,49 +22,16 @@ func TestStandardFields(t *testing.T) {
 
 	u1 := parseURL(t, "https://example1.com")
 
-	t.Run("console error", func(t *testing.T) {
-		stdErr := newMockWriter()
-
-		logger := New(module,
-			WithStdErr(stdErr),
-			WithFields(WithServiceName("myservice")),
-		)
-
-		logger.Error("Sample error", WithError(errors.New("some error")))
-
-		require.Contains(t, stdErr.Buffer.String(), `Sample error	{"service": "myservice", "error": "some error"}`)
-	})
-
-	t.Run("json error", func(t *testing.T) {
-		stdErr := newMockWriter()
-
-		logger := New(module,
-			WithStdErr(stdErr), WithEncoding(JSON),
-			WithFields(WithServiceName("myservice")),
-		)
-
-		logger.Error("Sample error", WithError(errors.New("some error")))
-
-		l := unmarshalLogData(t, stdErr.Bytes())
-
-		require.Equal(t, "myservice", l.Service)
-		require.Equal(t, "test_module", l.Logger)
-		require.Equal(t, "Sample error", l.Msg)
-		require.Contains(t, l.Caller, "log/fields_test.go")
-		require.Equal(t, "some error", l.Error)
-		require.Equal(t, "error", l.Level)
-	})
-
 	t.Run("json fields", func(t *testing.T) {
 		leaf := &mockObject{Field1: "leaf1", Field2: 32123}
 		pubKey := &mockObject{Field1: "key1", Field2: 32432}
 
 		stdOut := newMockWriter()
 
-		logger := New(module, WithStdOut(stdOut), WithEncoding(JSON))
+		logger := log.New(module, log.WithStdOut(stdOut), log.WithEncoding(log.JSON))
 
 		logger.Info("Some message",
-			WithServiceName("service1"), WithSize(1234), WithAddress(u1.String()),
+			WithServiceName("service1"), WithSize(1234),
 			WithBackoff(time.Minute), WithServiceEndpoint(u1.String()), WithTreeID(1234),
 			WithLeaf(leaf), WithStore("store1"), WithCommand("doit"),
 			WithVerifiableCredential([]byte(`"id":"vc1"`)), WithSignature([]byte("my signature")),
@@ -76,7 +44,6 @@ func TestStandardFields(t *testing.T) {
 		require.Equal(t, `Some message`, l.Msg)
 		require.Equal(t, `service1`, l.Service)
 		require.Equal(t, 1234, l.Size)
-		require.Equal(t, u1.String(), l.Address)
 		require.Equal(t, "1m0s", l.Backoff)
 		require.Equal(t, u1.String(), l.ServiceEndpoint)
 		require.Equal(t, 1234, l.TreeID)
@@ -105,7 +72,6 @@ type logData struct {
 
 	Service              string      `json:"service"`
 	Size                 int         `json:"size"`
-	Address              string      `json:"address"`
 	Backoff              string      `json:"backoff"`
 	ServiceEndpoint      string      `json:"serviceEndpoint"`
 	TreeID               int         `json:"treeID"`
@@ -135,4 +101,16 @@ func parseURL(t *testing.T, raw string) *url.URL {
 	require.NoError(t, err)
 
 	return u
+}
+
+type mockWriter struct {
+	*bytes.Buffer
+}
+
+func (m *mockWriter) Sync() error {
+	return nil
+}
+
+func newMockWriter() *mockWriter {
+	return &mockWriter{Buffer: bytes.NewBuffer(nil)}
 }

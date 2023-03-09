@@ -20,8 +20,8 @@ import (
 	"github.com/gorilla/mux"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
+	"github.com/trustbloc/logutil-go/pkg/log"
 
-	"github.com/trustbloc/vct/internal/pkg/log"
 	"github.com/trustbloc/vct/pkg/controller/command"
 	"github.com/trustbloc/vct/pkg/controller/errors"
 )

@@ -7,7 +7,7 @@ SPDX-License-Identifier: Apache-2.0
 package log
 
 import (
-	"github.com/trustbloc/vct/internal/pkg/log"
+	"github.com/trustbloc/logutil-go/pkg/log"
 )
 
 // SetLevel sets the log level for given module and level.

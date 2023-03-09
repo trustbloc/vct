@@ -31,10 +31,11 @@ import (
 	"github.com/google/trillian/storage/cache"
 	trilliantree "github.com/google/trillian/storage/tree"
 	"github.com/google/trillian/types"
-	"github.com/trustbloc/vct/internal/pkg/log"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/timestamppb"
+
+	logfields "github.com/trustbloc/vct/internal/pkg/log"
 )
 
 // nolint: lll
@@ -518,7 +519,7 @@ func (t *logTreeTX) QueueLeaves(ctx context.Context, leaves []*trillian.LogLeaf,
 			existingCount++
 
 			queuedDupCounter.Inc(label)
-			logger.Warn("Found duplicate", log.WithTreeID(t.treeID), log.WithLeaf(leaf))
+			logger.Warn("Found duplicate", logfields.WithTreeID(t.treeID), logfields.WithLeaf(leaf))
 
 			continue
 		}
@@ -819,9 +820,11 @@ func (t *logTreeTX) StoreSignedLogRoot(ctx context.Context, root *trillian.Signe
 	if len(logRoot.Metadata) != 0 {
 		return fmt.Errorf("unimplemented: postgres storage does not support log root metadata")
 	}
+
 	// get a json copy of the tree_head
 	data, _ := json.Marshal(logRoot) // nolint: errcheck
-	t.tx.ExecContext(                // nolint: errcheck,gosec
+
+	t.tx.ExecContext( // nolint: errcheck,gosec
 		ctx,
 		"update trees set current_tree_data = $1,root_signature = $2 where tree_id = $3",
 		data,

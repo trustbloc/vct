@@ -20,9 +20,9 @@ import (
 	"github.com/google/trillian/log"
 	"github.com/google/trillian/quota"
 	"github.com/google/trillian/storage"
+	logs "github.com/trustbloc/logutil-go/pkg/log"
 
 	"github.com/trustbloc/vct/cmd/log_signer/startcmd"
-	logs "github.com/trustbloc/vct/internal/pkg/log"
 	"github.com/trustbloc/vct/pkg/storage/memory"
 	"github.com/trustbloc/vct/pkg/storage/postgres"
 )

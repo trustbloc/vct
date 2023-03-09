@@ -12,7 +12,7 @@ require (
 	github.com/cucumber/godog v0.9.0
 	github.com/golang/mock v1.6.0
 	github.com/golang/protobuf v1.5.2
-	github.com/google/go-cmp v0.5.7
+	github.com/google/go-cmp v0.5.9
 	github.com/google/trillian v1.3.14-0.20210520152752-ceda464a95a3
 	github.com/google/uuid v1.3.0
 	github.com/gorilla/mux v1.8.0
@@ -31,8 +31,9 @@ require (
 	github.com/spf13/cobra v1.3.0
 	github.com/stretchr/testify v1.8.1
 	github.com/trustbloc/kms v0.1.9-0.20221024131747-f895f91207f1
+	github.com/trustbloc/logutil-go v1.0.0-rc1
 	go.etcd.io/etcd/client/v3 v3.5.0
-	go.uber.org/zap v1.17.0
+	go.uber.org/zap v1.23.0
 	google.golang.org/grpc v1.44.0
 	google.golang.org/protobuf v1.28.1
 )
@@ -131,6 +132,8 @@ require (
 	go.etcd.io/etcd/client/pkg/v3 v3.5.1 // indirect
 	go.mongodb.org/mongo-driver v1.8.0 // indirect
 	go.opencensus.io v0.23.0 // indirect
+	go.opentelemetry.io/otel v1.12.0 // indirect
+	go.opentelemetry.io/otel/trace v1.12.0 // indirect
 	go.uber.org/atomic v1.9.0 // indirect
 	go.uber.org/multierr v1.6.0 // indirect
 	golang.org/x/crypto v0.1.0 // indirect
