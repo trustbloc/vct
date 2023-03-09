@@ -36,7 +36,9 @@ import (
 	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/reflection"
 
-	"github.com/trustbloc/vct/internal/pkg/log"
+	"github.com/trustbloc/logutil-go/pkg/log"
+
+	logfields "github.com/trustbloc/vct/internal/pkg/log"
 )
 
 var logger = log.New("internal/serverutil")
@@ -153,7 +155,7 @@ func (m *Main) Run(ctx context.Context) error { // nolint: funlen
 		}()
 	}
 
-	logger.Info("RPC server starting", log.WithServiceEndpoint(m.RPCEndpoint))
+	logger.Info("RPC server starting", logfields.WithServiceEndpoint(m.RPCEndpoint))
 
 	lis, err := net.Listen("tcp", m.RPCEndpoint)
 	if err != nil {
@@ -239,11 +241,11 @@ func AnnounceSelf(ctx context.Context, client *clientv3.Client, etcdService, end
 
 	fullEndpoint := fmt.Sprintf("%s/%s", etcdService, endpoint)
 	em.AddEndpoint(ctx, fullEndpoint, endpoints.Endpoint{Addr: endpoint}) // nolint: errcheck, gosec
-	logger.Info("Announcing our presence", log.WithServiceEndpoint(etcdService))
+	logger.Info("Announcing our presence", logfields.WithServiceEndpoint(etcdService))
 
 	return func() {
 		// Use a background context because the original context may have been cancelled.
-		logger.Info("Removing our presence", log.WithServiceEndpoint(etcdService))
+		logger.Info("Removing our presence", logfields.WithServiceEndpoint(etcdService))
 
 		ctx := context.Background()
 		em.DeleteEndpoint(ctx, fullEndpoint) // nolint: errcheck, gosec

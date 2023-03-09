@@ -55,6 +55,7 @@ import (
 	"github.com/rs/cors"
 	"github.com/spf13/cobra"
 	awssvc "github.com/trustbloc/kms/pkg/aws"
+	"github.com/trustbloc/logutil-go/pkg/log"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/protobuf/types/known/durationpb"
@@ -64,7 +65,7 @@ import (
 	logsignerstart "github.com/trustbloc/vct/cmd/log_signer/startcmd"
 	"github.com/trustbloc/vct/internal/pkg/cmdutil"
 	"github.com/trustbloc/vct/internal/pkg/ldcontext"
-	"github.com/trustbloc/vct/internal/pkg/log"
+	logfields "github.com/trustbloc/vct/internal/pkg/log"
 	"github.com/trustbloc/vct/internal/pkg/tlsutil"
 	"github.com/trustbloc/vct/pkg/controller/command"
 	"github.com/trustbloc/vct/pkg/controller/rest"
@@ -928,7 +929,7 @@ func createTreeAndInit(conn *grpc.ClientConn, cfg storage.Store, alias string, t
 			return err // nolint: wrapcheck
 		}, backoff.WithMaxRetries(backoff.NewConstantBackOff(time.Second), timeout), func(err error, duration time.Duration) {
 			logger.Warn("Create tree failed, will sleep a while before trying again",
-				log.WithBackoff(duration), log.WithError(err))
+				logfields.WithBackoff(duration), log.WithError(err))
 		})
 
 		if err != nil {
@@ -1079,7 +1080,7 @@ func createStoreProvider(dbURL, prefix string, timeout uint64) (storeProvider, e
 		timeout,
 	), func(retryErr error, t time.Duration) {
 		logger.Warn("Failed to connect to storage, will sleep a while before trying again",
-			log.WithBackoff(t), log.WithError(retryErr))
+			logfields.WithBackoff(t), log.WithError(retryErr))
 	})
 }
 

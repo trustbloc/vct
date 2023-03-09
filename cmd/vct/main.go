@@ -23,9 +23,9 @@ package main
 
 import (
 	"github.com/spf13/cobra"
+	"github.com/trustbloc/logutil-go/pkg/log"
 
 	"github.com/trustbloc/vct/cmd/vct/startcmd"
-	"github.com/trustbloc/vct/internal/pkg/log"
 )
 
 var logger = log.New("vct")

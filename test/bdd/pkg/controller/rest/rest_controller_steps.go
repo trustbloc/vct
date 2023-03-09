@@ -25,9 +25,10 @@ import (
 	"github.com/hyperledger/aries-framework-go/pkg/doc/ld"
 	"github.com/hyperledger/aries-framework-go/pkg/doc/ldcontext"
 	ldstore "github.com/hyperledger/aries-framework-go/pkg/store/ld"
+	"github.com/trustbloc/logutil-go/pkg/log"
 
 	vcldcontext "github.com/trustbloc/vct/internal/pkg/ldcontext"
-	"github.com/trustbloc/vct/internal/pkg/log"
+	logfields "github.com/trustbloc/vct/internal/pkg/log"
 	"github.com/trustbloc/vct/pkg/client/vct"
 	"github.com/trustbloc/vct/pkg/controller/command"
 )
@@ -243,9 +244,9 @@ func (s *Steps) addVC(file string) error {
 
 	s.state.AddedCredentials[file] = resp
 
-	logger.Info("Successfully verified VC timestamp signature", log.WithVerifiableCredential(src),
-		log.WithSignature(resp.Signature), log.WithTimestamp(resp.Timestamp),
-		log.WithPublicKey(webResp.Properties[command.PublicKeyType]))
+	logger.Info("Successfully verified VC timestamp signature", logfields.WithVerifiableCredential(src),
+		logfields.WithSignature(resp.Signature), logfields.WithTimestamp(resp.Timestamp),
+		logfields.WithPublicKey(webResp.Properties[command.PublicKeyType]))
 
 	return nil
 }

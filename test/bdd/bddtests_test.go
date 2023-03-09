@@ -15,8 +15,9 @@ import (
 	"time"
 
 	"github.com/cucumber/godog"
+	"github.com/trustbloc/logutil-go/pkg/log"
 
-	"github.com/trustbloc/vct/internal/pkg/log"
+	logfields "github.com/trustbloc/vct/internal/pkg/log"
 	"github.com/trustbloc/vct/test/bdd/pkg/controller/rest"
 )
 
@@ -66,18 +67,18 @@ var (
 func runBddTests(tags, format string) int {
 	return godog.RunWithOptions("godogs", func(s *godog.Suite) {
 		s.BeforeSuite(func() {
-			logger.Info("Running command", log.WithCommand(strings.Join(dockerComposeUp, " ")))
+			logger.Info("Running command", logfields.WithCommand(strings.Join(dockerComposeUp, " ")))
 
 			if err := exec.Command(dockerComposeUp[0], dockerComposeUp[1:]...).Run(); err != nil { //nolint: gosec
-				logger.Error("Command", log.WithCommand(strings.Join(dockerComposeUp, " ")),
+				logger.Error("Command", logfields.WithCommand(strings.Join(dockerComposeUp, " ")),
 					log.WithError(err))
 			}
 		})
 		s.AfterSuite(func() {
-			logger.Info("Running command", log.WithCommand(strings.Join(dockerComposeDown, " ")))
+			logger.Info("Running command", logfields.WithCommand(strings.Join(dockerComposeDown, " ")))
 
 			if err := exec.Command(dockerComposeDown[0], dockerComposeDown[1:]...).Run(); err != nil { //nolint: gosec
-				logger.Error("Command failed", log.WithCommand(strings.Join(dockerComposeDown, " ")),
+				logger.Error("Command failed", logfields.WithCommand(strings.Join(dockerComposeDown, " ")),
 					log.WithError(err))
 			}
 		})

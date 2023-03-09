@@ -24,8 +24,9 @@ import (
 	"time"
 
 	"github.com/google/trillian/testonly"
+	"github.com/trustbloc/logutil-go/pkg/log"
 
-	"github.com/trustbloc/vct/internal/pkg/log"
+	logfields "github.com/trustbloc/vct/internal/pkg/log"
 )
 
 var logger = log.New("storage/testdb")
@@ -83,7 +84,7 @@ func newEmptyDB(ctx context.Context) (*sql.DB, func(context.Context), error) {
 
 		db, err = sql.Open("postgres", getConnStr("test"))
 		if _, err := db.ExecContext(ctx, fmt.Sprintf("DROP DATABASE %v  WITH (FORCE);", name)); err != nil {
-			logger.Warn("Failed to drop test database", log.WithStore(name), log.WithError(err))
+			logger.Warn("Failed to drop test database", logfields.WithStore(name), log.WithError(err))
 		}
 
 		db.Close() // nolint: errcheck, gosec
