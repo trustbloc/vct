@@ -38,7 +38,7 @@ func TestStandardFields(t *testing.T) {
 			WithTimestamp(321232), WithPublicKey(pubKey),
 		)
 
-		t.Logf(stdOut.String())
+		t.Logf("%s", stdOut.String())
 		l := unmarshalLogData(t, stdOut.Bytes())
 
 		require.Equal(t, `Some message`, l.Msg)
