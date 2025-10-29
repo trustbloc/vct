@@ -10,6 +10,7 @@ SWAGGER_DIR		="./test/bdd/fixtures/vct/specs"
 SWAGGER_OUTPUT	=$(SWAGGER_DIR)"/openAPI.yml"
 PROJECT_ROOT 	=github.com/trustbloc/vct
 
+
 DOCKER_OUTPUT_NS 	?=ghcr.io
 VCT_IMAGE_NAME 		?=trustbloc/vct
 LOG_SERVER_IMAGE_NAME ?=trustbloc/vct-log-server
