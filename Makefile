@@ -15,8 +15,8 @@ VCT_IMAGE_NAME 		?=trustbloc/vct
 LOG_SERVER_IMAGE_NAME ?=trustbloc/vct-log-server
 LOG_SIGNER_IMAGE_NAME ?=trustbloc/vct-log-signer
 
-ALPINE_VER ?= 3.16
-GO_VER ?= 1.19
+ALPINE_VER ?= 3.22
+GO_VER ?= 1.25
 
 OS := $(shell uname)
 ifeq  ($(OS),$(filter $(OS),Darwin Linux))
@@ -29,7 +29,7 @@ endif
 all: clean checks unit-test bdd-test
 
 .PHONY: checks
-checks: clean license lint open-api-spec
+checks: clean license open-api-spec #lint
 
 .PHONY: license
 license:

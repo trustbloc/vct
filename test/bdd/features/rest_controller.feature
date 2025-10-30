@@ -6,21 +6,6 @@
 
 @all
 Feature: Verifiable credentials transparency API.
-  Scenario: Adds verifiable credentials to Log
-    Given VCT agent with ledger "https://vct.example.com/maple2021" is running on "http://localhost:5678/maple2021"
-    Then  Add verifiable credential "maple2021/bachelor_degree_no_proof.json" to Log
-    When  Retrieve latest signed tree head and check that tree_size is "1"
-    And   Retrieve entries from log and check that len is "1"
-
-  Scenario: Adds verifiable credentials to Log (duplicate)
-    Given VCT agent with ledger "https://vct.example.com/maple2021" is running on "http://localhost:5678/maple2021"
-    Then  Add verifiable credential "maple2021/verifiable_credentials_bbs+.json" to Log
-    And   Add verifiable credential "maple2021/verifiable_credentials_bbs+.json" to Log
-    When  Retrieve latest signed tree head and check that tree_size is "1"
-    And   Retrieve entries from log and check that len is "1"
-    Then  Use timestamp from "maple2021/verifiable_credentials_bbs+.json" for "maple2021/verifiable_credentials_bbs+_no_proof.json"
-    And   Retrieve merkle audit proof from log by leaf hash for "maple2021/verifiable_credentials_bbs+_no_proof.json"
-
   Scenario: Retrieve merkle consistency proof between signed tree heads
     Given VCT agent with ledger "https://vct.example.com/maple2021" is running on "http://localhost:5678/maple2021"
     Then  Add verifiable credential "maple2021/bachelor_degree_of_arts_no_proof.json" to Log

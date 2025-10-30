@@ -26,10 +26,10 @@ jobs:
           icacls C:\Windows\System32\bash.exe /grant administrators:F
           ren C:\Windows\System32\bash.exe wsl-bash.exe
 
-      - name: Setup Go 1.19
-        uses: actions/setup-go@v2
+      - name: Setup Go 1.25
+        uses: actions/setup-go@v6.0.0
         with:
-          go-version: 1.19
+          go-version: 1.25
         id: go
 
       - uses: actions/checkout@v2
@@ -41,7 +41,7 @@ jobs:
       - name: Upload coverage to Codecov
         timeout-minutes: 10
         if: matrix.os == 'ubuntu-latest' && github.repository == 'trustbloc/vct'
-        uses: codecov/codecov-action@v1.3.1
+        uses: codecov/codecov-action@v5.5.1
         with:
           file: ./coverage.out
 
@@ -50,10 +50,10 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
-      - name: Setup Go 1.19
-        uses: actions/setup-go@v2
+      - name: Setup Go 1.25
+        uses: actions/setup-go@v6.0.0
         with:
-          go-version: 1.19
+          go-version: 1.25
         id: go
 
       - uses: actions/checkout@v2
@@ -65,14 +65,14 @@ jobs:
   checks:
     name: Checks
     timeout-minutes: 10
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     steps:
-      - name: Setup Go 1.19
-        uses: actions/setup-go@v2
+      - name: Setup Go 1.25
+        uses: actions/setup-go@v6.0.0
         with:
-          go-version: 1.19
+          go-version: 1.25
 
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v5.0.0
 
       - name: Run checks
         timeout-minutes: 10
@@ -85,7 +85,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v5.0.0
         with: { fetch-depth: 0 }
 
       - name: Get current published version
@@ -113,27 +113,27 @@ jobs:
           echo "IMAGE_PREFIX_LOG_SIGNER"=ghcr.io/trustbloc-cicd/vct-log-signer >> $GITHUB_ENV
 
       - name: Set up QEMU
-        uses: docker/setup-qemu-action@v1
+        uses: docker/setup-qemu-action@v3
 
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v1
+        uses: docker/setup-buildx-action@v3
 
       - name: Login to Github Container Registry
-        uses: docker/login-action@v1
+        uses: docker/login-action@v3
         with:
           registry: ghcr.io
           username: ${{ secrets.CR_USER }}
           password: ${{ secrets.CR_PAT }}
 
       - name: Build and Push container images (vct)
-        uses: docker/build-push-action@v2
+        uses: docker/build-push-action@v6
         with:
           context: .
           file: ./images/vct/Dockerfile
           platforms: linux/amd64,linux/arm64
           build-args: |
-            ALPINE_VER=3.15
-            GO_VER=1.19
+            ALPINE_VER=3.22
+            GO_VER=1.25
             APP_FOLDER=vct
             GO_LDFLAGS=-X 'github.com/trustbloc/orb/pkg/httpserver.BuildVersion=${{ env.IMAGE_TAG }}'
           push: true
@@ -142,14 +142,14 @@ jobs:
             ${{ env.IMAGE_PREFIX_VCT }}:latest
 
       - name: Build and Push container images (log-server)
-        uses: docker/build-push-action@v2
+        uses: docker/build-push-action@v6
         with:
           context: .
           file: ./images/vct/Dockerfile
           platforms: linux/amd64,linux/arm64
           build-args: |
-            ALPINE_VER=3.15
-            GO_VER=1.19
+            ALPINE_VER=3.22
+            GO_VER=1.25
             APP_FOLDER=log_server
           push: true
           tags: |
@@ -157,14 +157,14 @@ jobs:
             ${{ env.IMAGE_PREFIX_LOG_SERVER }}:latest
 
       - name: Build and Push container images (log-signer)
-        uses: docker/build-push-action@v2
+        uses: docker/build-push-action@v6
         with:
           context: .
           file: ./images/vct/Dockerfile
           platforms: linux/amd64,linux/arm64
           build-args: |
-            ALPINE_VER=3.15
-            GO_VER=1.19
+            ALPINE_VER=3.22
+            GO_VER=1.25
             APP_FOLDER=log_signer
           push: true
           tags: |
